@@ -1,10 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-
-const icons: Record<string,string> = {
-  Bergamot:"bergamot", Mandarin:"mandarin", Grapefruit:"grapefruit", Fig:"fig", Peony:"peony", Neroli:"neroli", Cedarwood:"cedarwood", "White Musk":"white-musk", Sandalwood:"sandalwood"
-}
+import { AtelierFlask } from "./AtelierVisuals"
 
 /** Gesture-controlled 2D blending. No motion permission is requested until a tap. */
 export function BlendVessel({ ingredients, onComplete }: { ingredients:string[]; onComplete:()=>void }) {
@@ -51,13 +48,11 @@ export function BlendVessel({ ingredients, onComplete }: { ingredients:string[];
       onPointerUp={()=>last.current=null} onPointerCancel={()=>last.current=null}
       onKeyDown={e=>{if(e.key==="ArrowLeft"||e.key==="ArrowRight"||e.key==="Enter"){e.preventDefault();advance(12)}}}>
       <div className="blend-illustration" style={{"--blend-rotation":`${Math.sin(rotation/30)*10}deg`} as React.CSSProperties}>
-        <div className="blend-bottle-neck" />
-        <div className="blend-bottle-body"><div className="blend-liquid" style={{height:`${20+progress*.42}%`}}/><strong>AURA</strong><small>PERSONAL ATELIER</small></div>
-        {ingredients.slice(0,9).map((ingredient,index)=><img key={ingredient} alt="" draggable={false} className="blend-floating-ingredient" style={{top:`${5+(index%3)*25}%`,left:`${index%2?68:1}%`}} src={`/assets/ingredients/${icons[ingredient]}.png`}/>)}
+        <AtelierFlask ingredients={ingredients} progress={progress} blended />
       </div>
     </div>
-    <div className="blend-progress"><span>BLENDING</span><span aria-live="polite">{Math.round(progress)}%</span></div>
-    <div className="blend-progress-track"><span style={{width:`${progress}%`}}/></div>
+    <div className="blend-progress"><span>{progress >= 100 ? "BLEND COMPLETE" : "BLENDING"}</span><span aria-live="polite">{Math.round(progress)}%</span></div>
+    <div className="blend-progress-track" role="progressbar" aria-label="블렌딩 진행률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><span style={{width:`${progress}%`}}/></div>
     <div className="blend-controls">
       {motionState==="idle" && <button type="button" className="blend-motion-button" onClick={activateMotion}>휴대폰 흔들기 사용</button>}
       {motionState==="enabled" && <span className="blend-support">흔들기 감지가 켜졌어요.</span>}

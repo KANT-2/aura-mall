@@ -1,0 +1,32 @@
+/* Atelier visuals only; the shared layout and other pages keep their styles. */
+.atelier-page .aura-flask-visual { width:min(100%,22rem); height:100%; max-height:30rem; overflow:visible; }
+.aura-flask-ingredient { animation:aura-ingredient-arrive .5s ease-out both; transform-box:fill-box; transform-origin:center; }
+.aura-flask-liquid { transition:d .4s ease, opacity .4s ease; }
+.atelier-page .aura-product-artwork { width:min(100%,22rem); height:100%; max-height:30rem; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.aura-product-artwork > svg { width:100%; height:calc(100% - 2rem); min-height:0; }
+.aura-product-blend-name { color:#e8dfd0; font-family:var(--font-serif); font-size:1rem; letter-spacing:.04em; text-align:center; }
+.atelier-page .aura-result-composition { display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; gap:.8rem; }
+.atelier-page .aura-result-composition .aura-flask-visual { height:70%; }
+.aura-result-notes { display:flex; flex-wrap:wrap; justify-content:center; gap:.35rem; max-width:28rem; }
+.aura-result-notes span { color:#ddd3c3; font-size:.68rem; line-height:1.5; padding:.25rem .55rem; border:1px solid #645c4f; border-radius:1rem; }
+.atelier-page .aura-result-caption { position:static; font-size:.75rem; color:#d2c7b7; letter-spacing:0; text-align:center; }
+.atelier-page .blend-illustration > .aura-flask-visual { width:100%; height:100%; }
+.atelier-page .aura-result-product { gap:.35rem; }
+.atelier-page .aura-result-product > p { margin:.4rem 0 0; color:#e8dfd0; font-size:.85rem; }
+.atelier-page .aura-result-product > strong { font-size:1.65rem; }
+@keyframes aura-ingredient-arrive { from { opacity:0; transform:translateY(-70px) scale(.65); } to { transform:translateY(0) scale(1); } }
+@media(max-width:560px) {
+  .atelier-page .aura-flask-visual { max-height:22rem; }
+  .aura-result-notes { gap:.25rem; }
+  .aura-result-notes span { font-size:.6rem; }
+}
+@media(prefers-reduced-motion:reduce) { .aura-flask-ingredient { animation:none; } .aura-flask-liquid { transition:none; } }
+.atelier-page .aura-result-product .aura-product-artwork { flex:1; height:auto; min-height:0; }
+.atelier-page .aura-result-product .aura-product-artwork > svg { flex:1; height:auto; min-height:0; }
+.atelier-page .aura-result-product > p,
+.atelier-page .aura-result-product > strong,
+.atelier-page .aura-product-blend-name { flex-shrink:0; }
+@media(max-width:560px) {
+  .atelier-page .atelier-object-frame { height:28rem; min-height:28rem; margin-block:1rem; }
+  .atelier-page .aura-result-product .aura-product-artwork { width:min(100%,17rem); }
+}

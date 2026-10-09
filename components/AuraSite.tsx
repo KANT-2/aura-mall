@@ -13,6 +13,7 @@ import { formatPoint, products } from "@/data/products"
 import type { Product, ScentFamily } from "@/types/product"
 import NextLink from "next/link"
 import { BlendVessel } from "@/components/BlendVessel"
+import { AtelierFlask, AtelierProductVisual } from "./AtelierVisuals"
 import "./AtelierProductName.css"
 import { type AuraMember, currentMember, signOut, registerMember, authenticateMember } from "@/components/LocalAccount"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -1234,7 +1235,7 @@ export function AtelierPage() {
             <Title as="h3">향료 라이브러리</Title>
             <p>각 노트에서 하나 이상, 원하는 향료를 자유롭게 선택하거나 해제하세요.</p>
             <p role="status">
-              {session.selected.length}가지 향료 선택 · {missingNotes.length > 0 ? `${missingNotes.join(" · ")}에서 향료를 더 골라 주세요.` : "블렌딩할 준비가 됐어요."}
+              {session.selected.length}가지 향료 선택 · {missingNotes.length > 0 ? `${missingNotes.join(" · ")}에서 향료를 더 골라 주세요.` : session.stage === "READY" ? "블렌딩할 준비가 됐어요." : "선택한 향료 구성이 확정됐어요."}
             </p>
           </div>
           <div className="ingredient-groups">
@@ -1278,50 +1279,25 @@ export function AtelierPage() {
           >
             {session.stage === "BLENDING" && <BlendVessel ingredients={session.selected} onComplete={()=>updateSession({stage:"REVEAL"})}/>}
             {!showArt && !showBottle && !showProduct && session.stage !== "BLENDING" && (
-              <div className={`mixing-flask fill-${Math.min(3,completeGroups)}`}>
-                {session.selected.slice(0,9).map((item,index)=><img key={item} className="vessel-botanical" style={{"--i":index} as CSSProperties} src={`/assets/ingredients/${item.toLowerCase().replaceAll(" ","-")}.png`} alt=""/>)}
-                <div className="flask-liquid" />
-                <div className="flask-shine" />
-                <div className="flask-label">
-                  AURA
-                  <br />
-                  LAB 01
-                </div>
-                <div className="selected-ingredients">
-                  {session.selected.map((item, index) => <span key={item} style={{ "--i": index } as CSSProperties}>{item}</span>)}
-                </div>
-              </div>
+              <AtelierFlask ingredients={session.selected} />
             )}
             {showArt && (
-              <div className="reveal-object">
-                <div className="custom-art-composition">{session.selected.slice(0,7).map(name=><img key={name} src={`/assets/ingredients/${name.toLowerCase().replaceAll(" ","-")}.png`} alt="" />)}</div>
-                <span>당신이 고른 {session.selected.length}가지 향료를 표현한 아트 오브젝트</span>
+              <div className="reveal-object aura-result-composition">
+                <AtelierFlask ingredients={session.selected} blended progress={100} />
+                <div className="aura-result-notes" aria-label="완성된 향료 구성">
+                  {session.selected.map((name) => <span key={name}>{name}</span>)}
+                </div>
+                <span className="aura-result-caption">{session.selected.length}가지 향료로 완성한 당신의 블렌드</span>
               </div>
             )}
             {showBottle && (
               <div className="reveal-object bottle-object">
-                <AssetImage
-                  asset={recipe.bottle}
-                  label={`${blendName} AURA 향수병`}
-                />
-                <span>{blendName} · EAU DE PARFUM</span>
+                <AtelierProductVisual type="Perfume" name={blendName} ingredients={session.selected} />
               </div>
             )}
             {showProduct && (
-              <div
-                className={`final-product product-${session.productType.toLowerCase().replace(" ", "-")}`}
-              >
-                {session.productType === "Perfume" ? (
-                  <AssetImage
-                    asset={recipe.bottle}
-                    label={`${blendName} 향수`}
-                  />
-                ) : (
-                  <div className="product-silhouette">
-                    <span>AURA</span>
-                    <small>{blendName}</small>
-                  </div>
-                )}
+              <div className={`final-product aura-result-product product-${session.productType.toLowerCase().replace(" ", "-")}`}>
+                <AtelierProductVisual type={session.productType} name={blendName} ingredients={session.selected} />
                 <p>{product.korean}</p>
                 <strong>{formatPoint(product.price)}</strong>
               </div>
