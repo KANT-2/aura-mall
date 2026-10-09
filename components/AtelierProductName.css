@@ -1,0 +1,34 @@
+.product-options .atelier-product-name {
+  display: grid;
+}
+
+.product-options .atelier-product-name > span {
+  grid-area: 1 / 1;
+}
+
+.atelier-product-name-korean {
+  visibility: hidden;
+}
+
+.atelier-product-option:hover .atelier-product-name-english,
+.atelier-product-option:focus-visible .atelier-product-name-english {
+  visibility: hidden;
+}
+
+.atelier-product-option:hover .atelier-product-name-korean,
+.atelier-product-option:focus-visible .atelier-product-name-korean {
+  visibility: visible;
+}
+
+@media (hover: none), (pointer: coarse), (max-width: 767px) {
+  .product-options .atelier-product-name > .atelier-product-name-english {
+    grid-area: 1 / 1;
+    visibility: visible;
+  }
+
+  .product-options .atelier-product-name > .atelier-product-name-korean {
+    grid-area: 2 / 1;
+    visibility: visible;
+    font-size: 0.85em;
+  }
+}

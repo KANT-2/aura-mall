@@ -13,6 +13,7 @@ import { formatPoint, products } from "@/data/products"
 import type { Product, ScentFamily } from "@/types/product"
 import NextLink from "next/link"
 import { BlendVessel } from "@/components/BlendVessel"
+import "./AtelierProductName.css"
 import { type AuraMember, currentMember, signOut, registerMember, authenticateMember } from "@/components/LocalAccount"
 import { useRouter, useSearchParams } from "next/navigation"
 
@@ -1318,7 +1319,7 @@ export function AtelierPage() {
                 ) : (
                   <div className="product-silhouette">
                     <span>AURA</span>
-                    <small>{recipe.name}</small>
+                    <small>{blendName}</small>
                   </div>
                 )}
                 <p>{product.korean}</p>
@@ -1415,12 +1416,17 @@ export function AtelierPage() {
               <p className="eyebrow">FINAL PRODUCT</p>
               {(Object.keys(atelierProducts) as ProductType[]).map((type) => (
                 <Button
-                  className={session.productType === type ? "is-active" : ""}
+                  className={`atelier-product-option ${session.productType === type ? "is-active" : ""}`}
+                  ariaPressed={session.productType === type}
+                  ariaLabel={`${type} · ${atelierProducts[type].korean} · ${formatPoint(atelierProducts[type].price)}`}
                   key={type}
                   onClick={() => updateSession({ productType: type })}
                 >
                   <span>
-                    <strong>{type}</strong>
+                    <strong className="atelier-product-name" aria-hidden="true">
+                      <span className="atelier-product-name-english" lang="en">{type}</span>
+                      <span className="atelier-product-name-korean" lang="ko">{atelierProducts[type].korean}</span>
+                    </strong>
                     <small>{atelierProducts[type].caption}</small>
                   </span>
                   <em>{formatPoint(atelierProducts[type].price)}</em>
