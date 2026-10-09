@@ -1051,7 +1051,7 @@ export function AtelierPage() {
   const router = useRouter()
   const { addCustomToCart } = useAppState()
   const [view, setView] = useState<"MOOD" | "RECIPE" | "WORKBENCH">("MOOD")
-  const [mood, setMood] = useState("clear")
+  const [mood, setMood] = useState<string | null>(null)
   const [recipeId, setRecipeId] = useState<RecipeId>("R01")
   const [sessions, setSessions] = useState<Record<RecipeId, AtelierSession>>({
     R01: { stage: "EMPTY", selected: [], productType: "Perfume" },
@@ -1069,7 +1069,7 @@ export function AtelierPage() {
   ]
   const selectedGroups = ingredientGroups.map(group => group.filter(item=>session.selected.includes(item)))
   const completeGroups = selectedGroups.filter(group=>group.length>0).length
-  const stageIndex = completeGroups
+  const missingNotes = ["TOP", "HEART", "BASE"].filter((_, index) => selectedGroups[index].length === 0)
   const product = atelierProducts[session.productType]
   const blendName = session.selected.length===3 && ingredients.every(note=>session.selected.includes(note)) ? recipe.name : "MY AURA Blend"
 
@@ -1080,13 +1080,16 @@ export function AtelierPage() {
     }))
 
   const selectIngredient = (ingredient: string) => {
-    if (["BLENDING","REVEAL","BOTTLE","PRODUCT_SELECTION","SUMMARY"].includes(session.stage)) return
-    const selected = session.selected.includes(ingredient)
-      ? session.selected.filter(item=>item!==ingredient)
-      : [...session.selected,ingredient]
-    const complete=ingredientGroups.filter(group=>group.some(item=>selected.includes(item))).length
-    const stage:AtelierStage = complete === 3 ? "READY" : complete===2 ? "HEART_SELECTED" : complete===1 ? "TOP_SELECTED" : "EMPTY"
-    updateSession({selected,stage})
+    setSessions((current) => {
+      const currentSession = current[recipeId]
+      if (["BLENDING", "REVEAL", "BOTTLE", "PRODUCT_SELECTION", "SUMMARY"].includes(currentSession.stage)) return current
+      const selected = currentSession.selected.includes(ingredient)
+        ? currentSession.selected.filter((item) => item !== ingredient)
+        : [...currentSession.selected, ingredient]
+      const complete = ingredientGroups.filter((group) => group.some((item) => selected.includes(item))).length
+      const stage: AtelierStage = complete === 3 ? "READY" : complete === 2 ? "HEART_SELECTED" : complete === 1 ? "TOP_SELECTED" : "EMPTY"
+      return { ...current, [recipeId]: { ...currentSession, selected, stage } }
+    })
   }
 
   const stageCopy: Record<AtelierStage, string> = {
@@ -1126,6 +1129,7 @@ export function AtelierPage() {
             ].map(([key, number, title, note, asset]) => (
               <Button
                 className={`mood-option ${mood === key ? "is-active" : ""}`}
+                ariaPressed={mood === key}
                 key={key}
                 onClick={() => {
                   setMood(key)
@@ -1136,7 +1140,7 @@ export function AtelierPage() {
                   asset={asset}
                   label={`${title} 향의 아트 오브젝트`}
                 />
-                <span>{number}</span>
+                <span>{number}{mood === key ? " · 선택한 분위기" : ""}</span>
                 <strong>{title}</strong>
                 <small>{note}</small>
                 <Icon name="arrow" />
@@ -1228,11 +1232,14 @@ export function AtelierPage() {
             <p className="eyebrow">INGREDIENT LIBRARY</p>
             <Title as="h3">향료 라이브러리</Title>
             <p>각 노트에서 하나 이상, 원하는 향료를 자유롭게 선택하거나 해제하세요.</p>
+            <p role="status">
+              {session.selected.length}가지 향료 선택 · {missingNotes.length > 0 ? `${missingNotes.join(" · ")}에서 향료를 더 골라 주세요.` : "블렌딩할 준비가 됐어요."}
+            </p>
           </div>
           <div className="ingredient-groups">
             {allIngredients.map((group, groupIndex) => (
               <div className="ingredient-group" key={group.stage}>
-                <span>{group.stage}</span>
+                <span>{group.stage} · {selectedGroups[groupIndex].length}개 선택</span>
                 <div>
                   {group.items.map((ingredient) => {
                     const active = session.selected.includes(ingredient)
