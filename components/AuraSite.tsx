@@ -1347,7 +1347,7 @@ export function AtelierPage() {
                     ingredients: session.selected,
                     productType: session.productType,
                     pointPrice: product.price,
-                    image: recipe.bottle,
+                    image: `atelier-${session.productType.toLowerCase().replaceAll(" ", "-")}`,
                   })
                   router.push("/cart")
                 }}
@@ -1524,6 +1524,8 @@ export function CardsPage() {
               </div>
               <BenefitRow label="연회비" value={card.fee} />
               <BenefitRow label="전월 실적" value={card.performance} />
+              <BenefitRow label="기본 적립률" value={card.basic} />
+              <BenefitRow label="뷰티 적립률" value={card.beauty} />
               <BenefitRow label="월 특별 적립 한도" value={card.limit} />
               <BenefitRow
                 label="Partner Perfumery 적립률"

@@ -30,3 +30,7 @@
   .atelier-page .atelier-object-frame { height:28rem; min-height:28rem; margin-block:1rem; }
   .atelier-page .aura-result-product .aura-product-artwork { width:min(100%,17rem); }
 }
+/* Product-specific assets passed by Atelier through the existing image contract. */
+.asset-image.asset-atelier-hand-cream { background-image:url('/assets/atelier/hand-cream.svg'); background-position:center!important; background-size:contain!important; background-repeat:no-repeat; }
+.asset-image.asset-atelier-diffuser { background-image:url('/assets/atelier/diffuser.svg'); background-position:center!important; background-size:contain!important; background-repeat:no-repeat; }
+.asset-image.asset-atelier-perfume { background-image:url('/assets/atelier/perfume.svg'); background-position:center!important; background-size:contain!important; background-repeat:no-repeat; }
