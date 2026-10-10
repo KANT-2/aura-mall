@@ -10,9 +10,12 @@ import {
   useState,
 } from "react"
 import { formatPoint, products } from "@/data/products"
-import type { Product, ScentFamily } from "@/types/product"
+import type { Product } from "@/types/product"
 import NextLink from "next/link"
 import { BlendVessel } from "@/components/BlendVessel"
+import { ProductCard } from "@/components/products/ProductCard"
+import { ProductCollection } from "@/components/products/ProductCollection"
+import { ProductDetail } from "@/components/products/ProductDetail"
 import { AtelierFlask, AtelierProductVisual } from "./AtelierVisuals"
 import { AtelierNaming, normalizeBlendName, suggestBlendNames } from "./AtelierNaming"
 import { describeBlend } from "./AtelierDescription"
@@ -522,46 +525,6 @@ function SectionHeading({
   )
 }
 
-function ProductCard({
-  product,
-  index = 0,
-}: {
-  product: Product
-  index?: number
-}) {
-  return (
-    <article className="product-card">
-      <Link
-        ariaLabel={`${product.name} 상세 보기`}
-        className={`product-visual tone-${product.accent}`}
-        href={`/products/${product.slug}`}
-      >
-        <span className="product-index">
-          {String(index + 1).padStart(2, "0")}
-        </span>
-        <AssetImage
-          asset={product.image}
-          label={`${product.name} 향수 이미지`}
-        />
-        <span className="product-image-name">{product.name}</span>
-        <span className="view-label">
-          VIEW SCENT <Icon name="arrow" />
-        </span>
-      </Link>
-      <div className="product-card-info">
-        <div>
-          <p className="product-family">{product.family} · 50mL</p>
-          <Title as="h3" className="product-name">
-            {product.name}
-          </Title>
-          <p className="product-description">{product.description}</p>
-        </div>
-        <strong className="product-price">{formatPoint(product.price)}</strong>
-      </div>
-    </article>
-  )
-}
-
 export function HomePage() {
   const { points, user } = useAppState()
   const feature = products.find((item)=>item.slug==="fig-reverie") || products[4]
@@ -636,117 +599,16 @@ function CreditCard({
   )
 }
 
+// 상품 목록 UI는 components/products/ProductCollection. MY AURA 배너는 이곳에 유지한다.
 export function CollectionPage() {
-  const params = useSearchParams()
-  const initialFamily = params.get("family") as ScentFamily | null
-  const [query, setQuery] = useState("")
-  const [family, setFamily] = useState<ScentFamily | "All">(
-    ["Fresh", "Floral", "Woody", "Musk"].includes(initialFamily || "")
-      ? initialFamily!
-      : "All",
-  )
-  const [sort, setSort] = useState("recommended")
-
-  const filtered = useMemo(() => {
-    const result = products.filter(
-      (product) =>
-        (family === "All" || product.family === family) &&
-        `${product.name} ${product.notes.top} ${product.notes.heart} ${product.notes.base}`
-          .toLowerCase()
-          .includes(query.toLowerCase()),
-    )
-    if (sort === "low") return [...result].sort((a, b) => a.price - b.price)
-    if (sort === "high") return [...result].sort((a, b) => b.price - a.price)
-    return result
-  }, [family, query, sort])
-
   return (
     <main className="collection-page">
-      <section className="collection-hero page-shell">
-        <div>
-          <p className="eyebrow">AURA COLLECTION · 50mL</p>
-          <Title as="h1">
-            Find Your
-            <br />
-            <em>Scent Veil.</em>
-          </Title>
-        </div>
-        <p>
-          향은 기억보다 먼저 당신을 말합니다.
-          <br />
-          피부 위에서 완성되는 여섯 가지 AURA를 만나보세요.
-        </p>
-      </section>
-
-      <section className="shop-controls page-shell">
-        <label className="search-box">
-          <Icon name="search" />
-          <input
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="향수 이름이나 향 노트를 검색해 보세요."
-            type="search"
-            value={query}
-          />
-        </label>
-        <div className="filter-row">
-          <div className="filter-tabs" role="group" aria-label="향 계열 필터">
-            {(["All", "Fresh", "Floral", "Woody", "Musk"] as const).map(
-              (item) => (
-                <Button
-                  className={family === item ? "is-active" : ""}
-                  key={item}
-                  onClick={() => setFamily(item)}
-                >
-                  {item === "All" ? "전체" : item}
-                </Button>
-              ),
-            )}
-          </div>
-          <label className="sort-select">
-            <select
-              onChange={(event) => setSort(event.target.value)}
-              value={sort}
-            >
-              <option value="recommended">추천순</option>
-              <option value="low">포인트 낮은 순</option>
-              <option value="high">포인트 높은 순</option>
-            </select>
-            <Icon name="chevron" />
-          </label>
-        </div>
-      </section>
-
-      <section className="shop-results page-shell">
-        <p className="result-count">
-          총 <strong>{filtered.length}</strong>개의 향
-        </p>
-        {filtered.length ? (
-          <div className="product-grid">
-            {filtered.map((product, index) => (
-              <ProductCard index={index} key={product.slug} product={product} />
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state">
-            <p className="eyebrow">NO SCENT FOUND</p>
-            <Title>조건에 맞는 향을 찾지 못했어요.</Title>
-            <p>검색어를 바꾸거나 다른 향 계열을 선택해 보세요.</p>
-            <Button
-              onClick={() => {
-                setQuery("")
-                setFamily("All")
-              }}
-            >
-              전체 향 보기
-            </Button>
-          </div>
-        )}
-      </section>
+      <ProductCollection />
 
       <section className="my-aura-banner page-shell">
         <AssetImage asset="pink-art" label="핑크 플로럴 AURA 아트 오브젝트" />
         <div>
-          <p className="eyebrow">CAN'T FIND YOUR SCENT?</p>
+          <p className="eyebrow">CAN&apos;T FIND YOUR SCENT?</p>
           <Title>
             찾는 향이 없다면,
             <br />
@@ -787,129 +649,15 @@ function QuantityControl({
   )
 }
 
+// 상품 상세 UI는 components/products/ProductDetail. 전역 상태에서 필요한 값만 전달한다.
 export function ProductDetailPage({ product }: { product: Product }) {
-  const [quantity, setQuantity] = useState(1)
-  const [added, setAdded] = useState(false)
   const { addToCart, points, user } = useAppState()
-  const canAfford = points >= product.price * quantity
-  const recommended = products
-    .filter((item) => item.slug !== product.slug)
-    .slice(0, 3)
-  const add = () => {
-    addToCart(product, quantity)
-    setAdded(true)
-    window.setTimeout(() => setAdded(false), 1800)
-  }
-
   return (
-    <main className="detail-page">
-      <div className="breadcrumb page-shell">
-        <Link href="/products">컬렉션</Link>
-        <span>/</span>
-        <span>{product.name}</span>
-      </div>
-      <section className="detail-main page-shell">
-        <div className={`detail-gallery tone-${product.accent}`}>
-          <span className="gallery-caption">AURA EAU DE PARFUM · 50mL</span>
-          <AssetImage
-            asset={product.image}
-            label={`${product.name} 정면 제품 이미지`}
-          />
-          <span className="detail-image-name">{product.name}</span>
-          <div className="gallery-thumbs">
-            <span className="is-active">01</span>
-            <span>02</span>
-            <span>03</span>
-          </div>
-        </div>
-        <div className="detail-info">
-          <p className="product-family">{product.family} · EAU DE PARFUM</p>
-          <Title as="h1">{product.name}</Title>
-          <p className="detail-description">{product.description}</p>
-          <p className="detail-story">{product.story}</p>
-          <div className="detail-price">
-            <span>필요 포인트</span>
-            <strong>{formatPoint(product.price)}</strong>
-          </div>
-          {user && <div className="balance-line"><span>현재 보유 포인트</span><strong>{formatPoint(points)}</strong></div>}
-          <div className="purchase-row">
-            <QuantityControl onChange={setQuantity} value={quantity} />
-            <Button
-              className="primary-button"
-              onClick={add}
-            >
-              {added ? "장바구니에 담았어요" : "장바구니 담기"}
-            </Button>
-          </div>
-          <p className="policy-note">
-            AURA 카드 회원 전용 · 100% 포인트 교환 상품
-          </p>
-          <div className="detail-accordions">
-            <details open>
-              <summary>
-                패키징 디테일 <span>+</span>
-              </summary>
-              <p>
-                재활용 가능한 종이 패키지와 유리 보틀, AURA 시그니처 태그로
-                구성됩니다.
-              </p>
-            </details>
-            <details>
-              <summary>
-                교환 안내 <span>+</span>
-              </summary>
-              <p>
-                상품을 장바구니에 담은 뒤 교환 내용을 확인할 수 있어요. 교환 시 보유한 AURA 포인트를 사용합니다.
-              </p>
-            </details>
-          </div>
-        </div>
-      </section>
-
-      <section className="notes-section page-shell section-pad">
-        <SectionHeading
-          eyebrow="SCENT NOTES"
-          title="피부 위에서 이어지는 향의 결"
-        />
-        <div className="notes-grid">
-          {[
-            ["TOP", product.notes.top, "첫 순간을 여는 투명하고 선명한 인상"],
-            [
-              "HEART",
-              product.notes.heart,
-              "향의 중심에서 부드럽게 피어나는 온도",
-            ],
-            ["BASE", product.notes.base, "피부 가까이에 오래 남는 고요한 잔향"],
-          ].map(([stage, note, copy], index) => (
-            <div className="note-item" key={stage}>
-              <span>0{index + 1}</span>
-              <p>{stage}</p>
-              <Title as="h3">{note}</Title>
-              <p>{copy}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="recommendations page-shell section-pad">
-        <SectionHeading
-          eyebrow="ALSO IN YOUR AURA"
-          title="이 향과 함께 만나보세요"
-        />
-        <div className="product-grid compact">
-          {recommended.map((item, index) => (
-            <ProductCard index={index} key={item.slug} product={item} />
-          ))}
-        </div>
-      </section>
-      <div className="mobile-sticky-cta">
-        <div>
-          <span>{product.name}</span>
-          <strong>{formatPoint(product.price * quantity)}</strong>
-        </div>
-        <Button onClick={add}>장바구니 담기</Button>
-      </div>
-    </main>
+    <ProductDetail
+      key={product.slug}
+      product={product}
+      shopper={{ addToCart, points, isSignedIn: Boolean(user) }}
+    />
   )
 }
 
