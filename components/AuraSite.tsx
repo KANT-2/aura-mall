@@ -14,6 +14,7 @@ import type { Product, ScentFamily } from "@/types/product"
 import NextLink from "next/link"
 import { BlendVessel } from "@/components/BlendVessel"
 import { AtelierFlask, AtelierProductVisual } from "./AtelierVisuals"
+import { AtelierNaming, normalizeBlendName, suggestBlendNames } from "./AtelierNaming"
 import "./AtelierProductName.css"
 import { type AuraMember, currentMember, signOut, registerMember, authenticateMember } from "@/components/LocalAccount"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -80,6 +81,7 @@ type AtelierSession = {
   stage: AtelierStage
   selected: string[]
   productType: ProductType
+  name: string
 }
 
 const atelierRecipes: AtelierRecipe[] = [
@@ -1056,14 +1058,13 @@ export function AtelierPage() {
   const [mood, setMood] = useState<string | null>(null)
   const [recipeId, setRecipeId] = useState<RecipeId>("R01")
   const [sessions, setSessions] = useState<Record<RecipeId, AtelierSession>>({
-    R01: { stage: "EMPTY", selected: [], productType: "Perfume" },
-    R02: { stage: "EMPTY", selected: [], productType: "Perfume" },
-    R03: { stage: "EMPTY", selected: [], productType: "Perfume" },
+    R01: { stage: "EMPTY", selected: [], productType: "Perfume", name: "" },
+    R02: { stage: "EMPTY", selected: [], productType: "Perfume", name: "" },
+    R03: { stage: "EMPTY", selected: [], productType: "Perfume", name: "" },
   })
 
   const recipe = atelierRecipes.find((item) => item.id === recipeId)!
   const session = sessions[recipeId]
-  const ingredients = [recipe.ingredients.top, recipe.ingredients.heart, recipe.ingredients.base]
   const ingredientGroups = [
     ["Bergamot", "Mandarin", "Grapefruit"],
     ["Fig", "Peony", "Neroli"],
@@ -1073,7 +1074,8 @@ export function AtelierPage() {
   const completeGroups = selectedGroups.filter(group=>group.length>0).length
   const missingNotes = ["TOP", "HEART", "BASE"].filter((_, index) => selectedGroups[index].length === 0)
   const product = atelierProducts[session.productType]
-  const blendName = session.selected.length===3 && ingredients.every(note=>session.selected.includes(note)) ? recipe.name : "MY AURA Blend"
+  const nameIdeas = suggestBlendNames(session.selected)
+  const blendName = normalizeBlendName(session.name, nameIdeas[0].en)
 
   const updateSession = (next: Partial<AtelierSession>) =>
     setSessions((current) => ({
@@ -1102,7 +1104,7 @@ export function AtelierPage() {
     READY: "향료가 준비됐어요. 원하는 만큼 더 추가할 수 있어요.",
     BLENDING: "용기를 직접 움직여 향을 섞어 보세요.",
     REVEAL: "보이지 않던 향이 하나의 형태로 드러납니다.",
-    BOTTLE: "당신의 향을 AURA 보틀에 담았습니다.",
+    BOTTLE: "당신의 향에 이름을 붙여 주세요.",
     PRODUCT_SELECTION: "어떤 형태로 향을 간직할까요?",
     SUMMARY: "당신의 AURA가 완성됐어요.",
   }
@@ -1316,18 +1318,21 @@ export function AtelierPage() {
             {session.stage === "REVEAL" && (
               <Button
                 className="atelier-primary"
-                onClick={() => updateSession({ stage: "BOTTLE" })}
+                onClick={() => updateSession({ stage: "BOTTLE", name: session.name || nameIdeas[0].en })}
               >
                 완성된 향 만나보기
               </Button>
             )}
             {session.stage === "BOTTLE" && (
-              <Button
-                className="atelier-primary"
-                onClick={() => updateSession({ stage: "PRODUCT_SELECTION" })}
-              >
-                간직할 형태 선택하기
-              </Button>
+              <div className="atelier-naming-step">
+                <AtelierNaming name={session.name} ideas={nameIdeas} onChange={(name) => updateSession({ name })} />
+                <Button
+                  className="atelier-primary"
+                  onClick={() => updateSession({ stage: "PRODUCT_SELECTION", name: blendName })}
+                >
+                  이 이름으로 간직할 형태 고르기
+                </Button>
+              </div>
             )}
             {session.stage === "PRODUCT_SELECTION" && (
               <Button
@@ -1424,6 +1429,7 @@ export function AtelierPage() {
                     updateSession({
                       selected: [],
                       stage: "EMPTY",
+                      name: "",
                     })
                   }
                 >

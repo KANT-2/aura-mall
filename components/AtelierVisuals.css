@@ -1,7 +1,14 @@
 /* Atelier visuals only; the shared layout and other pages keep their styles. */
 .atelier-page .aura-flask-visual { width:min(100%,22rem); height:100%; max-height:30rem; overflow:visible; }
-.aura-flask-ingredient { animation:aura-ingredient-arrive .5s ease-out both; transform-box:fill-box; transform-origin:center; }
-.aura-flask-liquid { transition:d .4s ease, opacity .4s ease; }
+.aura-flask-liquid { transition:d .55s cubic-bezier(.3,.7,.3,1), stroke-opacity .4s ease; }
+/* Notes rest at translate(x,y); position changes glide, the first appearance drops in through the neck. */
+.aura-flask-note { transition:transform .5s cubic-bezier(.3,.7,.3,1), opacity .4s ease; }
+.aura-flask-drop { animation:aura-note-drop .75s cubic-bezier(.45,0,.4,1) both; }
+.aura-flask-ripple { transform-box:fill-box; transform-origin:center; opacity:0; animation:aura-ripple .9s ease-out .55s both; }
+.aura-flask-layer-tag { transition:transform .55s cubic-bezier(.3,.7,.3,1); }
+.aura-flask-swirl { animation:aura-swirl 2.4s linear infinite; }
+.aura-flask-bubble { opacity:0; animation:aura-bubble 2.2s ease-in infinite; }
+.aura-flask-glow { transform-box:fill-box; transform-origin:center; animation:aura-glow 2.6s ease-in-out infinite alternate; }
 .atelier-page .aura-product-artwork { width:min(100%,22rem); height:100%; max-height:30rem; display:flex; flex-direction:column; align-items:center; justify-content:center; }
 .aura-product-artwork > svg { width:100%; height:calc(100% - 2rem); min-height:0; }
 .aura-product-blend-name { color:#e8dfd0; font-family:var(--font-serif); font-size:1rem; letter-spacing:.04em; text-align:center; }
@@ -14,13 +21,22 @@
 .atelier-page .aura-result-product { gap:.35rem; }
 .atelier-page .aura-result-product > p { margin:.4rem 0 0; color:#e8dfd0; font-size:.85rem; }
 .atelier-page .aura-result-product > strong { font-size:1.65rem; }
-@keyframes aura-ingredient-arrive { from { opacity:0; transform:translateY(-70px) scale(.65); } to { transform:translateY(0) scale(1); } }
+@keyframes aura-note-drop {
+  0% { opacity:0; transform:translate(var(--drop-x),var(--drop-y)) scale(.45) rotate(-25deg); }
+  15% { opacity:1; }
+  70% { transform:translate(0,6px) scale(1.04) rotate(6deg); }
+  100% { opacity:1; transform:translate(0,0) scale(1) rotate(0); }
+}
+@keyframes aura-ripple { 0% { opacity:.7; transform:scale(.2); stroke-width:2; } 100% { opacity:0; transform:scale(2.2); stroke-width:.5; } }
+@keyframes aura-swirl { to { transform:rotate(360deg); } }
+@keyframes aura-bubble { 0% { opacity:0; transform:translateY(0); } 20% { opacity:.5; } 100% { opacity:0; transform:translateY(var(--bubble-rise)); } }
+@keyframes aura-glow { from { opacity:.55; transform:scale(.92); } to { opacity:1; transform:scale(1.05); } }
 @media(max-width:560px) {
   .atelier-page .aura-flask-visual { max-height:22rem; }
   .aura-result-notes { gap:.25rem; }
   .aura-result-notes span { font-size:.6rem; }
 }
-@media(prefers-reduced-motion:reduce) { .aura-flask-ingredient { animation:none; } .aura-flask-liquid { transition:none; } }
+@media(prefers-reduced-motion:reduce) { .aura-flask-drop,.aura-flask-ripple,.aura-flask-swirl,.aura-flask-bubble,.aura-flask-glow { animation:none; } .aura-flask-bubble,.aura-flask-ripple { display:none; } .aura-flask-liquid,.aura-flask-note,.aura-flask-layer-tag { transition:none; } }
 .atelier-page .aura-result-product .aura-product-artwork { flex:1; height:auto; min-height:0; }
 .atelier-page .aura-result-product .aura-product-artwork > svg { flex:1; height:auto; min-height:0; }
 .atelier-page .aura-result-product > p,
@@ -34,3 +50,28 @@
 .asset-image.asset-atelier-hand-cream { background-image:url('/assets/atelier/hand-cream.svg'); background-position:center!important; background-size:contain!important; background-repeat:no-repeat; }
 .asset-image.asset-atelier-diffuser { background-image:url('/assets/atelier/diffuser.svg'); background-position:center!important; background-size:contain!important; background-repeat:no-repeat; }
 .asset-image.asset-atelier-perfume { background-image:url('/assets/atelier/perfume.svg'); background-position:center!important; background-size:contain!important; background-repeat:no-repeat; }
+/* Blending: the vessel springs back upright after each shake. */
+.atelier-page .blend-illustration { transition:transform .32s cubic-bezier(.34,1.56,.64,1); }
+.atelier-page .blend-controls button:disabled { opacity:.4; cursor:default; }
+.atelier-page .blend-interaction.is-complete .blend-guide { color:#e8dfd0; }
+.atelier-page .blend-touch-target { height:23rem; }
+.atelier-page .blend-illustration { width:19rem; height:22rem; }
+@media(max-width:560px) {
+  .atelier-page .blend-touch-target { height:18rem; }
+  .atelier-page .blend-illustration { width:15rem; height:17.5rem; transform:rotate(var(--blend-rotation)); }
+}
+/* Mobile: keep the library right under the vessel so picking a note and seeing it drop stay close. */
+@media(max-width:560px) {
+  .atelier-page .vessel-stage { min-height:0; }
+  .atelier-page .ingredient-library { order:2; padding-top:1rem; }
+  .atelier-page .recipe-panel { order:3; }
+  .atelier-page .atelier-object-frame:is(.stage-empty,.stage-top_selected,.stage-heart_selected,.stage-base_selected,.stage-ready) { height:19rem; min-height:19rem; margin-block:.5rem; }
+}
+/* Desktop: the vessel and its action stay in view while the longer library column scrolls. */
+@media(min-width:901px) {
+  .atelier-page .vessel-stage { position:sticky; top:4.75rem; align-self:start; height:calc(100svh - 4.75rem); min-height:38rem; padding-block:2rem 1.5rem; }
+  .atelier-page .vessel-stage .atelier-object-frame { height:100%; min-height:0; max-height:39rem; }
+}
+/* Korean copy: break between words, not inside them. */
+.atelier-page :is(h1,h2,h3,p,small,strong) { word-break:keep-all; overflow-wrap:break-word; }
+.atelier-page :is(h1,h2) { text-wrap:balance; }

@@ -1,0 +1,35 @@
+/* MY AURA naming step: suggestions in English, Korean on hover/focus (both on touch). */
+.atelier-naming-step { display:flex; flex-direction:column; align-items:center; gap:1rem; width:min(100%,30rem); margin-inline:auto; }
+.atelier-naming { width:100%; display:flex; flex-direction:column; gap:.55rem; color:#eee9e1; }
+.atelier-naming-label { margin:0; color:rgba(255,255,255,.45); font-size:.62rem; letter-spacing:.14em; }
+.atelier-naming-ideas { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.4rem; margin-bottom:.4rem; }
+.atelier-name-idea { min-height:3rem; padding:.55rem .5rem; border:1px solid rgba(255,255,255,.16); background:transparent; color:#eee9e1; cursor:pointer; transition:border-color .2s, background .2s; }
+.atelier-name-idea:hover { border-color:rgba(255,255,255,.5); }
+.atelier-name-idea.is-active { border-color:#c4b2a0; background:rgba(208,189,163,.16); }
+.atelier-name-idea-text { display:grid; align-items:center; }
+.atelier-name-idea-text > span { grid-area:1 / 1; font-family:var(--font-serif); font-size:.9rem; line-height:1.3; word-break:keep-all; }
+.atelier-name-idea-korean { visibility:hidden; }
+.atelier-name-idea:hover .atelier-name-idea-english,
+.atelier-name-idea:focus-visible .atelier-name-idea-english { visibility:hidden; }
+.atelier-name-idea:hover .atelier-name-idea-korean,
+.atelier-name-idea:focus-visible .atelier-name-idea-korean { visibility:visible; }
+.atelier-naming-field { display:flex; align-items:center; gap:.6rem; border-bottom:1px solid rgba(255,255,255,.4); }
+.atelier-naming-field:focus-within { border-color:#e6ddcd; }
+.atelier-naming-field input { flex:1; min-width:0; padding:.55rem 0; border:0; outline:0; background:transparent; color:#fff; font-family:var(--font-serif); font-size:1.15rem; }
+.atelier-naming-field input::placeholder { color:rgba(255,255,255,.3); }
+.atelier-naming-field > span { color:rgba(255,255,255,.4); font-size:.62rem; }
+.atelier-naming-hint { margin:0; color:rgba(255,255,255,.4); font-size:.65rem; line-height:1.5; word-break:keep-all; }
+
+/* The label already carries the name while it is being written. */
+.atelier-page .bottle-object .aura-product-blend-name { display:none; }
+
+@media (hover:none), (pointer:coarse), (max-width:767px) {
+  .atelier-name-idea-text > .atelier-name-idea-english { visibility:visible; }
+  .atelier-name-idea-text > .atelier-name-idea-korean { grid-area:2 / 1; visibility:visible; color:rgba(255,255,255,.55); font-size:.72rem; }
+}
+@media (max-width:560px) {
+  .atelier-name-idea-text > span { font-size:.8rem; }
+  /* Smaller bottle so the label preview and the naming field share one screen. */
+  .atelier-page .atelier-object-frame.stage-bottle { height:21rem; min-height:21rem; }
+  .atelier-page .bottle-object .aura-product-artwork { width:min(100%,16rem); max-height:21rem; }
+}
