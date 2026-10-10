@@ -1,36 +1,135 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 2026.10.07 프로젝트 기획
 
-## Getting Started
+**회의 주제:** 서비스 콘셉트, 카드 혜택·교환 정책, 역할 분담 및 개발 방향 정리
 
-First, run the development server:
+**팀 구성:** 고나경·전예진·양성용·정다라
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 1. 서비스 방향
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- 가상의 카드사 포인트몰에 향 제품을 접목한 서비스를 제작한다.
+- 카드 브랜드는 **아우라 카드(Aura Card)**이며, **Dew·Velvet·Amber** 3종으로 구성한다.
+- 고객은 카드 **1종을 보유**하며, 카드 종류와 관계없이 전체 상품을 교환할 수 있다.
+- 카드별 차이는 **가입 보너스·적립률·배송 혜택**으로 표현한다.
+- 화면과 문서의 용어는 **장바구니·교환·교환 확인·교환 완료·교환 내역**으로 통일한다.
+- 상품 가격, 배송비, 잔액, 적립금의 단위는 모두 **P**로 표시한다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 2. 상품·컬렉션 구성
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+상품은 **총 12개**, 컬렉션별 **4개**로 구성하며 초기 재고는 **상품당 15개**로 설정한다.
 
-## Learn More
+| 컬렉션 | 콘셉트 | 상품 및 가격 |
+| --- | --- | --- |
+| **Dew — Light & Fresh** | 맑고 가벼운 데일리 향 | Fresh Berry Perfume Mist 24,000P / Soft Cotton Hand Cream 12,000P / Citrus Hand Wash 15,000P / Milk & Berry Body Lotion 22,000P |
+| **Velvet — Soft & Deep** | 부드럽고 깊은 프리미엄 향 | Fig & Musk Eau de Parfum 46,000P / Blue Tea Hand Balm 18,000P / Hinoki Body Wash 27,000P / White Musk Body Lotion 32,000P |
+| **Amber — Warm & Rare** | 따뜻하고 깊은 시그니처 향 | Amber Woods Perfume Oil 68,000P / Black Tea & Leather Candle 52,000P / Oud & Rose Diffuser 74,000P / Signature Scent Gift Set 98,000P |
 
-To learn more about Next.js, take a look at the following resources:
+메인에서 컬렉션을 선택하면 해당 상품 4개를 확대하거나 테두리로 강조한다. 다른 컬렉션 상품도 계속 탐색할 수 있도록 구성한다.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**컬렉션 둘러보기와 실제 보유 카드 변경은 별도 기능으로 구분한다.**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 3. 카드별 혜택
 
-## Deploy on Vercel
+| 카드 | 포인트몰 가입 보너스 | 상품 교환 적립률 | 배송비 |
+| --- | --- | --- | --- |
+| Dew | 10,000P | 1% | 교환 건당 3,000P |
+| Velvet | 30,000P | 3% | 교환 건당 3,000P |
+| Amber | 50,000P | 5% | 무료배송 |
+- 가입 보너스는 **포인트몰 최초 가입 시 1회** 지급한다.
+- 카드 변경 시 가입 보너스를 추가 지급하거나 기존 지급분을 회수하지 않는다.
+- 카드 변경 후에도 포인트 잔액과 장바구니는 유지한다.
+- 변경된 카드 혜택은 이후 교환에 적용하며, 이전 교환 내역은 당시 혜택과 금액을 보존한다.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 4. 교환·장바구니 정책
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- 상품과 배송비를 모두 포인트로 지불한다.
+- 배송비는 상품 수량과 컬렉션에 관계없이 **교환 건당 한 번** 부과한다.
+- 적립은 **상품 합계에만** 적용하며 배송비는 제외한다.
+- 적립 포인트는 상품 합계에 카드 적립률을 적용한 뒤 **소수점을 버린다**.
+- 교환 전 상품 합계와 배송비를 지불할 잔액이 있어야 한다. 이번 교환의 예상 적립금으로 부족분을 충당할 수 없다.
+- 포인트가 부족하면 부족분을 안내하고 교환을 완료하지 않는다.
+- 교환 완료 시 교환번호·사용 포인트·적립 포인트·최종 잔액을 표시한다.
+- 장바구니는 **DB에 저장**하여 새로고침·재로그인 후에도 유지한다.
+- 동일 상품을 추가하면 수량을 합산하고, 수량은 현재 재고 범위 안에서 변경한다.
+- 장바구니에 담는 것만으로 재고를 차감하지 않는다.
+- 서버에서 현재 가격·재고·잔액·보유 카드 혜택을 확인한 뒤 교환을 처리한다.
+- 포인트 차감·적립, 재고 변경, 교환 내역 저장은 함께 처리하고 중복 요청으로 이중 차감되지 않도록 한다.
+
+## 5. 회원·포인트 운영
+
+- 회원가입 시 이름·이메일·비밀번호·비밀번호 확인·카드 선택을 입력한다.
+- 비밀번호는 **최소 8자, 영문·숫자·특수문자 포함**으로 검증하고 해시로 저장한다.
+- 실제 카드번호·CVC·유효기간 등록은 구현하지 않는다.
+- 비회원도 상품을 탐색할 수 있으며 장바구니·교환·마이페이지는 로그인 후 이용한다.
+- 실제 보유 카드 변경은 상품 상세 또는 마이페이지에서 제공한다.
+- 포인트는 외부 카드 이용으로 적립된다는 서비스 모델을 가정한다. 실제 카드 이용 실적 연동은 이번 구현 범위에 포함하지 않는다.
+
+**시연 운영 제안 — 팀 확인 필요**
+
+별도 충전 기능 없이 신규 계정으로 가입 혜택·포인트 부족 안내를 시연하고, 별도 잔액을 지급한 테스트 계정으로 정상 교환을 시연한다. 테스트 지급은 가입 보너스와 구분해 기록하며, 지급 금액은 시연 시나리오에 맞춰 정한다.
+
+## 6. 개발 방향
+
+- **Next.js App Router·TypeScript·Tailwind CSS·PostgreSQL**을 사용한다.
+- 공통 컴포넌트를 분리하고 반응형 화면을 기본 목표로 진행한다.
+- 상품 탐색 화면을 먼저 완성하고 회원·장바구니·교환 기능을 연결한다.
+- 관리자 화면은 핵심 기능 완성 후 여력을 보고 추가한다.
+- 실제 PG 결제 모듈은 구현하지 않는다.
+- 최종 빌드 확인, README, 화면 캡처, 발표·시연 자료를 준비한다.
+
+## 7. 페이지·공통 컴포넌트 담당
+
+| 담당 | 페이지·기능 | 공통 컴포넌트 |
+| --- | --- | --- |
+| **고나경** | 홈·로그인·회원가입 | Header·Footer·Nav, 공통 레이아웃·스타일, 홈 최종 조립 |
+| **전예진** | 상품 목록·상세·상품 데이터 | ProductCard·ProductGrid·QuickView·향 노트 |
+| **양성용** | 장바구니·교환 확인·배송 정보·교환 완료 | 장바구니 Drawer·교환 확인 Modal·Toast |
+| **정다라** | 마이페이지·카드 혜택·포인트·교환 내역·주소 관리 | 마이페이지 탭·내역·주소·카드 혜택 컴포넌트 |
+
+**서버·DB 책임은 추가 협의한다.** 각자 맡은 기능의 서버 처리까지 담당하는 안이 제안되었으며, 최종 배정은 아직 확정하지 않았다.
+
+## 8. 협업 규칙
+
+- 진행 상황과 막힌 문제를 수시로 공유한다.
+- 외출·지각·조퇴·결석 등 작업에 영향을 주는 일정은 미리 알린다.
+- 다른 담당자의 파일은 수정 전에 요청하고 협의한다.
+- 각자 진행 계획·작업 내용·문제 해결 과정을 노션에 기록한다.
+- 공용 DB 변경·초기화는 지정 담당자가 팀에 공지한 뒤 실행한다.
+- 최종 기능 연결·검수·문서화·시연 준비는 공동으로 진행한다.
+
+## 9. 다음 회의에서 정할 사항
+
+- 
+    
+    서버·DB 작업 분담 및 교환 처리 지원자
+    
+- 
+    
+    DB 구조 통합·마이그레이션·초기화 담당자
+    
+- 
+    
+    PostgreSQL 운영 환경과 공용 DB 서비스
+    
+- 
+    
+    ORM 및 로그인·세션 구현 방식
+    
+- 
+    
+    팀명·서비스명·디자인 시안·상품 이미지
+    
+- 
+    
+    팀 GitHub 저장소·브랜치·코드 작성 규칙
+    
+- 
+    
+    회의 시간·날짜별 마감·팀원별 가능한 작업 시간
+    
+- 
+    
+    테스트 계정 잔액·시연 시나리오
+    
+- 
+    
+    관리자 화면의 최종 구현 범위
