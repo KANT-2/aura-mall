@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react"
+import { atelierVolumes } from "@/data/atelier"
 import { formatPoint, products } from "@/data/products"
 import type { Product } from "@/types/product"
 import NextLink from "next/link"
@@ -16,6 +17,10 @@ import { BlendVessel } from "@/components/BlendVessel"
 import { ProductCard } from "@/components/products/ProductCard"
 import { ProductCollection } from "@/components/products/ProductCollection"
 import { ProductDetail } from "@/components/products/ProductDetail"
+import { AtelierFlask, AtelierProductVisual } from "./AtelierVisuals"
+import { AtelierNaming, normalizeBlendName, suggestBlendNames } from "./AtelierNaming"
+import { describeBlend } from "./AtelierDescription"
+import "./AtelierProductName.css"
 import { type AuraMember, currentMember, signOut, registerMember, authenticateMember } from "@/components/LocalAccount"
 import { useRouter, useSearchParams } from "next/navigation"
 
@@ -33,6 +38,7 @@ type CustomCartItem = {
   recipeName: string
   ingredients: string[]
   productType: ProductType
+  volume?: string
   pointPrice: number
   image: string
 }
@@ -81,6 +87,7 @@ type AtelierSession = {
   stage: AtelierStage
   selected: string[]
   productType: ProductType
+  name: string
 }
 
 const atelierRecipes: AtelierRecipe[] = [
@@ -723,7 +730,7 @@ export function CartPage() {
                     <p>
                       {item.kind === "product"
                         ? `${item.product.family} · 50mL`
-                        : `${item.recipeId} · ${item.productType}`}
+                        : `${item.recipeId} · ${item.productType} · ${item.volume ?? atelierVolumes[item.productType]}`}
                     </p>
                   </div>
                   <Title as="h3">
@@ -799,17 +806,16 @@ export function AtelierPage() {
   const router = useRouter()
   const { addCustomToCart } = useAppState()
   const [view, setView] = useState<"MOOD" | "RECIPE" | "WORKBENCH">("MOOD")
-  const [mood, setMood] = useState("clear")
+  const [mood, setMood] = useState<string | null>(null)
   const [recipeId, setRecipeId] = useState<RecipeId>("R01")
   const [sessions, setSessions] = useState<Record<RecipeId, AtelierSession>>({
-    R01: { stage: "EMPTY", selected: [], productType: "Perfume" },
-    R02: { stage: "EMPTY", selected: [], productType: "Perfume" },
-    R03: { stage: "EMPTY", selected: [], productType: "Perfume" },
+    R01: { stage: "EMPTY", selected: [], productType: "Perfume", name: "" },
+    R02: { stage: "EMPTY", selected: [], productType: "Perfume", name: "" },
+    R03: { stage: "EMPTY", selected: [], productType: "Perfume", name: "" },
   })
 
   const recipe = atelierRecipes.find((item) => item.id === recipeId)!
   const session = sessions[recipeId]
-  const ingredients = [recipe.ingredients.top, recipe.ingredients.heart, recipe.ingredients.base]
   const ingredientGroups = [
     ["Bergamot", "Mandarin", "Grapefruit"],
     ["Fig", "Peony", "Neroli"],
@@ -817,9 +823,11 @@ export function AtelierPage() {
   ]
   const selectedGroups = ingredientGroups.map(group => group.filter(item=>session.selected.includes(item)))
   const completeGroups = selectedGroups.filter(group=>group.length>0).length
-  const stageIndex = completeGroups
+  const missingNotes = ["TOP", "HEART", "BASE"].filter((_, index) => selectedGroups[index].length === 0)
   const product = atelierProducts[session.productType]
-  const blendName = session.selected.length===3 && ingredients.every(note=>session.selected.includes(note)) ? recipe.name : "MY AURA Blend"
+  const nameIdeas = suggestBlendNames(session.selected)
+  const blendName = normalizeBlendName(session.name, nameIdeas[0].en)
+  const blendStory = describeBlend(session.selected)
 
   const updateSession = (next: Partial<AtelierSession>) =>
     setSessions((current) => ({
@@ -828,27 +836,40 @@ export function AtelierPage() {
     }))
 
   const selectIngredient = (ingredient: string) => {
-    if (["BLENDING","REVEAL","BOTTLE","PRODUCT_SELECTION","SUMMARY"].includes(session.stage)) return
-    const selected = session.selected.includes(ingredient)
-      ? session.selected.filter(item=>item!==ingredient)
-      : [...session.selected,ingredient]
-    const complete=ingredientGroups.filter(group=>group.some(item=>selected.includes(item))).length
-    const stage:AtelierStage = complete === 3 ? "READY" : complete===2 ? "HEART_SELECTED" : complete===1 ? "TOP_SELECTED" : "EMPTY"
-    updateSession({selected,stage})
+    setSessions((current) => {
+      const currentSession = current[recipeId]
+      if (["BLENDING", "REVEAL", "BOTTLE", "PRODUCT_SELECTION", "SUMMARY"].includes(currentSession.stage)) return current
+      const selected = currentSession.selected.includes(ingredient)
+        ? currentSession.selected.filter((item) => item !== ingredient)
+        : [...currentSession.selected, ingredient]
+      const complete = ingredientGroups.filter((group) => group.some((item) => selected.includes(item))).length
+      const stage: AtelierStage = complete === 3 ? "READY" : complete === 2 ? "HEART_SELECTED" : complete === 1 ? "TOP_SELECTED" : "EMPTY"
+      return { ...current, [recipeId]: { ...currentSession, selected, stage } }
+    })
   }
 
   const stageCopy: Record<AtelierStage, string> = {
-    EMPTY: "TOP · HEART · BASE에서 향료를 골라 주세요.",
-    TOP_SELECTED: "좋아요. 나머지 향 계열도 선택해 보세요.",
-    HEART_SELECTED: "한 가지 계열을 더 선택하면 블렌딩할 수 있어요.",
+    EMPTY: "향료를 골라 주세요.",
+    TOP_SELECTED: "다른 노트도 골라 주세요.",
+    HEART_SELECTED: "한 가지 노트가 남았어요.",
     BASE_SELECTED: "선택한 향의 구성을 확인해 주세요.",
-    READY: "향료가 준비됐어요. 원하는 만큼 더 추가할 수 있어요.",
+    READY: "이제 섞어 볼까요?",
     BLENDING: "용기를 직접 움직여 향을 섞어 보세요.",
     REVEAL: "보이지 않던 향이 하나의 형태로 드러납니다.",
-    BOTTLE: "당신의 향을 AURA 보틀에 담았습니다.",
+    BOTTLE: "당신의 향에 이름을 붙여 주세요.",
     PRODUCT_SELECTION: "어떤 형태로 향을 간직할까요?",
     SUMMARY: "당신의 AURA가 완성됐어요.",
   }
+
+  const notesLocked = ["BLENDING", "REVEAL", "BOTTLE", "PRODUCT_SELECTION", "SUMMARY"].includes(session.stage)
+  const stageHints: Partial<Record<AtelierStage, string>> = {
+    BLENDING: "용기를 움직이거나 아래 버튼으로 향료를 섞어 주세요.",
+    REVEAL: "완성된 향을 확인하고 다음 단계에서 이름을 붙여 주세요.",
+    BOTTLE: "추천 이름을 고르거나 직접 입력하세요. 보틀 라벨에 표시됩니다.",
+    PRODUCT_SELECTION: "제품 종류와 용량을 확인해 주세요. 향료 구성은 그대로 유지됩니다.",
+    SUMMARY: "이름, 향료 구성, 제품과 용량을 확인한 뒤 장바구니에 담으세요.",
+  }
+  const stageHint = stageHints[session.stage] ?? (missingNotes.length > 0 ? `${missingNotes.join(" · ")}에서 하나 이상 선택해 주세요.` : session.stage === "READY" ? "향료를 더 추가하거나 블렌딩을 시작하세요." : "선택한 향료 구성은 확정되었습니다.")
 
   if (view === "MOOD") {
     return (
@@ -874,6 +895,7 @@ export function AtelierPage() {
             ].map(([key, number, title, note, asset]) => (
               <Button
                 className={`mood-option ${mood === key ? "is-active" : ""}`}
+                ariaPressed={mood === key}
                 key={key}
                 onClick={() => {
                   setMood(key)
@@ -884,7 +906,7 @@ export function AtelierPage() {
                   asset={asset}
                   label={`${title} 향의 아트 오브젝트`}
                 />
-                <span>{number}</span>
+                <span>{number}{mood === key ? " · 선택한 분위기" : ""}</span>
                 <strong>{title}</strong>
                 <small>{note}</small>
                 <Icon name="arrow" />
@@ -975,12 +997,15 @@ export function AtelierPage() {
           <div className="atelier-panel-heading">
             <p className="eyebrow">INGREDIENT LIBRARY</p>
             <Title as="h3">향료 라이브러리</Title>
-            <p>각 노트에서 하나 이상, 원하는 향료를 자유롭게 선택하거나 해제하세요.</p>
+            <p>{notesLocked ? "향 구성이 확정되었어요. 선택한 향료를 확인해 주세요." : "각 노트에서 하나 이상 선택하세요. 여러 향료를 함께 골라도 좋아요."}</p>
+            <p role="status">
+              {session.selected.length}가지 향료 선택 · {missingNotes.length > 0 ? `${missingNotes.join(" · ")}에서 향료를 더 골라 주세요.` : session.stage === "READY" ? "블렌딩할 준비가 됐어요." : "선택한 향료 구성이 확정됐어요."}
+            </p>
           </div>
           <div className="ingredient-groups">
             {allIngredients.map((group, groupIndex) => (
               <div className="ingredient-group" key={group.stage}>
-                <span>{group.stage}</span>
+                <span>{group.stage} · {selectedGroups[groupIndex].length}개 선택</span>
                 <div>
                   {group.items.map((ingredient) => {
                     const active = session.selected.includes(ingredient)
@@ -994,13 +1019,17 @@ export function AtelierPage() {
                       onClick={()=>selectIngredient(ingredient)}>
                       <img className="ingredient-illustration" src={`/assets/ingredients/${imageKey}.png`} alt=""/>
                       <strong>{ingredient}</strong>
-                      <small>{active ? "선택됨 · 다시 누르면 해제" : "선택하기"}</small>
+                      <small>{locked ? active ? "✓ 구성 확정" : "선택하지 않음" : active ? "✓ 선택됨" : "선택하기"}</small>
                     </Button>
                   })}
                 </div>
               </div>
             ))}
           </div>
+          {!notesLocked && <div className="atelier-mobile-selection">
+            <span>{session.selected.length}가지 선택 · {notesLocked ? "구성 확정" : missingNotes.length ? `${missingNotes.length}개 노트 남음` : "블렌딩 준비 완료"}</span>
+            {session.stage === "READY" && <Button onClick={() => updateSession({ stage: "BLENDING" })}>선택한 향료 섞기</Button>}
+          </div>}
         </aside>
 
         <section className="vessel-stage">
@@ -1011,6 +1040,7 @@ export function AtelierPage() {
                 : `${recipe.id} · ${session.stage.replace("_", " ")}`}
             </p>
             <Title>{stageCopy[session.stage]}</Title>
+            <p className="atelier-stage-hint">{stageHint}</p>
           </div>
 
           <div
@@ -1018,52 +1048,36 @@ export function AtelierPage() {
           >
             {session.stage === "BLENDING" && <BlendVessel ingredients={session.selected} onComplete={()=>updateSession({stage:"REVEAL"})}/>}
             {!showArt && !showBottle && !showProduct && session.stage !== "BLENDING" && (
-              <div className={`mixing-flask fill-${Math.min(3,completeGroups)}`}>
-                {session.selected.slice(0,9).map((item,index)=><img key={item} className="vessel-botanical" style={{"--i":index} as CSSProperties} src={`/assets/ingredients/${item.toLowerCase().replaceAll(" ","-")}.png`} alt=""/>)}
-                <div className="flask-liquid" />
-                <div className="flask-shine" />
-                <div className="flask-label">
-                  AURA
-                  <br />
-                  LAB 01
-                </div>
-                <div className="selected-ingredients">
-                  {session.selected.map((item, index) => <span key={item} style={{ "--i": index } as CSSProperties}>{item}</span>)}
-                </div>
-              </div>
+              <AtelierFlask ingredients={session.selected} />
             )}
             {showArt && (
-              <div className="reveal-object">
-                <div className="custom-art-composition">{session.selected.slice(0,7).map(name=><img key={name} src={`/assets/ingredients/${name.toLowerCase().replaceAll(" ","-")}.png`} alt="" />)}</div>
-                <span>당신이 고른 {session.selected.length}가지 향료를 표현한 아트 오브젝트</span>
+              <div className="reveal-object aura-result-composition">
+                <AtelierFlask ingredients={session.selected} blended progress={100} />
+                <div className="aura-result-notes" aria-label="완성된 향료 구성">
+                  {session.selected.map((name) => <span key={name}>{name}</span>)}
+                </div>
+                {blendStory ? <div className="aura-result-story">
+                  <strong>{blendStory.headline}</strong>
+                  <p>{blendStory.story}</p>
+                  <span className="aura-result-moods">{blendStory.moods.map((mood) => <em key={mood}>{mood}</em>)}</span>
+                </div> : <span className="aura-result-caption">{session.selected.length}가지 향료로 완성한 당신의 블렌드</span>}
               </div>
             )}
             {showBottle && (
               <div className="reveal-object bottle-object">
-                <AssetImage
-                  asset={recipe.bottle}
-                  label={`${blendName} AURA 향수병`}
-                />
-                <span>{blendName} · EAU DE PARFUM</span>
+                <AtelierProductVisual type="Perfume" name={blendName} ingredients={session.selected} />
               </div>
             )}
             {showProduct && (
-              <div
-                className={`final-product product-${session.productType.toLowerCase().replace(" ", "-")}`}
-              >
-                {session.productType === "Perfume" ? (
-                  <AssetImage
-                    asset={recipe.bottle}
-                    label={`${blendName} 향수`}
-                  />
-                ) : (
-                  <div className="product-silhouette">
-                    <span>AURA</span>
-                    <small>{recipe.name}</small>
-                  </div>
-                )}
-                <p>{product.korean}</p>
+              <div className={`final-product aura-result-product product-${session.productType.toLowerCase().replace(" ", "-")}`}>
+                <AtelierProductVisual type={session.productType} name={blendName} ingredients={session.selected} />
+                <p>{product.korean} · {atelierVolumes[session.productType]}</p>
                 <strong>{formatPoint(product.price)}</strong>
+                {session.stage === "SUMMARY" && blendStory && <div className="aura-result-story is-compact">
+                  <strong>{blendStory.headline}</strong>
+                  <p>{blendStory.story}</p>
+                  <span className="aura-result-moods">{blendStory.moods.map((mood) => <em key={mood}>{mood}</em>)}</span>
+                </div>}
               </div>
             )}
           </div>
@@ -1080,18 +1094,21 @@ export function AtelierPage() {
             {session.stage === "REVEAL" && (
               <Button
                 className="atelier-primary"
-                onClick={() => updateSession({ stage: "BOTTLE" })}
+                onClick={() => updateSession({ stage: "BOTTLE", name: session.name || nameIdeas[0].en })}
               >
                 완성된 향 만나보기
               </Button>
             )}
             {session.stage === "BOTTLE" && (
-              <Button
-                className="atelier-primary"
-                onClick={() => updateSession({ stage: "PRODUCT_SELECTION" })}
-              >
-                간직할 형태 선택하기
-              </Button>
+              <div className="atelier-naming-step">
+                <AtelierNaming name={session.name} ingredients={session.selected} fallback={nameIdeas[0].en} onChange={(name) => updateSession({ name })} />
+                <Button
+                  className="atelier-primary"
+                  onClick={() => updateSession({ stage: "PRODUCT_SELECTION", name: blendName })}
+                >
+                  이 이름으로 간직할 형태 고르기
+                </Button>
+              </div>
             )}
             {session.stage === "PRODUCT_SELECTION" && (
               <Button
@@ -1111,7 +1128,8 @@ export function AtelierPage() {
                     ingredients: session.selected,
                     productType: session.productType,
                     pointPrice: product.price,
-                    image: recipe.bottle,
+                    volume: atelierVolumes[session.productType],
+                    image: `atelier-${session.productType.toLowerCase().replaceAll(" ", "-")}`,
                   })
                   router.push("/cart")
                 }}
@@ -1134,7 +1152,12 @@ export function AtelierPage() {
             <p>{recipe.description}</p>
             <span className="recipe-mood">{recipe.mood}</span>
           </div>
-          <div className="recipe-progress">
+          {session.stage === "SUMMARY" && <div className="atelier-selection-summary" aria-label="최종 구성 요약">
+            <strong>{blendName}</strong>
+            <span>{product.korean} · {atelierVolumes[session.productType]} · {formatPoint(product.price)}</span>
+            {selectedGroups.map((notes, index) => <p key={index}><b>{["TOP", "HEART", "BASE"][index]}</b> {notes.join(", ")}</p>)}
+          </div>}
+          {session.stage !== "SUMMARY" && <div className="recipe-progress">
             {[
               ["TOP", selectedGroups[0].join(", ") || "선택 전"],
               ["HEART", selectedGroups[1].join(", ") || "선택 전"],
@@ -1150,19 +1173,24 @@ export function AtelierPage() {
                 <em>{selectedGroups[index].length ? "SELECTED" : "WAITING"}</em>
               </div>
             ))}
-          </div>
+          </div>}
           {["PRODUCT_SELECTION", "SUMMARY"].includes(session.stage) && (
             <div className="product-options">
               <p className="eyebrow">FINAL PRODUCT</p>
               {(Object.keys(atelierProducts) as ProductType[]).map((type) => (
                 <Button
-                  className={session.productType === type ? "is-active" : ""}
+                  className={`atelier-product-option ${session.productType === type ? "is-active" : ""}`}
+                  ariaPressed={session.productType === type}
+                  ariaLabel={`${type} · ${atelierProducts[type].korean} · ${atelierVolumes[type]} · ${formatPoint(atelierProducts[type].price)}`}
                   key={type}
                   onClick={() => updateSession({ productType: type })}
                 >
                   <span>
-                    <strong>{type}</strong>
-                    <small>{atelierProducts[type].caption}</small>
+                    <strong className="atelier-product-name" aria-hidden="true">
+                      <span className="atelier-product-name-english" lang="en">{type}</span>
+                      <span className="atelier-product-name-korean" lang="ko">{atelierProducts[type].korean}</span>
+                    </strong>
+                    <small>{atelierVolumes[type]} · {atelierProducts[type].caption}</small>
                   </span>
                   <em>{formatPoint(atelierProducts[type].price)}</em>
                 </Button>
@@ -1183,6 +1211,7 @@ export function AtelierPage() {
                     updateSession({
                       selected: [],
                       stage: "EMPTY",
+                      name: "",
                     })
                   }
                 >
@@ -1283,6 +1312,8 @@ export function CardsPage() {
               </div>
               <BenefitRow label="연회비" value={card.fee} />
               <BenefitRow label="전월 실적" value={card.performance} />
+              <BenefitRow label="기본 적립률" value={card.basic} />
+              <BenefitRow label="뷰티 적립률" value={card.beauty} />
               <BenefitRow label="월 특별 적립 한도" value={card.limit} />
               <BenefitRow
                 label="Partner Perfumery 적립률"

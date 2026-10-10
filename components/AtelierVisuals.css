@@ -1,0 +1,115 @@
+/* Atelier visuals only; the shared layout and other pages keep their styles. */
+.atelier-page .aura-flask-visual { width:min(100%,22rem); height:100%; max-height:30rem; overflow:visible; }
+.aura-flask-liquid { transition:d .55s cubic-bezier(.3,.7,.3,1), stroke-opacity .4s ease; }
+/* Notes rest at translate(x,y); position changes glide, the first appearance drops in through the neck. */
+.aura-flask-note { transition:transform .5s cubic-bezier(.3,.7,.3,1), opacity .4s ease; }
+.aura-flask-drop { animation:aura-note-drop .75s cubic-bezier(.45,0,.4,1) both; }
+.aura-flask-ripple { transform-box:fill-box; transform-origin:center; opacity:0; animation:aura-ripple .9s ease-out .55s both; }
+.aura-flask-layer-tag { transition:transform .55s cubic-bezier(.3,.7,.3,1); }
+.aura-flask-swirl { animation:aura-swirl 2.4s linear infinite; }
+.aura-flask-bubble { opacity:0; animation:aura-bubble 2.2s ease-in infinite; }
+.aura-flask-glow { transform-box:fill-box; transform-origin:center; animation:aura-glow 2.6s ease-in-out infinite alternate; }
+.atelier-page .aura-product-artwork { width:min(100%,22rem); height:100%; max-height:30rem; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.aura-product-artwork > svg { width:100%; height:calc(100% - 2rem); min-height:0; }
+.aura-product-blend-name { color:#e8dfd0; font-family:var(--font-serif); font-size:1rem; letter-spacing:.04em; text-align:center; }
+.atelier-page .aura-result-composition { display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; gap:.8rem; }
+.atelier-page .aura-result-composition .aura-flask-visual { height:70%; }
+.aura-result-notes { display:flex; flex-wrap:wrap; justify-content:center; gap:.35rem; max-width:28rem; }
+.aura-result-notes span { color:#ddd3c3; font-size:.68rem; line-height:1.5; padding:.25rem .55rem; border:1px solid #645c4f; border-radius:1rem; }
+.atelier-page .aura-result-caption { position:static; font-size:.75rem; color:#d2c7b7; letter-spacing:0; text-align:center; }
+.atelier-page .blend-illustration > .aura-flask-visual { width:100%; height:100%; }
+.atelier-page .aura-result-product { gap:.35rem; }
+.atelier-page .aura-result-product > p { margin:.4rem 0 0; color:#e8dfd0; font-size:.85rem; }
+.atelier-page .aura-result-product > strong { font-size:1.65rem; }
+@keyframes aura-note-drop {
+  0% { opacity:0; transform:translate(var(--drop-x),var(--drop-y)) scale(.45) rotate(-25deg); }
+  15% { opacity:1; }
+  70% { transform:translate(0,6px) scale(1.04) rotate(6deg); }
+  100% { opacity:1; transform:translate(0,0) scale(1) rotate(0); }
+}
+@keyframes aura-ripple { 0% { opacity:.7; transform:scale(.2); stroke-width:2; } 100% { opacity:0; transform:scale(2.2); stroke-width:.5; } }
+@keyframes aura-swirl { to { transform:rotate(360deg); } }
+@keyframes aura-bubble { 0% { opacity:0; transform:translateY(0); } 20% { opacity:.5; } 100% { opacity:0; transform:translateY(var(--bubble-rise)); } }
+@keyframes aura-glow { from { opacity:.55; transform:scale(.92); } to { opacity:1; transform:scale(1.05); } }
+@media(max-width:560px) {
+  .atelier-page .aura-flask-visual { max-height:22rem; }
+  .aura-result-notes { gap:.25rem; }
+  .aura-result-notes span { font-size:.6rem; }
+}
+@media(prefers-reduced-motion:reduce) { .aura-flask-drop,.aura-flask-ripple,.aura-flask-swirl,.aura-flask-bubble,.aura-flask-glow { animation:none; } .aura-flask-bubble,.aura-flask-ripple { display:none; } .aura-flask-liquid,.aura-flask-note,.aura-flask-layer-tag { transition:none; } }
+.atelier-page .aura-result-product .aura-product-artwork { flex:1; height:auto; min-height:0; }
+.atelier-page .aura-result-product .aura-product-artwork > svg { flex:1; height:auto; min-height:0; }
+.atelier-page .aura-result-product > p,
+.atelier-page .aura-result-product > strong,
+.atelier-page .aura-product-blend-name { flex-shrink:0; }
+@media(max-width:560px) {
+  .atelier-page .atelier-object-frame { height:28rem; min-height:28rem; margin-block:1rem; }
+  .atelier-page .aura-result-product .aura-product-artwork { width:min(100%,17rem); }
+}
+/* Product-specific assets passed by Atelier through the existing image contract. */
+.asset-image.asset-atelier-hand-cream { background-image:url('/assets/atelier/hand-cream.svg'); background-position:center!important; background-size:contain!important; background-repeat:no-repeat; }
+.asset-image.asset-atelier-diffuser { background-image:url('/assets/atelier/diffuser.svg'); background-position:center!important; background-size:contain!important; background-repeat:no-repeat; }
+.asset-image.asset-atelier-perfume { background-image:url('/assets/atelier/perfume.svg'); background-position:center!important; background-size:contain!important; background-repeat:no-repeat; }
+/* Blending: the vessel springs back upright after each shake. */
+.atelier-page .blend-illustration { transition:transform .32s cubic-bezier(.34,1.56,.64,1); }
+.atelier-page .blend-controls button:disabled { opacity:.4; cursor:default; }
+.atelier-page .blend-interaction.is-complete .blend-guide { color:#e8dfd0; }
+.atelier-page .blend-touch-target { height:23rem; }
+.atelier-page .blend-illustration { width:19rem; height:22rem; }
+@media(max-width:560px) {
+  .atelier-page .blend-touch-target { height:18rem; }
+  .atelier-page .blend-illustration { width:15rem; height:17.5rem; transform:rotate(var(--blend-rotation)); }
+}
+/* Mobile: keep the library right under the vessel so picking a note and seeing it drop stay close. */
+@media(max-width:560px) {
+  .atelier-page .vessel-stage { min-height:0; }
+  .atelier-page .ingredient-library { order:2; padding-top:1rem; }
+  .atelier-page .recipe-panel { order:3; }
+  .atelier-page .atelier-object-frame:is(.stage-empty,.stage-top_selected,.stage-heart_selected,.stage-base_selected,.stage-ready) { height:19rem; min-height:19rem; margin-block:.5rem; }
+}
+/* Desktop: the vessel and its action stay in view while the longer library column scrolls. */
+@media(min-width:901px) {
+  .atelier-page .vessel-stage { position:sticky; top:4.75rem; align-self:start; height:calc(100svh - 4.75rem); min-height:38rem; padding-block:2rem 1.5rem; }
+  .atelier-page .vessel-stage .atelier-object-frame { height:100%; min-height:0; max-height:39rem; }
+}
+/* Korean copy: break between words, not inside them. */
+.atelier-page :is(h1,h2,h3,p,small,strong) { word-break:keep-all; overflow-wrap:break-word; }
+.atelier-page :is(h1,h2) { text-wrap:balance; }
+/* Stage visuals scale down to the space left by the copy and controls instead of overflowing it. */
+.atelier-page .atelier-object-frame { grid-template-rows:minmax(0,1fr); }
+.atelier-page .atelier-object-frame > .reveal-object { height:100%; min-height:0; }
+.atelier-page .bottle-object .aura-product-artwork { height:100%; min-height:0; }
+.atelier-page .bottle-object .aura-product-artwork > svg { height:100%; }
+/* What the finished blend smells like, written from TOP to BASE. */
+.atelier-page .aura-result-story { flex-shrink:0; max-width:26rem; text-align:center; animation:atelierReveal .8s var(--ease) .25s both; }
+.atelier-page .aura-result-story > strong { display:block; color:#e5c9a8; font-family:var(--font-serif); font-size:1.05rem; font-weight:400; }
+.atelier-page .aura-result-story > p { margin:.4rem 0 0; color:#d2c7b7; font-size:.78rem; line-height:1.65; }
+.atelier-page .aura-result-story.is-compact { margin-top:.6rem; }
+.atelier-page .aura-result-story.is-compact > strong { font-size:.9rem; }
+.atelier-page .aura-result-story.is-compact > p { font-size:.7rem; }
+@media(prefers-reduced-motion:reduce) { .atelier-page .aura-result-story { animation:none; } }
+.atelier-page .aura-result-moods { display:flex; flex-wrap:wrap; justify-content:center; gap:.35rem; margin-top:.6rem; }
+.atelier-page .aura-result-moods > em { padding:.2rem .6rem; border:1px solid rgba(229,201,168,.35); border-radius:1rem; color:#e5c9a8; font-size:.65rem; font-style:normal; }
+.atelier-page .aura-result-story.is-compact .aura-result-moods { margin-top:.4rem; }
+@media(max-width:560px) { .atelier-page .aura-result-composition .aura-flask-visual { height:58%; } }
+/* Selection readability and a compact mobile action near the ingredient list. */
+.atelier-page .ingredient-chip small { font-size:.72rem; color:#bfb6aa; }
+.atelier-page .ingredient-chip.is-selected { border-color:#c8b69a; background:rgba(229,201,168,.12); }
+.atelier-page .ingredient-chip.is-selected:disabled { opacity:.85; }
+.atelier-page .atelier-panel-heading > p:last-child { color:#bfb6aa; font-size:.8rem; }
+.atelier-page .atelier-stage-hint { margin:.6rem auto 0; max-width:30rem; color:#c7bcad; font-size:.85rem; line-height:1.6; }
+.atelier-page .atelier-mobile-selection { display:none; }
+.atelier-page .atelier-selection-summary { margin:1rem 0; padding:1rem; border:1px solid #766957; background:rgba(229,201,168,.06); }
+.atelier-selection-summary > strong,.atelier-selection-summary > span { display:block; overflow-wrap:anywhere; }
+.atelier-selection-summary > span { margin:.5rem 0 1rem; color:#e5c9a8; }
+.atelier-selection-summary p { color:#d2c7b7; font-size:.8rem; line-height:1.6; }
+.atelier-selection-summary b { display:block; color:#e5c9a8; font-size:.7rem; }
+@media(max-width:560px) {
+  .atelier-page .ingredient-chip small { font-size:.7rem; }
+  .atelier-page .atelier-mobile-selection { position:sticky; bottom:.5rem; z-index:6; display:flex; flex-direction:column; gap:.5rem; padding:.75rem; background:#25231f; border:1px solid #766957; box-shadow:0 4px 20px #0006; }
+  .atelier-mobile-selection > span { color:#e8dfd0; font-size:.8rem; }
+  .atelier-mobile-selection button { min-height:44px; padding:.7rem; background:#e8dfd0; color:#25231f; border:0; }
+}
+/* Keep the compact summary; improve contrast and group separation without enlarging it. */
+.atelier-page .atelier-selection-summary p { color:#e6ded1; margin:.65rem 0 0; }
+.atelier-page .atelier-selection-summary b { color:#e6c69c; margin-bottom:.15rem; }
