@@ -92,3 +92,24 @@
 .atelier-page .aura-result-moods > em { padding:.2rem .6rem; border:1px solid rgba(229,201,168,.35); border-radius:1rem; color:#e5c9a8; font-size:.65rem; font-style:normal; }
 .atelier-page .aura-result-story.is-compact .aura-result-moods { margin-top:.4rem; }
 @media(max-width:560px) { .atelier-page .aura-result-composition .aura-flask-visual { height:58%; } }
+/* Selection readability and a compact mobile action near the ingredient list. */
+.atelier-page .ingredient-chip small { font-size:.72rem; color:#bfb6aa; }
+.atelier-page .ingredient-chip.is-selected { border-color:#c8b69a; background:rgba(229,201,168,.12); }
+.atelier-page .ingredient-chip.is-selected:disabled { opacity:.85; }
+.atelier-page .atelier-panel-heading > p:last-child { color:#bfb6aa; font-size:.8rem; }
+.atelier-page .atelier-stage-hint { margin:.6rem auto 0; max-width:30rem; color:#c7bcad; font-size:.85rem; line-height:1.6; }
+.atelier-page .atelier-mobile-selection { display:none; }
+.atelier-page .atelier-selection-summary { margin:1rem 0; padding:1rem; border:1px solid #766957; background:rgba(229,201,168,.06); }
+.atelier-selection-summary > strong,.atelier-selection-summary > span { display:block; overflow-wrap:anywhere; }
+.atelier-selection-summary > span { margin:.5rem 0 1rem; color:#e5c9a8; }
+.atelier-selection-summary p { color:#d2c7b7; font-size:.8rem; line-height:1.6; }
+.atelier-selection-summary b { display:block; color:#e5c9a8; font-size:.7rem; }
+@media(max-width:560px) {
+  .atelier-page .ingredient-chip small { font-size:.7rem; }
+  .atelier-page .atelier-mobile-selection { position:sticky; bottom:.5rem; z-index:6; display:flex; flex-direction:column; gap:.5rem; padding:.75rem; background:#25231f; border:1px solid #766957; box-shadow:0 4px 20px #0006; }
+  .atelier-mobile-selection > span { color:#e8dfd0; font-size:.8rem; }
+  .atelier-mobile-selection button { min-height:44px; padding:.7rem; background:#e8dfd0; color:#25231f; border:0; }
+}
+/* Keep the compact summary; improve contrast and group separation without enlarging it. */
+.atelier-page .atelier-selection-summary p { color:#e6ded1; margin:.65rem 0 0; }
+.atelier-page .atelier-selection-summary b { color:#e6c69c; margin-bottom:.15rem; }

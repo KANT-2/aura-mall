@@ -1,5 +1,6 @@
 "use client"
 
+import { atelierVolumes } from "@/data/atelier"
 import { useId, type CSSProperties } from "react"
 import "./AtelierVisuals.css"
 
@@ -140,13 +141,14 @@ export function AtelierFlask({ ingredients, progress = 0, blended = false, tilt 
 }
 
 const LABEL_NAME_SIZE = 14
-const LABEL_NAME_WIDTH = 96
 /** Rough rendered width: Hangul is near full-width, Latin about half. */
 const labelTextWidth = (text: string) => [...text].reduce((width, char) => width + LABEL_NAME_SIZE * (/[가-힣]/.test(char) ? 1 : /[A-Z]/.test(char) ? .68 : .52), 0)
 
 export function AtelierProductVisual({ type, name, ingredients }: { type: ProductKind; name: string; ingredients: string[] }) {
   const id = useId().replaceAll(":", "")
   const labelY = type === "Diffuser" ? 258 : type === "Hand Cream" ? 218 : 228
+  const labelWidth = type === "Hand Cream" ? 84 : 108
+  const labelNameWidth = labelWidth - 12
   return <div className="aura-product-artwork">
     <svg viewBox="0 0 320 400" role="img" aria-label={`${name} ${type === "Hand Cream" ? "핸드크림" : type === "Diffuser" ? "디퓨저" : "향수"} 완성 제품`}>
       <defs><linearGradient id={`${id}-product`}><stop stopColor={blendColor(ingredients)} stopOpacity=".8"/><stop offset=".45" stopColor="#eee6d7" stopOpacity=".22"/><stop offset="1" stopColor={blendColor(ingredients)} stopOpacity=".65"/></linearGradient></defs>
@@ -167,14 +169,14 @@ export function AtelierProductVisual({ type, name, ingredients }: { type: Produc
         <rect x="125" y="78" width="70" height="51" rx="6" fill="#292724" stroke="#c7b590"/>
         <path d="M102 169 V317" stroke="white" strokeOpacity=".4" strokeWidth="4" strokeLinecap="round"/>
       </g>}
-      <rect x="106" y={labelY - 26} width="108" height="80" rx="2" fill="#eee7db" fillOpacity=".96"/>
+      <rect x={160 - labelWidth / 2} y={labelY - 26} width={labelWidth} height="80" rx="2" fill="#eee7db" fillOpacity=".96"/>
       <text x="160" y={labelY - 10} textAnchor="middle" fill="#282622" fontSize="9" letterSpacing="3">AURA</text>
       <path d={`M146 ${labelY - 3} H174`} stroke="#b9ab95" strokeWidth=".6"/>
       {/* The blend's own name, squeezed to the label width when it runs long. */}
       <text x="160" y={labelY + 15} textAnchor="middle" fill="#282622" fontSize={LABEL_NAME_SIZE} style={{ fontFamily: "var(--font-serif)" }}
-        {...(labelTextWidth(name) > LABEL_NAME_WIDTH ? { textLength: LABEL_NAME_WIDTH, lengthAdjust: "spacingAndGlyphs" } : {})}>{name}</text>
+        {...(labelTextWidth(name) > labelNameWidth ? { textLength: labelNameWidth, lengthAdjust: "spacingAndGlyphs" } : {})}>{name}</text>
       <text x="160" y={labelY + 33} textAnchor="middle" fill="#655c4f" fontSize="6" letterSpacing="1.2">PERSONAL BLEND</text>
-      <text x="160" y={labelY + 44} textAnchor="middle" fill="#655c4f" fontSize="6" letterSpacing=".8">{type === "Hand Cream" ? "HAND CREAM" : type === "Diffuser" ? "DIFFUSER" : "EAU DE PARFUM"}</text>
+      <text x="160" y={labelY + 44} textAnchor="middle" fill="#655c4f" fontSize="6" letterSpacing=".8">{type === "Hand Cream" ? "HAND CREAM" : type === "Diffuser" ? "DIFFUSER" : "EAU DE PARFUM"} · {atelierVolumes[type]}</text>
     </svg>
     <span className="aura-product-blend-name">{name}</span>
   </div>
