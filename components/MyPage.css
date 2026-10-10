@@ -1,0 +1,39 @@
+/* MyPage: demo member's points, card and point history. */
+.mypage-wallet-month { margin:0; color:var(--muted); font-size:.85rem; }
+.mypage-wallet-month b { color:#1f1d1a; font-weight:500; }
+.mypage-wallet-link { margin-top:auto; font-size:.8rem; text-decoration:underline; text-underline-offset:5px; }
+
+.mypage-member-card { gap:1.1rem; }
+.mypage-card-visual { position:relative; width:min(100%,19rem); aspect-ratio:1.586; }
+.mypage-card-visual .physical-card-face { padding:1.1rem 1.2rem; }
+.mypage-card-visual .masked-number { position:relative; z-index:2; font-size:.78rem; letter-spacing:.08em; }
+.mypage-card-rates { display:grid; grid-template-columns:repeat(3,auto); justify-content:start; gap:1.6rem; margin:0; }
+.mypage-card-rates div { display:grid; gap:.2rem; }
+.mypage-card-rates dt { font-size:.7rem; opacity:.75; }
+.mypage-card-rates dd { margin:0; font-family:var(--font-serif); font-size:1.25rem; }
+.mypage-card-limit p { display:flex; justify-content:space-between; gap:1rem; margin:0 0 .5rem; font-size:.78rem; }
+.mypage-card-limit p span { opacity:.8; }
+.mypage-card-limit p b { font-weight:500; }
+.mypage-card-limit > div { height:3px; background:rgba(255,255,255,.22); }
+.mypage-card-limit i { display:block; height:100%; background:#f3eaef; }
+
+.mypage-history-head { display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:.5rem; }
+.mypage-history-head h2 { margin:0; }
+.mypage-history-filter { display:flex; gap:.4rem; }
+.mypage-history-filter button { padding:.45rem .9rem; border:1px solid var(--line); border-radius:99px; background:transparent; color:inherit; font-size:.78rem; cursor:pointer; }
+.mypage-history-filter button.is-active { background:#1f1d1a; border-color:#1f1d1a; color:#f7f4ee; }
+.mypage-history article > span:first-child em { display:inline-block; width:max-content; padding:.1rem .5rem; border:1px solid var(--line); border-radius:99px; font-size:.68rem; font-style:normal; color:var(--muted); }
+.mypage-history article.is-earn .mypage-history-amount strong { color:#5b4e59; }
+.mypage-history .mypage-history-amount { justify-items:end; text-align:right; }
+
+.mypage-history-empty { display:grid; gap:.6rem; padding:2.5rem; background:#f0eee8; }
+.mypage-history-empty > strong { font-family:var(--font-serif); font-size:1.4rem; font-weight:400; }
+.mypage-history-empty > p { max-width:30rem; margin:0; color:var(--muted); font-size:.9rem; line-height:1.7; word-break:keep-all; }
+.mypage-history-empty > div { display:flex; flex-wrap:wrap; gap:1rem 2.5rem; margin-top:1rem; }
+@media(max-width:560px) {
+  .mypage-card-visual { width:100%; }
+  .mypage-history article { gap:1rem; }
+  .mypage-history-empty { padding:1.5rem; }
+  .mypage-history-empty > div { flex-direction:column; }
+}
+.mypage-dev-badge { margin-left:.8rem; padding:.15rem .5rem; border:1px dashed currentColor; border-radius:99px; letter-spacing:0; }

@@ -1,0 +1,36 @@
+/** AURA card tiers. Shared by the card comparison page and the member's card on MyPage. */
+export const auraCards = [
+  {
+    name: "Dew",
+    tier: "START",
+    className: "physical-dew",
+    fee: "10,000원",
+    performance: "없음",
+    limit: "3,000P",
+    basic: "0.5%",
+    beauty: "1%",
+    partner: "1%",
+  },
+  {
+    name: "Velvet",
+    tier: "TASTE",
+    className: "physical-velvet",
+    fee: "30,000원",
+    performance: "300,000원",
+    limit: "8,000P",
+    basic: "0.7%",
+    beauty: "3%",
+    partner: "5%",
+  },
+  {
+    name: "Amber",
+    tier: "PRIVILEGE",
+    className: "physical-amber",
+    fee: "50,000원",
+    performance: "500,000원",
+    limit: "15,000P",
+    basic: "1%",
+    beauty: "5%",
+    partner: "5%",
+  },
+]

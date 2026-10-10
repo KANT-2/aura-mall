@@ -11,6 +11,7 @@ import {
 } from "react"
 import { atelierVolumes } from "@/data/atelier"
 import { formatPoint, products } from "@/data/products"
+import { auraCards } from "@/data/cards"
 import type { Product } from "@/types/product"
 import NextLink from "next/link"
 import { BlendVessel } from "@/components/BlendVessel"
@@ -21,6 +22,7 @@ import { AtelierFlask, AtelierProductVisual } from "./AtelierVisuals"
 import { AtelierNaming, normalizeBlendName, suggestBlendNames } from "./AtelierNaming"
 import { describeBlend } from "./AtelierDescription"
 import "./AtelierProductName.css"
+import "./MyPage.css"
 import { type AuraMember, currentMember, signOut, registerMember, authenticateMember } from "@/components/LocalAccount"
 import { useRouter, useSearchParams } from "next/navigation"
 
@@ -1235,41 +1237,7 @@ export function AtelierPage() {
 }
 
 export function CardsPage() {
-  const cards = [
-    {
-      name: "Dew",
-      tier: "START",
-      className: "physical-dew",
-      fee: "10,000원",
-      performance: "없음",
-      limit: "3,000P",
-      basic: "0.5%",
-      beauty: "1%",
-      partner: "1%",
-    },
-    {
-      name: "Velvet",
-      tier: "TASTE",
-      className: "physical-velvet",
-      fee: "30,000원",
-      performance: "300,000원",
-      limit: "8,000P",
-      basic: "0.7%",
-      beauty: "3%",
-      partner: "5%",
-    },
-    {
-      name: "Amber",
-      tier: "PRIVILEGE",
-      className: "physical-amber",
-      fee: "50,000원",
-      performance: "500,000원",
-      limit: "15,000P",
-      basic: "1%",
-      beauty: "5%",
-      partner: "5%",
-    },
-  ]
+  const cards = auraCards
   return (
     <main className="cards-page page-shell">
       <section className="cards-hero">
@@ -1478,14 +1446,100 @@ export function AuthPage({mode}:{mode:"login"|"signup"}) {
   </main>
 }
 
+type MyPageEntry = { id: string; date: string; type: "earn" | "redeem"; title: string; detail: string; amount: number; special?: boolean }
+type MyPageMember = { name: string; email: string; joinedAt?: string; card?: { name: string; last4: string }; points: number; history: MyPageEntry[] }
+
+/**
+ * Local preview only: in `next dev`, a member in public/dev/demo-member.json (kept out of git)
+ * replaces the signed-in member so MyPage can be built against full card and history data.
+ */
+function useDevDemoMember() {
+  const [demo, setDemo] = useState<MyPageMember | null>(null)
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return
+    let active = true
+    fetch("/dev/demo-member.json").then((response) => response.ok ? response.json() : null).then((data) => { if (active && data) setDemo(data) }).catch(() => {})
+    return () => { active = false }
+  }, [])
+  return demo
+}
+
 export function MyPage(){
-  const {user,points,pointHistory,recoveryPending,logout}=useAppState()
+  const {user,points,pointHistory,logout}=useAppState()
   const router=useRouter()
-  if(!user)return <main className="simple-page page-shell"><p className="eyebrow">MY AURA ACCOUNT</p><Title as="h1">로그인하고 내 포인트를 확인하세요.</Title><CtaLink href="/login?next=%2Fmypage">로그인하기</CtaLink></main>
-  return <main className="mypage page-shell"><p className="eyebrow">MY AURA ACCOUNT</p><Title as="h1">{user.name}님의 AURA</Title><p className="mypage-email">{user.email}</p>
-    <div className="mypage-grid"><article className="mypage-wallet"><span>사용 가능 포인트</span><strong>{formatPoint(points)}</strong><small>회수 대기 {formatPoint(recoveryPending)}</small></article><article className="mypage-card"><span>YOUR AURA</span><h3>일상과 취향을 연결하는 혜택</h3><Link href="/cards">카드 혜택 알아보기 ↗</Link></article></div>
-    <section className="mypage-history"><Title>포인트 사용 내역</Title>{pointHistory.length?pointHistory.map(item=><article key={item.id}><span>{item.label}<small>{item.date} · {item.detail}</small></span><strong>{formatPoint(item.amount)}</strong></article>):<p>아직 포인트 사용 내역이 없어요.</p>}</section>
-    <button className="mypage-logout" type="button" onClick={()=>{logout();router.push("/")}}>로그아웃</button>
+  const demo=useDevDemoMember()
+  const [filter,setFilter]=useState<"all"|MyPageEntry["type"]>("all")
+  const member: MyPageMember | null = demo ?? (user && {
+    name: user.name,
+    email: user.email,
+    points,
+    history: pointHistory.map((item) => ({ id: item.id, date: item.date, type: item.amount >= 0 ? "earn" : "redeem", title: item.label, detail: item.detail, amount: item.amount })),
+  })
+  if(!member)return <main className="simple-page page-shell"><p className="eyebrow">MY AURA ACCOUNT</p><Title as="h1">로그인하고 내 포인트를 확인하세요.</Title><CtaLink href="/login?next=%2Fmypage">로그인하기</CtaLink></main>
+
+  const card = member.card && auraCards.find((item) => item.name === member.card!.name)
+  const specialLimit = card ? Number(card.limit.replace(/\D/g, "")) : 0
+  const latestMonth = member.history[0]?.date.slice(0, 7)
+  const monthEarned = member.history.filter((entry) => entry.type === "earn" && entry.date.startsWith(latestMonth ?? ""))
+  const monthTotal = monthEarned.reduce((sum, entry) => sum + entry.amount, 0)
+  const monthSpecial = monthEarned.filter((entry) => entry.special).reduce((sum, entry) => sum + entry.amount, 0)
+  const specialRatio = specialLimit ? Math.min(100, Math.round((monthSpecial / specialLimit) * 100)) : 0
+  // Balance right after each entry, newest first: today's balance, then undo the newer entries one by one.
+  const balances = member.history.reduce<number[]>((list, item, index) => [...list, index === 0 ? member.points : list[index - 1] - member.history[index - 1].amount], [])
+  const entries = member.history.map((entry, index) => ({ entry, balance: balances[index] })).filter(({ entry }) => filter === "all" || entry.type === filter)
+
+  return <main className="mypage page-shell"><p className="eyebrow">MY AURA ACCOUNT{demo && <span className="mypage-dev-badge">개발용 가상 회원</span>}</p><Title as="h1">{member.name}님의 AURA</Title><p className="mypage-email">{member.email}{member.joinedAt && ` · ${member.joinedAt} 가입`}</p>
+    <div className="mypage-grid">
+      <article className="mypage-wallet">
+        <span>사용 가능 포인트</span>
+        <strong>{formatPoint(member.points)}</strong>
+        {monthTotal > 0 && <p className="mypage-wallet-month">이번 달 적립 <b>+{formatPoint(monthTotal)}</b></p>}
+        {member.points > 0
+          ? <Link className="mypage-wallet-link" href="/products">포인트로 향 교환하기 ↗</Link>
+          : <p className="mypage-wallet-empty">AURA 카드로 결제하면 포인트가 쌓여요. 쌓인 포인트로 컬렉션의 향이나 나만의 향을 교환할 수 있어요.</p>}
+      </article>
+      {card && member.card
+        ? <article className="mypage-card mypage-member-card">
+            <span>MY CARD</span>
+            <div className="mypage-card-visual" role="img" aria-label={`보유 카드 ${card.name}, 끝자리 ${member.card.last4}`}>
+              <span className={`physical-card-face card-front ${card.className}`} aria-hidden="true">
+                <span className="physical-card-top"><strong>AURA</strong><em>{card.tier}</em></span>
+                <span className="masked-number">••••&nbsp;&nbsp;••••&nbsp;&nbsp;••••&nbsp;&nbsp;{member.card.last4}</span>
+                <span className="physical-card-bottom"><strong>{card.name}</strong>{member.joinedAt && <small>MEMBER SINCE {member.joinedAt.slice(0, 4)}</small>}</span>
+              </span>
+            </div>
+            <dl className="mypage-card-rates">
+              <div><dt>기본</dt><dd>{card.basic}</dd></div>
+              <div><dt>뷰티</dt><dd>{card.beauty}</dd></div>
+              <div><dt>제휴점</dt><dd>{card.partner}</dd></div>
+            </dl>
+            <div className="mypage-card-limit">
+              <p><span>이번 달 특별 적립</span><b>{formatPoint(monthSpecial)} / {card.limit}</b></p>
+              <div role="progressbar" aria-label="이번 달 특별 적립 한도 사용률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={specialRatio}><i style={{ width: `${specialRatio}%` }} /></div>
+            </div>
+            <Link href="/cards">카드 혜택 비교하기 ↗</Link>
+          </article>
+        : <article className="mypage-card"><span>YOUR AURA</span><h3>일상과 취향을 연결하는 혜택</h3><Link href="/cards">카드 혜택 알아보기 ↗</Link></article>}
+    </div>
+    <section className="mypage-history">
+      <div className="mypage-history-head">
+        <Title>포인트 내역</Title>
+        {member.history.length > 0 && <div className="mypage-history-filter" role="group" aria-label="포인트 내역 보기">
+          {([["all", "전체"], ["earn", "적립"], ["redeem", "교환"]] as const).map(([key, label]) => <button key={key} type="button" aria-pressed={filter === key} className={filter === key ? "is-active" : ""} onClick={() => setFilter(key)}>{label}</button>)}
+        </div>}
+      </div>
+      {entries.length
+        ? entries.map(({ entry, balance }) => <article key={entry.id} className={`is-${entry.type}`}>
+            <span><em>{entry.type === "earn" ? "적립" : "교환"}</em>{entry.title}<small>{entry.date} · {entry.detail}</small></span>
+            <span className="mypage-history-amount"><strong>{entry.amount > 0 ? "+" : ""}{formatPoint(entry.amount)}</strong><small>잔액 {formatPoint(balance)}</small></span>
+          </article>)
+        : <div className="mypage-history-empty">
+            <strong>{filter === "earn" ? "아직 적립된 포인트가 없어요." : "아직 교환한 향이 없어요."}</strong>
+            <p>{filter === "earn" ? "AURA 카드로 결제하면 포인트가 쌓여요." : "포인트로 컬렉션의 향을 교환하거나, 나만의 향을 직접 만들어 보세요. 교환하면 이곳에 내역이 남아요."}</p>
+            <div>{filter === "earn" ? <CtaLink href="/cards">카드 혜택 알아보기</CtaLink> : <><CtaLink href="/products">컬렉션 둘러보기</CtaLink><CtaLink href="/custom">나만의 향 만들기</CtaLink></>}</div>
+          </div>}
+    </section>
+    {user && <button className="mypage-logout" type="button" onClick={()=>{logout();router.push("/")}}>로그아웃</button>}
   </main>
 }
 
