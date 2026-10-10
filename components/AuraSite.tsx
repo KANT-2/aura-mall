@@ -15,6 +15,7 @@ import NextLink from "next/link"
 import { BlendVessel } from "@/components/BlendVessel"
 import { AtelierFlask, AtelierProductVisual } from "./AtelierVisuals"
 import { AtelierNaming, normalizeBlendName, suggestBlendNames } from "./AtelierNaming"
+import { describeBlend } from "./AtelierDescription"
 import "./AtelierProductName.css"
 import { type AuraMember, currentMember, signOut, registerMember, authenticateMember } from "@/components/LocalAccount"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -1076,6 +1077,7 @@ export function AtelierPage() {
   const product = atelierProducts[session.productType]
   const nameIdeas = suggestBlendNames(session.selected)
   const blendName = normalizeBlendName(session.name, nameIdeas[0].en)
+  const blendStory = describeBlend(session.selected)
 
   const updateSession = (next: Partial<AtelierSession>) =>
     setSessions((current) => ({
@@ -1289,7 +1291,11 @@ export function AtelierPage() {
                 <div className="aura-result-notes" aria-label="완성된 향료 구성">
                   {session.selected.map((name) => <span key={name}>{name}</span>)}
                 </div>
-                <span className="aura-result-caption">{session.selected.length}가지 향료로 완성한 당신의 블렌드</span>
+                {blendStory ? <div className="aura-result-story">
+                  <strong>{blendStory.headline}</strong>
+                  <p>{blendStory.story}</p>
+                  <span className="aura-result-moods">{blendStory.moods.map((mood) => <em key={mood}>{mood}</em>)}</span>
+                </div> : <span className="aura-result-caption">{session.selected.length}가지 향료로 완성한 당신의 블렌드</span>}
               </div>
             )}
             {showBottle && (
@@ -1302,6 +1308,11 @@ export function AtelierPage() {
                 <AtelierProductVisual type={session.productType} name={blendName} ingredients={session.selected} />
                 <p>{product.korean}</p>
                 <strong>{formatPoint(product.price)}</strong>
+                {session.stage === "SUMMARY" && blendStory && <div className="aura-result-story is-compact">
+                  <strong>{blendStory.headline}</strong>
+                  <p>{blendStory.story}</p>
+                  <span className="aura-result-moods">{blendStory.moods.map((mood) => <em key={mood}>{mood}</em>)}</span>
+                </div>}
               </div>
             )}
           </div>
@@ -1325,7 +1336,7 @@ export function AtelierPage() {
             )}
             {session.stage === "BOTTLE" && (
               <div className="atelier-naming-step">
-                <AtelierNaming name={session.name} ideas={nameIdeas} onChange={(name) => updateSession({ name })} />
+                <AtelierNaming name={session.name} ingredients={session.selected} fallback={nameIdeas[0].en} onChange={(name) => updateSession({ name })} />
                 <Button
                   className="atelier-primary"
                   onClick={() => updateSession({ stage: "PRODUCT_SELECTION", name: blendName })}
