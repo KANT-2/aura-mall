@@ -857,7 +857,7 @@ export function AtelierPage() {
     BASE_SELECTED: "선택한 향의 구성을 확인해 주세요.",
     READY: "이제 섞어 볼까요?",
     BLENDING: "향료를 하나로 섞어 주세요.",
-    REVEAL: "보이지 않던 향이 하나의 형태로 드러납니다.",
+    REVEAL: "보이지 않던 향이 하나의 형태로 드러났어요.",
     BOTTLE: "당신의 향에 이름을 붙여 주세요.",
     PRODUCT_SELECTION: "어떤 형태로 향을 간직할까요?",
     SUMMARY: "당신의 AURA가 완성됐어요.",
@@ -867,16 +867,16 @@ export function AtelierPage() {
   const stageHints: Partial<Record<AtelierStage, string>> = {
     BLENDING: "용기를 좌우로 끌거나, 아래 버튼으로 천천히 저어 주세요.",
     REVEAL: "완성된 향을 확인하고 다음 단계에서 이름을 붙여 주세요.",
-    BOTTLE: "추천 이름을 고르거나 직접 입력하세요. 보틀 라벨에 표시됩니다.",
-    PRODUCT_SELECTION: "제품 종류와 용량을 확인해 주세요. 향료 구성은 그대로 유지됩니다.",
-    SUMMARY: "이름, 향료 구성, 제품과 용량을 확인한 뒤 장바구니에 담으세요.",
+    BOTTLE: "추천 이름을 고르거나 직접 입력해 주세요. 보틀 라벨에 새겨져요.",
+    PRODUCT_SELECTION: "제품 종류와 용량을 골라 주세요. 향료 구성은 그대로 유지돼요.",
+    SUMMARY: "이름, 향료 구성, 제품과 용량을 확인한 뒤 장바구니에 담아 주세요.",
   }
   const stageStep: Record<AtelierStage, [number, string]> = {
     EMPTY: [3, "향료 선택"], TOP_SELECTED: [3, "향료 선택"], HEART_SELECTED: [3, "향료 선택"], BASE_SELECTED: [3, "향료 선택"], READY: [3, "향료 선택"],
     BLENDING: [4, "블렌딩"], REVEAL: [5, "완성된 향"], BOTTLE: [6, "이름 짓기"], PRODUCT_SELECTION: [7, "제품 선택"], SUMMARY: [8, "최종 확인"],
   }
   const [stepNumber, stepLabel] = stageStep[session.stage]
-  const stageHint = stageHints[session.stage] ?? (missingNotes.length > 0 ? `${missingNotes.join(" · ")}에서 하나 이상 선택해 주세요.` : session.stage === "READY" ? "향료를 더 추가하거나 블렌딩을 시작하세요." : "선택한 향료 구성은 확정되었습니다.")
+  const stageHint = stageHints[session.stage] ?? (missingNotes.length > 0 ? `${missingNotes.join(" · ")}에서 하나 이상 선택해 주세요.` : session.stage === "READY" ? "향료를 더 고르거나 블렌딩을 시작해 주세요." : "선택한 향료 구성이 확정됐어요.")
 
   if (view === "MOOD") {
     return (
@@ -891,7 +891,7 @@ export function AtelierPage() {
             </Title>
             <p>
               지금 마음이 향하는 온도를 골라 주세요. 다음 단계에서 당신의 취향에
-              가까운 대표 레시피를 제안합니다.
+              가까운 대표 레시피를 제안해요.
             </p>
           </div>
           <div className="mood-options">
@@ -1028,7 +1028,7 @@ export function AtelierPage() {
           <div className="atelier-panel-heading">
             <p className="eyebrow">INGREDIENT LIBRARY</p>
             <Title as="h3">향료 라이브러리</Title>
-            <p>{notesLocked ? "향 구성이 확정되었어요. 선택한 향료를 확인해 주세요." : "각 노트에서 하나 이상 선택하세요. 여러 향료를 함께 골라도 좋아요."}</p>
+            <p>{notesLocked ? "향료 구성이 확정됐어요. 선택한 향료를 확인해 주세요." : "각 노트에서 하나 이상 골라 주세요. 여러 향료를 함께 골라도 좋아요."}</p>
             <p role="status">
               {session.selected.length}가지 향료 선택 · {missingNotes.length > 0 ? `${missingNotes.join(" · ")}에서 향료를 더 골라 주세요.` : session.stage === "READY" ? "블렌딩할 준비가 됐어요." : "선택한 향료 구성이 확정됐어요."}
             </p>
@@ -1198,7 +1198,7 @@ export function AtelierPage() {
                 <span>0{index + 1}</span>
                 <p>{stage}</p>
                 <strong>{ingredient}</strong>
-                <em>{selectedGroups[index].length ? "SELECTED" : "WAITING"}</em>
+                <em>{selectedGroups[index].length ? "완료" : "대기"}</em>
               </div>
             ))}
           </div>}
@@ -1248,15 +1248,15 @@ export function CardsPage() {
           <em>향으로 돌아오도록.</em>
         </Title>
         <p>
-          카드 등급과 향 타입은 독립적이며, 모든 AURA 카드 회원이 컬렉션과
-          Atelier를 이용할 수 있습니다.
+          카드 등급과 향 계열은 서로 관계가 없으며, 모든 AURA 카드 회원이 컬렉션과
+          MY AURA를 이용할 수 있습니다.
         </p>
       </section>
       <section className="physical-card-gallery">
         {cards.map((card) => (
           <article key={card.name}>
             <AuraFlipCard card={card} />
-            <p>카드를 클릭해 뒷면을 확인하세요.</p>
+            <p>카드를 눌러 뒷면을 확인하세요.</p>
           </article>
         ))}
       </section>
@@ -1269,7 +1269,7 @@ export function CardsPage() {
           </Title>
           <p>
             카드 등급은 향 계열이나 상품 접근을 제한하지 않습니다. 모든 카드
-            회원이 일반 컬렉션과 Personal Atelier를 이용할 수 있습니다.
+            회원이 컬렉션과 MY AURA를 이용할 수 있습니다.
           </p>
         </div>
         <div className="benefit-grid">
