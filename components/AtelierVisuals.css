@@ -113,3 +113,17 @@
 /* Keep the compact summary; improve contrast and group separation without enlarging it. */
 .atelier-page .atelier-selection-summary p { color:#e6ded1; margin:.65rem 0 0; }
 .atelier-page .atelier-selection-summary b { color:#e6c69c; margin-bottom:.15rem; }
+/* Notes already in the vessel don't fall in again when the blending or result vessel mounts. */
+.aura-flask-visual.is-blended .aura-flask-drop { animation:none; }
+/* Keep the blend description above the frame's floor shadow. */
+.atelier-page .aura-result-story { position:relative; z-index:1; }
+/* Small labels stay legible. */
+.atelier-page .recipe-progress em,
+.atelier-page .ingredient-group > span { font-size:.6875rem; }
+/* Mobile: product choices sit right above the stage action; wider layouts keep them in the recipe panel. */
+.atelier-stage-product-options { display:none; }
+@media(max-width:560px) {
+  .atelier-page .atelier-stage-actions.has-product-options { flex-direction:column; align-items:stretch; }
+  .atelier-stage-product-options { display:block; width:100%; margin-bottom:.8rem; }
+  .atelier-page .recipe-panel .product-options { display:none; }
+}

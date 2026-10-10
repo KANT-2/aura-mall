@@ -854,7 +854,7 @@ export function AtelierPage() {
     HEART_SELECTED: "한 가지 노트가 남았어요.",
     BASE_SELECTED: "선택한 향의 구성을 확인해 주세요.",
     READY: "이제 섞어 볼까요?",
-    BLENDING: "용기를 직접 움직여 향을 섞어 보세요.",
+    BLENDING: "향료를 하나로 섞어 주세요.",
     REVEAL: "보이지 않던 향이 하나의 형태로 드러납니다.",
     BOTTLE: "당신의 향에 이름을 붙여 주세요.",
     PRODUCT_SELECTION: "어떤 형태로 향을 간직할까요?",
@@ -863,12 +863,17 @@ export function AtelierPage() {
 
   const notesLocked = ["BLENDING", "REVEAL", "BOTTLE", "PRODUCT_SELECTION", "SUMMARY"].includes(session.stage)
   const stageHints: Partial<Record<AtelierStage, string>> = {
-    BLENDING: "용기를 움직이거나 아래 버튼으로 향료를 섞어 주세요.",
+    BLENDING: "용기를 좌우로 끌거나, 아래 버튼으로 천천히 저어 주세요.",
     REVEAL: "완성된 향을 확인하고 다음 단계에서 이름을 붙여 주세요.",
     BOTTLE: "추천 이름을 고르거나 직접 입력하세요. 보틀 라벨에 표시됩니다.",
     PRODUCT_SELECTION: "제품 종류와 용량을 확인해 주세요. 향료 구성은 그대로 유지됩니다.",
     SUMMARY: "이름, 향료 구성, 제품과 용량을 확인한 뒤 장바구니에 담으세요.",
   }
+  const stageStep: Record<AtelierStage, [number, string]> = {
+    EMPTY: [3, "향료 선택"], TOP_SELECTED: [3, "향료 선택"], HEART_SELECTED: [3, "향료 선택"], BASE_SELECTED: [3, "향료 선택"], READY: [3, "향료 선택"],
+    BLENDING: [4, "블렌딩"], REVEAL: [5, "완성된 향"], BOTTLE: [6, "이름 짓기"], PRODUCT_SELECTION: [7, "제품 선택"], SUMMARY: [8, "최종 확인"],
+  }
+  const [stepNumber, stepLabel] = stageStep[session.stage]
   const stageHint = stageHints[session.stage] ?? (missingNotes.length > 0 ? `${missingNotes.join(" · ")}에서 하나 이상 선택해 주세요.` : session.stage === "READY" ? "향료를 더 추가하거나 블렌딩을 시작하세요." : "선택한 향료 구성은 확정되었습니다.")
 
   if (view === "MOOD") {
@@ -978,6 +983,30 @@ export function AtelierPage() {
     },
   ]
 
+  const productOptions = (
+    <div className="product-options">
+      <p className="eyebrow">FINAL PRODUCT</p>
+      {(Object.keys(atelierProducts) as ProductType[]).map((type) => (
+        <Button
+          className={`atelier-product-option ${session.productType === type ? "is-active" : ""}`}
+          ariaPressed={session.productType === type}
+          ariaLabel={`${type} · ${atelierProducts[type].korean} · ${atelierVolumes[type]} · ${formatPoint(atelierProducts[type].price)}`}
+          key={type}
+          onClick={() => updateSession({ productType: type })}
+        >
+          <span>
+            <strong className="atelier-product-name" aria-hidden="true">
+              <span className="atelier-product-name-english" lang="en">{type}</span>
+              <span className="atelier-product-name-korean" lang="ko">{atelierProducts[type].korean}</span>
+            </strong>
+            <small>{atelierVolumes[type]} · {atelierProducts[type].caption}</small>
+          </span>
+          <em>{formatPoint(atelierProducts[type].price)}</em>
+        </Button>
+      ))}
+    </div>
+  )
+
   const showArt = session.stage === "REVEAL"
   const showBottle = session.stage === "BOTTLE"
   const showProduct = ["PRODUCT_SELECTION", "SUMMARY"].includes(session.stage)
@@ -1034,11 +1063,7 @@ export function AtelierPage() {
 
         <section className="vessel-stage">
           <div className="vessel-heading">
-            <p className="eyebrow">
-              {session.stage === "BLENDING"
-                ? "BLENDING IN PROGRESS"
-                : `${recipe.id} · ${session.stage.replace("_", " ")}`}
-            </p>
+            <p className="eyebrow">STEP {String(stepNumber).padStart(2, "0")} / 08 · {stepLabel}</p>
             <Title>{stageCopy[session.stage]}</Title>
             <p className="atelier-stage-hint">{stageHint}</p>
           </div>
@@ -1082,7 +1107,7 @@ export function AtelierPage() {
             )}
           </div>
 
-          <div className="atelier-stage-actions">
+          <div className={`atelier-stage-actions ${session.stage === "PRODUCT_SELECTION" ? "has-product-options" : ""}`}>
             {session.stage === "READY" && (
               <Button
                 className="atelier-primary"
@@ -1110,6 +1135,7 @@ export function AtelierPage() {
                 </Button>
               </div>
             )}
+            {session.stage === "PRODUCT_SELECTION" && <div className="atelier-stage-product-options">{productOptions}</div>}
             {session.stage === "PRODUCT_SELECTION" && (
               <Button
                 className="atelier-primary"
@@ -1174,29 +1200,7 @@ export function AtelierPage() {
               </div>
             ))}
           </div>}
-          {["PRODUCT_SELECTION", "SUMMARY"].includes(session.stage) && (
-            <div className="product-options">
-              <p className="eyebrow">FINAL PRODUCT</p>
-              {(Object.keys(atelierProducts) as ProductType[]).map((type) => (
-                <Button
-                  className={`atelier-product-option ${session.productType === type ? "is-active" : ""}`}
-                  ariaPressed={session.productType === type}
-                  ariaLabel={`${type} · ${atelierProducts[type].korean} · ${atelierVolumes[type]} · ${formatPoint(atelierProducts[type].price)}`}
-                  key={type}
-                  onClick={() => updateSession({ productType: type })}
-                >
-                  <span>
-                    <strong className="atelier-product-name" aria-hidden="true">
-                      <span className="atelier-product-name-english" lang="en">{type}</span>
-                      <span className="atelier-product-name-korean" lang="ko">{atelierProducts[type].korean}</span>
-                    </strong>
-                    <small>{atelierVolumes[type]} · {atelierProducts[type].caption}</small>
-                  </span>
-                  <em>{formatPoint(atelierProducts[type].price)}</em>
-                </Button>
-              ))}
-            </div>
-          )}
+          {["PRODUCT_SELECTION", "SUMMARY"].includes(session.stage) && productOptions}
           <div className="recipe-panel-footer">
             {session.selected.length > 0 &&
               [
@@ -1218,8 +1222,8 @@ export function AtelierPage() {
                   향료 다시 선택하기
                 </Button>
               )}
-            <span>진행률</span>
-            <strong>{Math.round((completeGroups / 3) * 100)}%</strong>
+            <span>노트 선택</span>
+            <strong>{completeGroups} / 3</strong>
             <div>
               <i style={{ width: `${(completeGroups / 3) * 100}%` }} />
             </div>
