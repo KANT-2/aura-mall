@@ -924,6 +924,12 @@ button:disabled { cursor:not-allowed; }
   .product-visual-wrap:hover .quick-view-trigger, .product-visual-wrap:focus-within .quick-view-trigger { opacity:1; }
 }
 
+/* 목록: 향 계열 필터 호버 (선택된 버튼·포커스 표시는 기존 규칙 유지) */
+.shop-controls .filter-tabs button { transition:background-color .25s var(--ease), border-color .25s var(--ease); }
+@media (hover:hover) {
+  .shop-controls .filter-tabs button:not(.is-active):hover { background:#ece9e1; border-color:rgba(27,27,25,.45); }
+}
+
 /* 목록: 결과·활성 조건 */
 .result-bar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:2rem; }
 .result-bar .result-count { margin:0; }
@@ -974,7 +980,7 @@ html:has(dialog.quick-view[open]) { overflow:hidden; }
   .quick-view-description { margin-bottom:1.5rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .product-image-frame img, .quick-view-trigger { transition:none; }
+  .product-image-frame img, .quick-view-trigger, .shop-controls .filter-tabs button { transition:none; }
 }
 
 .cart-added-dialog { margin:auto; width:min(440px, calc(100vw - 32px)); padding:32px; border:1px solid var(--line); background:var(--paper, #f8f7f3); color:var(--ink, #1b1b18); }
