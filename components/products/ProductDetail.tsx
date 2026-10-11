@@ -138,7 +138,7 @@ export function ProductDetail({ product, shopper }: { product: Product; shopper:
           </dl>
           <div className="detail-price">
             <span>필요 포인트</span>
-            <strong>{formatPoint(product.price)}</strong>
+            <strong>{formatPoint(total)}</strong>
           </div>
           {isSignedIn ? (
             <div className="balance-line">

@@ -7,9 +7,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  useSyncExternalStore,
 } from "react"
 import { formatPoint, products } from "@/data/products"
+import { cardPolicies, calculateCardReward, detectAuraCard, formatAuraCardNumber, type AuraCard } from "@/data/cardPolicies"
 import type { Product } from "@/types/product"
 import NextLink from "next/link"
 import { BlendVessel } from "@/components/BlendVessel"
@@ -37,13 +40,80 @@ type CustomCartItem = {
   image: string
 }
 type CartItem = ShopCartItem | CustomCartItem
+const scentGroups = [
+  ["Bergamot", "Mandarin", "Grapefruit"],
+  ["Fig", "Peony", "Neroli"],
+  ["Cedarwood", "White Musk", "Sandalwood"],
+]
+
+function selectSingleIngredient(selected: string[], ingredient: string) {
+  const group = scentGroups.find(group => group.includes(ingredient))
+  if (!group) return selected
+  const remaining = selected.filter(item => !group.includes(item))
+  return selected.includes(ingredient) ? remaining : [...remaining, ingredient]
+}
+
+function customCartKey(item: CustomCartItem) {
+  return JSON.stringify([item.productType, [...item.ingredients].sort(), item.pointPrice])
+}
+
+function mergeCustomCart(items: CartItem[]) {
+  const merged: CartItem[] = []
+  for (const item of items) {
+    if (item.kind !== "custom") { merged.push(item); continue }
+    const existing = merged.find(candidate => candidate.kind === "custom" && customCartKey(candidate) === customCartKey(item))
+    if (existing) existing.quantity += item.quantity
+    else merged.push({ ...item })
+  }
+  return merged
+}
+
 type PointTransaction = {
   id: string
   label: string
   detail: string
   amount: number
   date: string
+  items?: { name: string; quantity: number }[]
+  balanceAfter?: number
+  card?: AuraCard
+  rewardRate?: number
 }
+function groupPointHistory(history: PointTransaction[]) {
+  const pairedCredits = new Set(history
+    .filter(item => item.id.startsWith("redeem-"))
+    .map(item => `cashback-${item.id}`))
+  return history.filter(item => !pairedCredits.has(item.id)).map(transaction => ({
+    transaction,
+    cashback: history.find(item => item.id === `cashback-${transaction.id}`),
+  }))
+}
+
+function PointHistoryEntries({ history }: { history: PointTransaction[] }) {
+  return groupPointHistory(history).map(({ transaction, cashback }) => (
+    <article key={transaction.id} style={{ display: "block" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: ".3rem" }}>
+        <span>{transaction.date}</span>
+        <strong>{transaction.items?.length ? transaction.items.map(item => `${item.name} × ${item.quantity}개`).join(" · ") : transaction.id.startsWith("redeem-") ? `${transaction.detail} 교환` : transaction.label}</strong>
+      </div>
+      <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", marginTop: ".7rem" }}>
+        <span>{transaction.amount < 0 ? "사용 포인트" : "적립 포인트"}</span>
+        <em style={{ color: transaction.amount > 0 ? "#42745a" : "#8c544d", fontStyle: "normal" }}>
+          {transaction.amount > 0 ? "+" : ""}{formatPoint(transaction.amount)}
+        </em>
+      </div>
+      {cashback && <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", marginTop: ".4rem" }}>
+        <span>{cashback.card ? cardPolicies[cashback.card].name : "앰버"} {cashback.rewardRate ?? 5}% 적립</span>
+        <em style={{ color: "#42745a", fontStyle: "normal" }}>+{formatPoint(cashback.amount)}</em>
+      </div>}
+      {transaction.balanceAfter !== undefined && <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", marginTop: ".8rem" }}>
+        <strong>교환 후 잔액</strong>
+        <strong>{formatPoint(transaction.balanceAfter)}</strong>
+      </div>}
+    </article>
+  ))
+}
+
 type AppState = {
   points: number
   user: AuraMember | null
@@ -261,7 +331,7 @@ function Header() {
   const closeWallet = () => {
     setWalletOpen(false)
     window.setTimeout(
-      () => document.querySelector<HTMLButtonElement>(".points-link")?.focus(),
+      () => document.querySelector<HTMLButtonElement>(window.innerWidth <= 900 ? ".mobile-menu" : ".points-link")?.focus(),
       0,
     )
   }
@@ -286,7 +356,12 @@ function Header() {
                 {label}
               </Link>
             ))}
-            {user && <Link className="mobile-only-link" href="/mypage" onClick={()=>setOpen(false)}>마이페이지</Link>}
+            {user && <Link className="mobile-only-link" href="/mypage" onClick={()=>setOpen(false)}>{user.name}님 · 마이페이지</Link>}
+            {user && <Button className="mobile-only-link mobile-points" onClick={()=>{setOpen(false);setWalletOpen(true)}}>내 포인트 {formatPoint(points)}</Button>}
+            {!user && <>
+              <Link className="mobile-only-link" href="/login" onClick={()=>setOpen(false)}>로그인</Link>
+              <Link className="mobile-only-link" href="/signup" onClick={()=>setOpen(false)}>회원가입</Link>
+            </>}
             {user && <Button className="mobile-only-link mobile-logout" onClick={()=>{logout();setOpen(false)}}>로그아웃</Button>}
             <Link
               className="mobile-only-link"
@@ -324,7 +399,7 @@ function Header() {
 }
 
 function PointWallet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { points, recoveryPending, pointHistory } = useAppState()
+  const { points, recoveryPending, pointHistory, user } = useAppState()
 
   useEffect(() => {
     if (!open) return
@@ -392,7 +467,7 @@ function PointWallet({ open, onClose }: { open: boolean; onClose: () => void }) 
         <div className="wallet-status-grid">
           <div>
             <span>카드 등급</span>
-            <strong>Velvet · TASTE</strong>
+            <strong>{user ? `${user.card} · ${cardPolicies[user.card].tier}` : "—"}</strong>
           </div>
           <div>
             <span>회수 대기 포인트</span>
@@ -401,25 +476,15 @@ function PointWallet({ open, onClose }: { open: boolean; onClose: () => void }) 
         </div>
         <div className="wallet-history">
           <div className="wallet-section-title">
-            <strong>포인트 사용 내역</strong>
-            <span>{pointHistory.length}건</span>
+            <strong>포인트 내역</strong>
+            <span>최근 순 · {groupPointHistory(pointHistory).length}건</span>
           </div>
           {pointHistory.length ? (
-            pointHistory.map((transaction) => (
-              <article key={transaction.id}>
-                <div>
-                  <strong>{transaction.label}</strong>
-                  <span>
-                    {transaction.date} · {transaction.detail}
-                  </span>
-                </div>
-                <em>{formatPoint(transaction.amount)}</em>
-              </article>
-            ))
+            <PointHistoryEntries history={pointHistory} />
           ) : (
             <div className="wallet-empty">
-              <span>아직 교환 내역이 없어요.</span>
-              <p>포인트 교환이 완료되면 이곳에 기록됩니다.</p>
+              <span>아직 포인트 내역이 없어요.</span>
+              <p>포인트 사용과 적립 내역이 이곳에 기록됩니다.</p>
             </div>
           )}
         </div>
@@ -665,19 +730,62 @@ export function CartPage() {
         item.quantity,
     0,
   )
-  const [done, setDone] = useState(false)
+  const [completedExchange, setCompletedExchange] = useState<{
+    items: { name: string; quantity: number }[]
+    used: number
+    earned: number
+    balance: number
+    rewardLabel: string
+  } | null>(null)
+  const confirmationRef = useRef<HTMLDialogElement>(null)
+  const confirmingRef = useRef(false)
+  const [confirmationError, setConfirmationError] = useState("")
+  const cashback = user ? calculateCardReward(total, user.card) : 0
+  const rewardLabel = user ? `${cardPolicies[user.card].name} ${cardPolicies[user.card].rate}% 적립` : "카드 적립"
+  const finalBalance = points - total + cashback
+  const confirmExchange = () => {
+    if (confirmingRef.current) return
+    confirmingRef.current = true
+    if (!user || !cart.length || total <= 0 || total > points) {
+      setConfirmationError("회원 정보와 장바구니, 보유 포인트를 다시 확인해 주세요.")
+      confirmingRef.current = false
+      return
+    }
+    if (redeem(total)) {
+      confirmationRef.current?.close()
+      setCompletedExchange({
+        items: cart.map(item => ({
+          name: item.kind === "product" ? item.product.name : `${item.recipeName} · ${item.productType}`,
+          quantity: item.quantity,
+        })),
+        used: total,
+        earned: cashback,
+        balance: finalBalance,
+        rewardLabel,
+      })
+    } else {
+      setConfirmationError("교환할 수 없어요. 보유 포인트와 상품을 다시 확인해 주세요.")
+      confirmingRef.current = false
+    }
+  }
 
-  if (done) {
+  if (completedExchange) {
     return (
       <main className="simple-page success-page page-shell">
         <p className="eyebrow">REDEEM COMPLETE</p>
         <Title as="h1">
-          당신의 AURA를
+          선택한 상품의
           <br />
           교환을 완료했어요.
         </Title>
+        <section aria-label="교환 결과" style={{ width: "min(100%, 480px)", margin: "24px auto", padding: "24px", border: "1px solid var(--line)", textAlign: "left" }}>
+          {completedExchange.items.map((item, index) => <p key={index}>{item.name} × {item.quantity}개</p>)}
+          <p style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}><span>사용 포인트</span><strong>{formatPoint(completedExchange.used)}</strong></p>
+          {completedExchange.earned > 0 && <p style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}><span>{completedExchange.rewardLabel}</span><strong style={{ color: "#42745a" }}>+{formatPoint(completedExchange.earned)}</strong></p>}
+          <p style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}><strong>교환 후 잔액</strong><strong>{formatPoint(completedExchange.balance)}</strong></p>
+        </section>
         <p>
-          포인트 사용 내역은 내 포인트 지갑에서 확인할 수 있어요.
+          포인트 내역은 내 포인트 지갑에서 확인할 수 있어요.
         </p>
         <CtaLink href="/products">다른 향 둘러보기</CtaLink>
       </main>
@@ -771,7 +879,7 @@ export function CartPage() {
               <span>필요 포인트</span>
               <strong>{formatPoint(total)}</strong>
             </p>
-            {user && <div><span>교환 후 포인트</span><strong>{formatPoint(Math.max(0, points - total))}</strong></div>}
+            {user && <div><span>교환 후 잔액</span><strong>{formatPoint(Math.max(0, finalBalance))}</strong></div>}
             {user && total > points && (
               <p className="shortage-notice">
                 <span>부족 포인트</span>
@@ -782,7 +890,8 @@ export function CartPage() {
               className="primary-button"
               disabled={!user || total > points}
               onClick={() => {
-                if (user && redeem(total)) setDone(true)
+                setConfirmationError("")
+                confirmationRef.current?.showModal()
               }}
             >
               {!user ? "로그인 후 교환 가능" : total <= points ? "포인트로 교환하기" : `${formatPoint(total - points)} 부족해요`}
@@ -791,12 +900,28 @@ export function CartPage() {
           </aside>
         </div>
       )}
+      <dialog ref={confirmationRef} className="cart-added-dialog" aria-labelledby="exchange-confirm-title">
+        <h2 id="exchange-confirm-title">교환 내용을 확인해 주세요.</h2>
+        <div style={{ maxHeight: "40vh", overflowY: "auto", marginBottom: "20px" }}>
+          {cart.map(item => <div key={item.id} style={{ marginBottom: "12px" }}>
+            <strong>{item.kind === "product" ? item.product.name : item.recipeName} × {item.quantity}개</strong>
+            <p style={{ margin: "4px 0" }}>{item.kind === "product" ? item.product.volume : `${item.productType} · ${item.ingredients.join(", ")}`}</p>
+          </div>)}
+        </div>
+        <p>사용 포인트　{formatPoint(total)}</p>
+        {cashback > 0 && <p>{rewardLabel}　+{formatPoint(cashback)}</p>}
+        <p><strong>교환 후 잔액　{formatPoint(Math.max(0, finalBalance))}</strong></p>
+        {confirmationError && <p role="alert">{confirmationError}</p>}
+        <div className="cart-added-actions">
+          <button type="button" onClick={() => confirmationRef.current?.close()}>취소</button>
+          <button type="button" disabled={!user || !cart.length || total > points || total <= 0} onClick={confirmExchange}>교환 확정</button>
+        </div>
+      </dialog>
     </main>
   )
 }
 
 export function AtelierPage() {
-  const router = useRouter()
   const { addCustomToCart } = useAppState()
   const [view, setView] = useState<"MOOD" | "RECIPE" | "WORKBENCH">("MOOD")
   const [mood, setMood] = useState("clear")
@@ -810,11 +935,7 @@ export function AtelierPage() {
   const recipe = atelierRecipes.find((item) => item.id === recipeId)!
   const session = sessions[recipeId]
   const ingredients = [recipe.ingredients.top, recipe.ingredients.heart, recipe.ingredients.base]
-  const ingredientGroups = [
-    ["Bergamot", "Mandarin", "Grapefruit"],
-    ["Fig", "Peony", "Neroli"],
-    ["Cedarwood", "White Musk", "Sandalwood"],
-  ]
+  const ingredientGroups = scentGroups
   const selectedGroups = ingredientGroups.map(group => group.filter(item=>session.selected.includes(item)))
   const completeGroups = selectedGroups.filter(group=>group.length>0).length
   const stageIndex = completeGroups
@@ -829,20 +950,18 @@ export function AtelierPage() {
 
   const selectIngredient = (ingredient: string) => {
     if (["BLENDING","REVEAL","BOTTLE","PRODUCT_SELECTION","SUMMARY"].includes(session.stage)) return
-    const selected = session.selected.includes(ingredient)
-      ? session.selected.filter(item=>item!==ingredient)
-      : [...session.selected,ingredient]
+    const selected = selectSingleIngredient(session.selected, ingredient)
     const complete=ingredientGroups.filter(group=>group.some(item=>selected.includes(item))).length
     const stage:AtelierStage = complete === 3 ? "READY" : complete===2 ? "HEART_SELECTED" : complete===1 ? "TOP_SELECTED" : "EMPTY"
     updateSession({selected,stage})
   }
 
   const stageCopy: Record<AtelierStage, string> = {
-    EMPTY: "TOP · HEART · BASE에서 향료를 골라 주세요.",
+    EMPTY: "TOP · HEART · BASE에서 향료를 하나씩 골라 주세요.",
     TOP_SELECTED: "좋아요. 나머지 향 계열도 선택해 보세요.",
     HEART_SELECTED: "한 가지 계열을 더 선택하면 블렌딩할 수 있어요.",
     BASE_SELECTED: "선택한 향의 구성을 확인해 주세요.",
-    READY: "향료가 준비됐어요. 원하는 만큼 더 추가할 수 있어요.",
+    READY: "향료 3종이 준비됐어요. 블렌딩을 시작해 주세요.",
     BLENDING: "용기를 직접 움직여 향을 섞어 보세요.",
     REVEAL: "보이지 않던 향이 하나의 형태로 드러납니다.",
     BOTTLE: "당신의 향을 AURA 보틀에 담았습니다.",
@@ -975,7 +1094,7 @@ export function AtelierPage() {
           <div className="atelier-panel-heading">
             <p className="eyebrow">INGREDIENT LIBRARY</p>
             <Title as="h3">향료 라이브러리</Title>
-            <p>각 노트에서 하나 이상, 원하는 향료를 자유롭게 선택하거나 해제하세요.</p>
+            <p>TOP·HEART·BASE에서 향료를 하나씩 선택해 주세요.</p>
           </div>
           <div className="ingredient-groups">
             {allIngredients.map((group, groupIndex) => (
@@ -1093,14 +1212,6 @@ export function AtelierPage() {
                 간직할 형태 선택하기
               </Button>
             )}
-            {session.stage === "PRODUCT_SELECTION" && (
-              <Button
-                className="atelier-primary"
-                onClick={() => updateSession({ stage: "SUMMARY" })}
-              >
-                구성 확인하기
-              </Button>
-            )}
             {session.stage === "SUMMARY" && (
               <Button
                 className="atelier-primary"
@@ -1113,7 +1224,6 @@ export function AtelierPage() {
                     pointPrice: product.price,
                     image: recipe.bottle,
                   })
-                  router.push("/cart")
                 }}
               >
                 장바구니 담기 · {formatPoint(product.price)}
@@ -1169,6 +1279,14 @@ export function AtelierPage() {
               ))}
             </div>
           )}
+          {session.stage === "PRODUCT_SELECTION" && (
+            <Button
+              className="atelier-primary recipe-confirm"
+              onClick={() => updateSession({ stage: "SUMMARY" })}
+            >
+              선택한 구성 확인하기
+            </Button>
+          )}
           <div className="recipe-panel-footer">
             {session.selected.length > 0 &&
               [
@@ -1189,7 +1307,7 @@ export function AtelierPage() {
                   향료 다시 선택하기
                 </Button>
               )}
-            <span>진행률</span>
+            <span>향료 선택</span>
             <strong>{Math.round((completeGroups / 3) * 100)}%</strong>
             <div>
               <i style={{ width: `${(completeGroups / 3) * 100}%` }} />
@@ -1410,6 +1528,8 @@ export function AuthPage({mode}:{mode:"login"|"signup"}) {
   const [email,setEmail]=useState("")
   const [password,setPassword]=useState("")
   const [confirm,setConfirm]=useState("")
+  const [cardNumber,setCardNumber]=useState("")
+  const card = detectAuraCard(cardNumber)
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState("")
   const [visible,setVisible]=useState(false)
@@ -1421,22 +1541,34 @@ export function AuthPage({mode}:{mode:"login"|"signup"}) {
     if(mode==="signup" && password!==confirm){setError("비밀번호가 일치하지 않아요.");return}
     setBusy(true)
     try{
-      const member=mode==="signup"?await registerMember(name,email,password):await authenticateMember(email,password)
+      const member=mode==="signup"?await registerMember(name,email,password,cardNumber):await authenticateMember(email,password)
       setSignedInUser(member);router.push(destination)
     }catch(e){setError(e instanceof Error?e.message:"다시 시도해 주세요.")}
     finally{setBusy(false)}
   }
   return <main className="auth-layout">
     <section className="auth-brand"><span className="eyebrow">AURA · FROM SCENT TO IDENTITY</span><Title as="h1">Your scent,<br/><em>your identity.</em></Title><p>일상의 포인트가 당신만의 향이 되는 곳.</p><AssetImage asset="hero-bottles" label="AURA 향수 컬렉션"/></section>
-    <section className="auth-form-panel"><div className="auth-form-inner"><p className="eyebrow">AURA ACCOUNT</p><Title as="h2">{mode==="signup"?"AURA에 오신 것을 환영해요.":"다시 만나 반가워요."}</Title><p className="auth-subtitle">{mode==="signup"?"새로운 취향을 만나는 여정을 시작하세요.":"로그인하고 내 포인트와 리워드 내역을 확인하세요."}</p>
+    <section className="auth-form-panel"><div className="auth-form-inner"><p className="eyebrow">AURA ACCOUNT</p><Title as="h2">{mode==="signup"?"AURA에 오신 것을 환영해요.":"다시 만나 반가워요."}</Title><p className="auth-subtitle">{mode==="signup"?"새로운 취향을 만나는 여정을 시작하세요.":"로그인하고 내 포인트와 교환 내역을 확인하세요."}</p>
       {user && <p className="auth-notice">현재 {user.name}님으로 로그인되어 있습니다. 다른 계정으로 이용하려면 먼저 로그아웃해 주세요.</p>}
       <form className="auth-form" onSubmit={submit}>
         {mode==="signup"&&<label>이름<input autoComplete="name" maxLength={30} onChange={e=>setName(e.target.value)} placeholder="이름을 입력해 주세요" required value={name}/></label>}
         <label>이메일<input autoComplete="email" type="email" onChange={e=>setEmail(e.target.value)} placeholder="이메일을 입력해 주세요" required value={email}/></label>
         <label>비밀번호<div className="auth-password"><input autoComplete={mode==="signup"?"new-password":"current-password"} type={visible?"text":"password"} minLength={8} onChange={e=>setPassword(e.target.value)} placeholder="비밀번호를 입력해 주세요 (8자 이상)" required value={password}/><button type="button" onClick={()=>setVisible(v=>!v)} aria-label={visible?"비밀번호 숨기기":"비밀번호 보기"}>{visible?"숨기기":"보기"}</button></div></label>
         {mode==="signup"&&<label>비밀번호 확인<input autoComplete="new-password" type={visible?"text":"password"} minLength={8} onChange={e=>setConfirm(e.target.value)} placeholder="비밀번호를 한 번 더 입력해 주세요" required value={confirm}/></label>}
+        {mode==="signup" && <label>AURA 카드 번호
+          <input type="text" inputMode="numeric" autoComplete="off" maxLength={19}
+            placeholder="0000 0000 0000 0000" value={cardNumber}
+            onChange={event => setCardNumber(formatAuraCardNumber(event.target.value))}
+            pattern="[0-9]{4} [0-9]{4} [0-9]{4} [0-9]{4}" required
+            aria-describedby="aura-card-status" />
+          <small id="aura-card-status" aria-live="polite">
+            {card ? `${card} 카드 확인됨 · 가입 ${formatPoint(cardPolicies[card].signupBonus)} · 교환 ${cardPolicies[card].rate}% 적립`
+              : cardNumber.replace(/\s/g, "").length === 16 ? "등록된 AURA 카드 번호를 확인해 주세요."
+              : "16자리 AURA 카드 번호를 입력해 주세요."}
+          </small>
+        </label>}
         {error&&<p className="auth-error" role="alert">{error}</p>}
-        <button className="auth-submit" type="submit" disabled={busy}>{busy?"처리 중…":mode==="signup"?"회원가입":"로그인"} <span aria-hidden="true">↗</span></button>
+        <button className="auth-submit" type="submit" disabled={busy || (mode==="signup" && !card)}>{busy?"처리 중…":mode==="signup"?"회원가입":"로그인"} <span aria-hidden="true">↗</span></button>
       </form>
       <p className="auth-switch">{mode==="signup"?"이미 회원이신가요?":"아직 AURA 회원이 아니신가요?"} <Link href={mode==="signup"?"/login":"/signup"}>{mode==="signup"?"로그인":"회원가입"}</Link></p>
     </div></section>
@@ -1448,31 +1580,164 @@ export function MyPage(){
   const router=useRouter()
   if(!user)return <main className="simple-page page-shell"><p className="eyebrow">MY AURA ACCOUNT</p><Title as="h1">로그인하고 내 포인트를 확인하세요.</Title><CtaLink href="/login?next=%2Fmypage">로그인하기</CtaLink></main>
   return <main className="mypage page-shell"><p className="eyebrow">MY AURA ACCOUNT</p><Title as="h1">{user.name}님의 AURA</Title><p className="mypage-email">{user.email}</p>
-    <div className="mypage-grid"><article className="mypage-wallet"><span>사용 가능 포인트</span><strong>{formatPoint(points)}</strong><small>회수 대기 {formatPoint(recoveryPending)}</small></article><article className="mypage-card"><span>YOUR AURA</span><h3>일상과 취향을 연결하는 혜택</h3><Link href="/cards">카드 혜택 알아보기 ↗</Link></article></div>
-    <section className="mypage-history"><Title>포인트 사용 내역</Title>{pointHistory.length?pointHistory.map(item=><article key={item.id}><span>{item.label}<small>{item.date} · {item.detail}</small></span><strong>{formatPoint(item.amount)}</strong></article>):<p>아직 포인트 사용 내역이 없어요.</p>}</section>
+    <div className="mypage-grid"><article className="mypage-wallet"><span>사용 가능 포인트</span><strong>{formatPoint(points)}</strong><small>회수 대기 {formatPoint(recoveryPending)}</small></article><article className="mypage-card"><span>YOUR AURA</span><h3>{user.card} · {cardPolicies[user.card].tier}</h3><p>교환 {cardPolicies[user.card].rate}% 적립</p><Link href="/cards">카드 혜택 알아보기 ↗</Link></article></div>
+    <section className="mypage-history"><Title>포인트 내역</Title><p>최근 순 · {groupPointHistory(pointHistory).length}건</p>{pointHistory.length ? <PointHistoryEntries history={pointHistory} /> : <p>아직 포인트 내역이 없어요.</p>}</section>
     <button className="mypage-logout" type="button" onClick={()=>{logout();router.push("/")}}>로그아웃</button>
   </main>
 }
 
+const subscribeToBrowserReady = () => () => {}
+const getBrowserReady = () => true
+const getServerReady = () => false
+
+function readMemberWallet(email: string) {
+  let points = 0
+  let history: PointTransaction[] = []
+  let demoBalanceInitialized = false
+  let testTopUp100kApplied = false
+  let exactBalance25kApplied = false
+  try {
+    const wallet = JSON.parse(localStorage.getItem(`aura_wallet_${email}`) || "{}")
+    points = typeof wallet?.points === "number" && Number.isFinite(wallet.points) ? wallet.points : 0
+    history = Array.isArray(wallet?.history) ? wallet.history : []
+    demoBalanceInitialized = wallet?.demoBalanceInitialized === true
+    testTopUp100kApplied = wallet?.testTopUp100kApplied === true
+    exactBalance25kApplied = wallet?.exactBalance25kApplied === true
+  } catch {
+    // 저장값을 읽지 못하면 기본값 사용
+  }
+  if (email.trim().toLowerCase() === "dara09@naver.com") {
+    const oldGrant = history.some(item => item?.id === "demo-grant-200000-v1")
+    const amberGrant = history.some(item => item?.id === "demo-amber-signup-v1")
+    if (!demoBalanceInitialized) {
+      if (oldGrant) points -= 50000
+      else if (!amberGrant) points += 150000
+    }
+    history = history.filter(item => ![
+      "demo-grant-200000-v1",
+      "demo-amber-signup-v1",
+      "demo-amber-purchase-v1",
+    ].includes(item?.id))
+    // 기존 42,000P 교환 한 건에만 적립을 소급 적용한다.
+    const previousExchange = history.find(item => item?.amount === -42000 && item?.id?.startsWith("redeem-"))
+    if (previousExchange && !history.some(item => item?.id === `cashback-${previousExchange.id}`)) {
+      points += 2100
+      history = [{
+        id: `cashback-${previousExchange.id}`,
+        label: "앰버 카드 교환 적립",
+        detail: "42,000P × 5% 적립",
+        amount: 2100,
+        date: previousExchange.date,
+      }, ...history]
+    }
+  }
+  // 기존 기록은 현재 잔액에서 거래별 증감을 거슬러 계산한다.
+  let historicalBalance = points
+  const balances = new Map<string, number>()
+  for (const { transaction, cashback } of groupPointHistory(history)) {
+    balances.set(transaction.id, historicalBalance)
+    historicalBalance -= transaction.amount + (cashback?.amount || 0)
+  }
+  history = history.map(transaction => {
+    if (!transaction.id.startsWith("redeem-")) return transaction
+    return {
+      ...transaction,
+      balanceAfter: transaction.balanceAfter ?? balances.get(transaction.id),
+      items: transaction.items ?? (
+        email.trim().toLowerCase() === "dara09@naver.com" && transaction.amount === -42000
+          ? [{ name: "Petal Haze", quantity: 1 }]
+          : undefined
+      ),
+    }
+  })
+  if (email.trim().toLowerCase() === "dara09@naver.com" && !testTopUp100kApplied) {
+    points += 100000
+  }
+  if (email.trim().toLowerCase() === "dara09@naver.com" && !exactBalance25kApplied) {
+    points = 25000
+  }
+  return { points, history }
+}
+
+function readSavedAuraState() {
+  let user: AuraMember | null = null
+  let points = 0
+  let history: PointTransaction[] = []
+  let cart: CartItem[] = []
+
+  try {
+    user = currentMember()
+
+    if (user) {
+      const wallet = readMemberWallet(user.email)
+      points = wallet.points
+      history = wallet.history
+    }
+  } catch {
+    // 저장값을 읽지 못하면 기본값 사용
+  }
+
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem("aura_cart_v1") || "[]",
+    )
+    cart = Array.isArray(saved) ? mergeCustomCart(saved) : []
+  } catch {
+    // 저장값을 읽지 못하면 빈 장바구니 사용
+  }
+
+  return { user, points, history, cart }
+}
+
 export function AuraProviders({ children }: { children: ReactNode }) {
-  const [cart, setCart] = useState<CartItem[]>([])
-  const [user,setUser] = useState<AuraMember|null>(null)
-  const [pointBalance, setPointBalance] = useState(0)
-  const [pointHistory, setPointHistory] = useState<PointTransaction[]>([])
-  const [hydrated,setHydrated]=useState(false)
+  const ready = useSyncExternalStore(
+    subscribeToBrowserReady,
+    getBrowserReady,
+    getServerReady,
+  )
+
+  return (
+    <AuraStateProvider key={ready ? "browser" : "server"} ready={ready}>
+      {children}
+    </AuraStateProvider>
+  )
+}
+
+function AuraStateProvider({
+  children,
+  ready,
+}: {
+  children: ReactNode
+  ready: boolean
+}) {
+  const cartDialogRef = useRef<HTMLDialogElement>(null)
+  const router = useRouter()
+  const [initial] = useState(() =>
+    ready
+      ? readSavedAuraState()
+      : {
+          user: null,
+          points: 0,
+          history: [] as PointTransaction[],
+          cart: [] as CartItem[],
+        },
+  )
+
+  const [cart, setCart] = useState<CartItem[]>(initial.cart)
+  const [user, setUser] = useState<AuraMember | null>(initial.user)
+  const [pointBalance, setPointBalance] = useState(initial.points)
+  const [pointHistory, setPointHistory] =
+    useState<PointTransaction[]>(initial.history)
+  const hydrated = ready
   useEffect(()=>{
-    const restored=currentMember()
-    if(restored){setUser(restored);const saved=localStorage.getItem(`aura_wallet_${restored.email}`);if(saved){try{const data=JSON.parse(saved);setPointBalance(data.points||0);setPointHistory(data.history||[])}catch{}}}
-    try { const savedCart=JSON.parse(localStorage.getItem("aura_cart_v1")||"[]");if(Array.isArray(savedCart))setCart(savedCart) } catch {}
-    setHydrated(true)
-  },[])
-  useEffect(()=>{
-    if(user && hydrated) localStorage.setItem(`aura_wallet_${user.email}`,JSON.stringify({points:pointBalance,history:pointHistory}))
+    if(user && hydrated) localStorage.setItem(`aura_wallet_${user.email}`,JSON.stringify({points:pointBalance,history:pointHistory,demoBalanceInitialized:user.email.trim().toLowerCase()==="dara09@naver.com",testTopUp100kApplied:user.email.trim().toLowerCase()==="dara09@naver.com",exactBalance25kApplied:user.email.trim().toLowerCase()==="dara09@naver.com"}))
   },[user,pointBalance,pointHistory,hydrated])
   useEffect(()=>{if(hydrated)localStorage.setItem("aura_cart_v1",JSON.stringify(cart))},[cart,hydrated])
   const setSignedInUser=(member:AuraMember)=>{
     setUser(member)
-    try{const data=JSON.parse(localStorage.getItem(`aura_wallet_${member.email}`)||"{}");setPointBalance(data.points||0);setPointHistory(data.history||[])}catch{setPointBalance(0);setPointHistory([])}
+    const wallet = readMemberWallet(member.email)
+    setPointBalance(wallet.points)
+    setPointHistory(wallet.history)
   }
   const logout=()=>{signOut();setUser(null);setPointBalance(0);setPointHistory([]);setCart([]);localStorage.removeItem("aura_cart_v1")}
   const [recoveryRequest] = useState(0)
@@ -1487,7 +1752,7 @@ export function AuraProviders({ children }: { children: ReactNode }) {
       recoveryPending,
       pointHistory,
       cart,
-      addToCart: (product, quantity = 1) =>
+      addToCart: (product, quantity = 1) => {
         setCart((current) => {
           const existing = current.find(
             (item) =>
@@ -1503,9 +1768,11 @@ export function AuraProviders({ children }: { children: ReactNode }) {
                 ...current,
                 { kind: "product", id: product.slug, product, quantity },
               ]
-        }),
-      addCustomToCart: (item) =>
-        setCart((current) => [
+        })
+        cartDialogRef.current?.showModal()
+      },
+      addCustomToCart: (item) => {
+        setCart((current) => mergeCustomCart([
           ...current,
           {
             ...item,
@@ -1513,7 +1780,9 @@ export function AuraProviders({ children }: { children: ReactNode }) {
             id: `${item.recipeId}-${item.productType}-${Date.now()}`,
             quantity: 1,
           },
-        ]),
+        ]))
+        cartDialogRef.current?.showModal()
+      },
       changeQuantity: (id, quantity) =>
         setCart((current) =>
           current.map((item) =>
@@ -1527,12 +1796,30 @@ export function AuraProviders({ children }: { children: ReactNode }) {
       redeem: (total) => {
         if (!user || total > points || total<=0) return false
         const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0)
-        setPointBalance((current) => current - total)
+        const policy = cardPolicies[user.card]
+        const cashback = calculateCardReward(total, user.card)
+        const exchangeId = `redeem-${Date.now()}`
+        const date = new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit" }).format(new Date())
+        setPointBalance((current) => current - total + cashback)
         setPointHistory((current) => [
+          ...(cashback > 0 ? [{
+            id: `cashback-${exchangeId}`,
+            label: `${policy.name} 카드 교환 적립`,
+            detail: `${formatPoint(total)} × ${policy.rate}% 적립`,
+            card: user.card,
+            rewardRate: policy.rate,
+            amount: cashback,
+            date,
+          }] : []),
           {
-            id: `redeem-${Date.now()}`,
+            id: exchangeId,
             label: "AURA 포인트 교환",
             detail: `${itemCount}개 상품`,
+            items: cart.map(item => ({
+              name: item.kind === "product" ? item.product.name : `${item.recipeName} · ${item.productType}`,
+              quantity: item.quantity,
+            })),
+            balanceAfter: pointBalance - total + cashback,
             amount: -total,
             date: new Intl.DateTimeFormat("ko-KR", {
               month: "2-digit",
@@ -1545,11 +1832,20 @@ export function AuraProviders({ children }: { children: ReactNode }) {
         return true
       },
     }),
-    [cart, pointHistory, points, recoveryPending, user],
+    [cart, pointBalance, pointHistory, points, recoveryPending, user],
   )
   return (
     <AppStateContext.Provider value={state}>
       {children}
+      <dialog ref={cartDialogRef} className="cart-added-dialog" aria-labelledby="cart-added-title"
+        onClick={event => { if (event.target === event.currentTarget) event.currentTarget.close() }}>
+        <h2 id="cart-added-title">장바구니에 담았어요.</h2>
+        <p>장바구니로 이동하시겠어요?</p>
+        <div className="cart-added-actions">
+          <button type="button" onClick={() => cartDialogRef.current?.close()}>계속 둘러보기</button>
+          <button type="button" onClick={() => { cartDialogRef.current?.close(); router.push("/cart") }}>장바구니로 이동</button>
+        </div>
+      </dialog>
     </AppStateContext.Provider>
   )
 }
