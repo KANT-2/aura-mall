@@ -1626,10 +1626,10 @@ export function MyPage(){
   const card = member.card && auraCards.find((item) => item.name === member.card!.name)
   const mallPolicy = member.card ? cardPolicies[member.card.name as AuraCard] : undefined
   const specialLimit = card ? Number(card.limit.replace(/\D/g, "")) : 0
-  // Demo dates are "2026.10.10"; stored exchange dates are "10. 10.". Compare by month either way.
-  const monthOf = (date: string) => /^\d{4}\./.test(date) ? date.slice(0, 7) : date.split(".")[0]
-  const latestMonth = member.history[0] && monthOf(member.history[0].date)
-  const thisMonth = member.history.filter((entry) => monthOf(entry.date) === latestMonth)
+  // Demo dates are "2026.10.10"; stored dates are "10. 10." (no year). Compare against the current month in Seoul.
+  const [currentYear, currentMonth] = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", timeZone: "Asia/Seoul" }).format(new Date()).split("-")
+  const isCurrentMonth = (date: string) => /^\d{4}\./.test(date) ? date.slice(0, 7) === `${currentYear}.${currentMonth}` : date.split(".")[0].trim() === currentMonth
+  const thisMonth = member.history.filter((entry) => isCurrentMonth(entry.date))
   const monthTotal = thisMonth.reduce((sum, entry) => sum + (entry.type === "earn" ? entry.amount : 0) + (entry.reward?.amount ?? 0), 0)
   const monthSpecial = thisMonth.filter((entry) => entry.special).reduce((sum, entry) => sum + entry.amount, 0)
   const specialRatio = specialLimit ? Math.min(100, Math.round((monthSpecial / specialLimit) * 100)) : 0
