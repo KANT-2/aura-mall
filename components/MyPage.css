@@ -37,3 +37,4 @@
   .mypage-history-empty > div { flex-direction:column; }
 }
 .mypage-dev-badge { margin-left:.8rem; padding:.15rem .5rem; border:1px dashed currentColor; border-radius:99px; letter-spacing:0; }
+.mypage-history .mypage-history-reward { color:#42745a; }

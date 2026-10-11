@@ -127,3 +127,6 @@
   .atelier-stage-product-options { display:block; width:100%; margin-bottom:.8rem; }
   .atelier-page .recipe-panel .product-options { display:none; }
 }
+/* Mobile: the confirm button sits with the product options in the stage area, so hide the panel copy. */
+@media(max-width:560px) { .atelier-page .recipe-panel .recipe-confirm { display:none; } }
+.atelier-stage-product-options > .atelier-primary { width:100%; margin-top:.8rem; }
