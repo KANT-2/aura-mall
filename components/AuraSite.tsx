@@ -13,6 +13,7 @@ import {
 } from "react"
 import { atelierVolumes } from "@/data/atelier"
 import { formatPoint, products } from "@/data/products"
+import { auraCards } from "@/data/cards"
 import { cardPolicies, calculateCardReward, detectAuraCard, formatAuraCardNumber, type AuraCard } from "@/data/cardPolicies"
 import type { Product } from "@/types/product"
 import NextLink from "next/link"
@@ -24,6 +25,7 @@ import { AtelierFlask, AtelierProductVisual } from "./AtelierVisuals"
 import { AtelierNaming, normalizeBlendName, suggestBlendNames } from "./AtelierNaming"
 import { describeBlend } from "./AtelierDescription"
 import "./AtelierProductName.css"
+import "./MyPage.css"
 import { type AuraMember, currentMember, signOut, registerMember, authenticateMember } from "@/components/LocalAccount"
 import { useRouter, useSearchParams } from "next/navigation"
 
@@ -973,8 +975,8 @@ export function AtelierPage() {
     HEART_SELECTED: "한 가지 계열을 더 선택하면 블렌딩할 수 있어요.",
     BASE_SELECTED: "선택한 향의 구성을 확인해 주세요.",
     READY: "향료 3종이 준비됐어요. 블렌딩을 시작해 주세요.",
-    BLENDING: "용기를 직접 움직여 향을 섞어 보세요.",
-    REVEAL: "보이지 않던 향이 하나의 형태로 드러납니다.",
+    BLENDING: "향료를 하나로 섞어 주세요.",
+    REVEAL: "보이지 않던 향이 하나의 형태로 드러났어요.",
     BOTTLE: "당신의 향에 이름을 붙여 주세요.",
     PRODUCT_SELECTION: "어떤 형태로 향을 간직할까요?",
     SUMMARY: "당신의 AURA가 완성됐어요.",
@@ -982,13 +984,18 @@ export function AtelierPage() {
 
   const notesLocked = ["BLENDING", "REVEAL", "BOTTLE", "PRODUCT_SELECTION", "SUMMARY"].includes(session.stage)
   const stageHints: Partial<Record<AtelierStage, string>> = {
-    BLENDING: "용기를 움직이거나 아래 버튼으로 향료를 섞어 주세요.",
+    BLENDING: "용기를 좌우로 끌거나, 아래 버튼으로 천천히 저어 주세요.",
     REVEAL: "완성된 향을 확인하고 다음 단계에서 이름을 붙여 주세요.",
-    BOTTLE: "추천 이름을 고르거나 직접 입력하세요. 보틀 라벨에 표시됩니다.",
-    PRODUCT_SELECTION: "제품 종류와 용량을 확인해 주세요. 향료 구성은 그대로 유지됩니다.",
-    SUMMARY: "이름, 향료 구성, 제품과 용량을 확인한 뒤 장바구니에 담으세요.",
+    BOTTLE: "추천 이름을 고르거나 직접 입력해 주세요. 보틀 라벨에 새겨져요.",
+    PRODUCT_SELECTION: "제품 종류와 용량을 골라 주세요. 향료 구성은 그대로 유지돼요.",
+    SUMMARY: "이름, 향료 구성, 제품과 용량을 확인한 뒤 장바구니에 담아 주세요.",
   }
-  const stageHint = stageHints[session.stage] ?? (missingNotes.length > 0 ? `${missingNotes.join(" · ")}에서 향료를 하나씩 선택해 주세요.` : session.stage === "READY" ? "선택한 향료를 변경하거나 블렌딩을 시작하세요." : "선택한 향료 구성은 확정되었습니다.")
+  const stageStep: Record<AtelierStage, [number, string]> = {
+    EMPTY: [3, "향료 선택"], TOP_SELECTED: [3, "향료 선택"], HEART_SELECTED: [3, "향료 선택"], BASE_SELECTED: [3, "향료 선택"], READY: [3, "향료 선택"],
+    BLENDING: [4, "블렌딩"], REVEAL: [5, "완성된 향"], BOTTLE: [6, "이름 짓기"], PRODUCT_SELECTION: [7, "제품 선택"], SUMMARY: [8, "최종 확인"],
+  }
+  const [stepNumber, stepLabel] = stageStep[session.stage]
+  const stageHint = stageHints[session.stage] ?? (missingNotes.length > 0 ? `${missingNotes.join(" · ")}에서 향료를 하나씩 골라 주세요.` : session.stage === "READY" ? "선택한 향료를 바꾸거나 블렌딩을 시작해 주세요." : "선택한 향료 구성이 확정됐어요.")
 
   if (view === "MOOD") {
     return (
@@ -1003,7 +1010,7 @@ export function AtelierPage() {
             </Title>
             <p>
               지금 마음이 향하는 온도를 골라 주세요. 다음 단계에서 당신의 취향에
-              가까운 대표 레시피를 제안합니다.
+              가까운 대표 레시피를 제안해요.
             </p>
           </div>
           <div className="mood-options">
@@ -1097,6 +1104,30 @@ export function AtelierPage() {
     },
   ]
 
+  const productOptions = (
+    <div className="product-options">
+      <p className="eyebrow">FINAL PRODUCT</p>
+      {(Object.keys(atelierProducts) as ProductType[]).map((type) => (
+        <Button
+          className={`atelier-product-option ${session.productType === type ? "is-active" : ""}`}
+          ariaPressed={session.productType === type}
+          ariaLabel={`${type} · ${atelierProducts[type].korean} · ${atelierVolumes[type]} · ${formatPoint(atelierProducts[type].price)}`}
+          key={type}
+          onClick={() => updateSession({ productType: type })}
+        >
+          <span>
+            <strong className="atelier-product-name" aria-hidden="true">
+              <span className="atelier-product-name-english" lang="en">{type}</span>
+              <span className="atelier-product-name-korean" lang="ko">{atelierProducts[type].korean}</span>
+            </strong>
+            <small>{atelierVolumes[type]} · {atelierProducts[type].caption}</small>
+          </span>
+          <em>{formatPoint(atelierProducts[type].price)}</em>
+        </Button>
+      ))}
+    </div>
+  )
+
   const showArt = session.stage === "REVEAL"
   const showBottle = session.stage === "BOTTLE"
   const showProduct = ["PRODUCT_SELECTION", "SUMMARY"].includes(session.stage)
@@ -1116,7 +1147,7 @@ export function AtelierPage() {
           <div className="atelier-panel-heading">
             <p className="eyebrow">INGREDIENT LIBRARY</p>
             <Title as="h3">향료 라이브러리</Title>
-            <p>{notesLocked ? "향 구성이 확정되었어요. 선택한 향료를 확인해 주세요." : "TOP·HEART·BASE에서 향료를 하나씩 선택해 주세요."}</p>
+            <p>{notesLocked ? "향료 구성이 확정됐어요. 선택한 향료를 확인해 주세요." : "TOP·HEART·BASE에서 향료를 하나씩 골라 주세요."}</p>
             <p role="status">
               {session.selected.length}가지 향료 선택 · {missingNotes.length > 0 ? `${missingNotes.join(" · ")}에서 향료를 더 골라 주세요.` : session.stage === "READY" ? "블렌딩할 준비가 됐어요." : "선택한 향료 구성이 확정됐어요."}
             </p>
@@ -1153,11 +1184,7 @@ export function AtelierPage() {
 
         <section className="vessel-stage">
           <div className="vessel-heading">
-            <p className="eyebrow">
-              {session.stage === "BLENDING"
-                ? "BLENDING IN PROGRESS"
-                : `${recipe.id} · ${session.stage.replace("_", " ")}`}
-            </p>
+            <p className="eyebrow">STEP {String(stepNumber).padStart(2, "0")} / 08 · {stepLabel}</p>
             <Title>{stageCopy[session.stage]}</Title>
             <p className="atelier-stage-hint">{stageHint}</p>
           </div>
@@ -1201,7 +1228,7 @@ export function AtelierPage() {
             )}
           </div>
 
-          <div className="atelier-stage-actions">
+          <div className={`atelier-stage-actions ${session.stage === "PRODUCT_SELECTION" ? "has-product-options" : ""}`}>
             {session.stage === "READY" && (
               <Button
                 className="atelier-primary"
@@ -1229,6 +1256,10 @@ export function AtelierPage() {
                 </Button>
               </div>
             )}
+            {session.stage === "PRODUCT_SELECTION" && <div className="atelier-stage-product-options">
+              {productOptions}
+              <Button className="atelier-primary" onClick={() => updateSession({ stage: "SUMMARY" })}>선택한 구성 확인하기</Button>
+            </div>}
             {session.stage === "SUMMARY" && (
               <Button
                 className="atelier-primary"
@@ -1280,33 +1311,11 @@ export function AtelierPage() {
                 <span>0{index + 1}</span>
                 <p>{stage}</p>
                 <strong>{ingredient}</strong>
-                <em>{selectedGroups[index].length ? "SELECTED" : "WAITING"}</em>
+                <em>{selectedGroups[index].length ? "완료" : "대기"}</em>
               </div>
             ))}
           </div>}
-          {["PRODUCT_SELECTION", "SUMMARY"].includes(session.stage) && (
-            <div className="product-options">
-              <p className="eyebrow">FINAL PRODUCT</p>
-              {(Object.keys(atelierProducts) as ProductType[]).map((type) => (
-                <Button
-                  className={`atelier-product-option ${session.productType === type ? "is-active" : ""}`}
-                  ariaPressed={session.productType === type}
-                  ariaLabel={`${type} · ${atelierProducts[type].korean} · ${atelierVolumes[type]} · ${formatPoint(atelierProducts[type].price)}`}
-                  key={type}
-                  onClick={() => updateSession({ productType: type })}
-                >
-                  <span>
-                    <strong className="atelier-product-name" aria-hidden="true">
-                      <span className="atelier-product-name-english" lang="en">{type}</span>
-                      <span className="atelier-product-name-korean" lang="ko">{atelierProducts[type].korean}</span>
-                    </strong>
-                    <small>{atelierVolumes[type]} · {atelierProducts[type].caption}</small>
-                  </span>
-                  <em>{formatPoint(atelierProducts[type].price)}</em>
-                </Button>
-              ))}
-            </div>
-          )}
+          {["PRODUCT_SELECTION", "SUMMARY"].includes(session.stage) && productOptions}
           {session.stage === "PRODUCT_SELECTION" && (
             <Button
               className="atelier-primary recipe-confirm"
@@ -1337,7 +1346,7 @@ export function AtelierPage() {
                 </Button>
               )}
             <span>향료 선택</span>
-            <strong>{Math.round((completeGroups / 3) * 100)}%</strong>
+            <strong>{completeGroups} / 3</strong>
             <div>
               <i style={{ width: `${(completeGroups / 3) * 100}%` }} />
             </div>
@@ -1349,41 +1358,7 @@ export function AtelierPage() {
 }
 
 export function CardsPage() {
-  const cards = [
-    {
-      name: "Dew",
-      tier: "START",
-      className: "physical-dew",
-      fee: "10,000원",
-      performance: "없음",
-      limit: "3,000P",
-      basic: "0.5%",
-      beauty: "1%",
-      partner: "1%",
-    },
-    {
-      name: "Velvet",
-      tier: "TASTE",
-      className: "physical-velvet",
-      fee: "30,000원",
-      performance: "300,000원",
-      limit: "8,000P",
-      basic: "0.7%",
-      beauty: "3%",
-      partner: "5%",
-    },
-    {
-      name: "Amber",
-      tier: "PRIVILEGE",
-      className: "physical-amber",
-      fee: "50,000원",
-      performance: "500,000원",
-      limit: "15,000P",
-      basic: "1%",
-      beauty: "5%",
-      partner: "5%",
-    },
-  ]
+  const cards = auraCards
   return (
     <main className="cards-page page-shell">
       <section className="cards-hero">
@@ -1394,15 +1369,15 @@ export function CardsPage() {
           <em>향으로 돌아오도록.</em>
         </Title>
         <p>
-          카드 등급과 향 타입은 독립적이며, 모든 AURA 카드 회원이 컬렉션과
-          Atelier를 이용할 수 있습니다.
+          카드 등급과 향 계열은 서로 관계가 없으며, 모든 AURA 카드 회원이 컬렉션과
+          MY AURA를 이용할 수 있습니다.
         </p>
       </section>
       <section className="physical-card-gallery">
         {cards.map((card) => (
           <article key={card.name}>
             <AuraFlipCard card={card} />
-            <p>카드를 클릭해 뒷면을 확인하세요.</p>
+            <p>카드를 눌러 뒷면을 확인하세요.</p>
           </article>
         ))}
       </section>
@@ -1415,7 +1390,7 @@ export function CardsPage() {
           </Title>
           <p>
             카드 등급은 향 계열이나 상품 접근을 제한하지 않습니다. 모든 카드
-            회원이 일반 컬렉션과 Personal Atelier를 이용할 수 있습니다.
+            회원이 컬렉션과 MY AURA를 이용할 수 있습니다.
           </p>
         </div>
         <div className="benefit-grid">
@@ -1606,14 +1581,122 @@ export function AuthPage({mode}:{mode:"login"|"signup"}) {
   </main>
 }
 
+type MyPageEntry = { id: string; date: string; type: "earn" | "redeem"; title: string; detail: string; amount: number; special?: boolean; reward?: { amount: number; label: string }; balanceAfter?: number }
+type MyPageMember = { name: string; email: string; joinedAt?: string; card?: { name: string; last4?: string }; points: number; history: MyPageEntry[] }
+
+/**
+ * Local preview only: in `next dev`, a member in public/dev/demo-member.json (kept out of git)
+ * replaces the signed-in member so MyPage can be built against full card and history data.
+ */
+function useDevDemoMember() {
+  const [demo, setDemo] = useState<MyPageMember | null>(null)
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return
+    let active = true
+    fetch("/dev/demo-member.json").then((response) => response.ok ? response.json() : null).then((data) => { if (active && data) setDemo(data) }).catch(() => {})
+    return () => { active = false }
+  }, [])
+  return demo
+}
+
 export function MyPage(){
-  const {user,points,pointHistory,recoveryPending,logout}=useAppState()
+  const {user,points,pointHistory,logout}=useAppState()
   const router=useRouter()
-  if(!user)return <main className="simple-page page-shell"><p className="eyebrow">MY AURA ACCOUNT</p><Title as="h1">로그인하고 내 포인트를 확인하세요.</Title><CtaLink href="/login?next=%2Fmypage">로그인하기</CtaLink></main>
-  return <main className="mypage page-shell"><p className="eyebrow">MY AURA ACCOUNT</p><Title as="h1">{user.name}님의 AURA</Title><p className="mypage-email">{user.email}</p>
-    <div className="mypage-grid"><article className="mypage-wallet"><span>사용 가능 포인트</span><strong>{formatPoint(points)}</strong><small>회수 대기 {formatPoint(recoveryPending)}</small></article><article className="mypage-card"><span>YOUR AURA</span><h3>{user.card} · {cardPolicies[user.card].tier}</h3><p>교환 {cardPolicies[user.card].rate}% 적립</p><Link href="/cards">카드 혜택 알아보기 ↗</Link></article></div>
-    <section className="mypage-history"><Title>포인트 내역</Title><p>최근 순 · {groupPointHistory(pointHistory).length}건</p>{pointHistory.length ? <PointHistoryEntries history={pointHistory} /> : <p>아직 포인트 내역이 없어요.</p>}</section>
-    <button className="mypage-logout" type="button" onClick={()=>{logout();router.push("/")}}>로그아웃</button>
+  const demo=useDevDemoMember()
+  const [filter,setFilter]=useState<"all"|MyPageEntry["type"]>("all")
+  const member: MyPageMember | null = demo ?? (user && {
+    name: user.name,
+    email: user.email,
+    card: { name: user.card },
+    points,
+    // An exchange and its card reward are stored as two entries; show them as one row.
+    history: groupPointHistory(pointHistory).map(({ transaction, cashback }) => ({
+      id: transaction.id,
+      date: transaction.date,
+      type: transaction.amount >= 0 ? "earn" : "redeem",
+      title: transaction.items?.length ? transaction.items.map((item) => `${item.name} × ${item.quantity}`).join(" · ") : transaction.label,
+      detail: transaction.detail,
+      amount: transaction.amount,
+      reward: cashback && { amount: cashback.amount, label: cashback.label },
+      balanceAfter: transaction.balanceAfter,
+    })),
+  })
+  if(!member)return <main className="simple-page page-shell"><p className="eyebrow">MY AURA ACCOUNT</p><Title as="h1">로그인하고 내 포인트를 확인하세요.</Title><CtaLink href="/login?next=%2Fmypage">로그인하기</CtaLink></main>
+
+  const card = member.card && auraCards.find((item) => item.name === member.card!.name)
+  const mallPolicy = member.card ? cardPolicies[member.card.name as AuraCard] : undefined
+  const specialLimit = card ? Number(card.limit.replace(/\D/g, "")) : 0
+  // Demo dates are "2026.10.10"; stored exchange dates are "10. 10.". Compare by month either way.
+  const monthOf = (date: string) => /^\d{4}\./.test(date) ? date.slice(0, 7) : date.split(".")[0]
+  const latestMonth = member.history[0] && monthOf(member.history[0].date)
+  const thisMonth = member.history.filter((entry) => monthOf(entry.date) === latestMonth)
+  const monthTotal = thisMonth.reduce((sum, entry) => sum + (entry.type === "earn" ? entry.amount : 0) + (entry.reward?.amount ?? 0), 0)
+  const monthSpecial = thisMonth.filter((entry) => entry.special).reduce((sum, entry) => sum + entry.amount, 0)
+  const specialRatio = specialLimit ? Math.min(100, Math.round((monthSpecial / specialLimit) * 100)) : 0
+  // Balance right after each entry, newest first: today's balance, then undo the newer entries one by one.
+  const balances = member.history.reduce<number[]>((list, item, index) => {
+    const newer = member.history[index - 1]
+    return [...list, index === 0 ? member.points : list[index - 1] - newer.amount - (newer.reward?.amount ?? 0)]
+  }, [])
+  const entries = member.history.map((entry, index) => ({ entry, balance: entry.balanceAfter ?? balances[index] })).filter(({ entry }) => filter === "all" || entry.type === filter)
+
+  return <main className="mypage page-shell"><p className="eyebrow">MY AURA ACCOUNT{demo && <span className="mypage-dev-badge">개발용 가상 회원</span>}</p><Title as="h1">{member.name}님의 AURA</Title><p className="mypage-email">{member.email}{member.joinedAt && ` · ${member.joinedAt} 가입`}</p>
+    <div className="mypage-grid">
+      <article className="mypage-wallet">
+        <span>사용 가능 포인트</span>
+        <strong>{formatPoint(member.points)}</strong>
+        {monthTotal > 0 && <p className="mypage-wallet-month">이번 달 적립 <b>+{formatPoint(monthTotal)}</b></p>}
+        {member.points > 0
+          ? <Link className="mypage-wallet-link" href="/products">포인트로 향 교환하기 ↗</Link>
+          : <p className="mypage-wallet-empty">AURA 카드로 결제하면 포인트가 쌓여요. 쌓인 포인트로 컬렉션의 향이나 나만의 향을 교환할 수 있어요.</p>}
+      </article>
+      {card && member.card
+        ? <article className="mypage-card mypage-member-card">
+            <span>MY CARD</span>
+            <div className="mypage-card-visual" role="img" aria-label={`보유 카드 ${card.name}${member.card.last4 ? `, 끝자리 ${member.card.last4}` : ""}`}>
+              <span className={`physical-card-face card-front ${card.className}`} aria-hidden="true">
+                <span className="physical-card-top"><strong>AURA</strong><em>{card.tier}</em></span>
+                <span className="masked-number">••••&nbsp;&nbsp;••••&nbsp;&nbsp;••••&nbsp;&nbsp;{member.card.last4 ?? "••••"}</span>
+                <span className="physical-card-bottom"><strong>{card.name}</strong>{member.joinedAt && <small>MEMBER SINCE {member.joinedAt.slice(0, 4)}</small>}</span>
+              </span>
+            </div>
+            <dl className="mypage-card-rates">
+              {mallPolicy && <div><dt>교환 적립</dt><dd>{mallPolicy.rate}%</dd></div>}
+              <div><dt>기본</dt><dd>{card.basic}</dd></div>
+              <div><dt>뷰티</dt><dd>{card.beauty}</dd></div>
+              <div><dt>제휴점</dt><dd>{card.partner}</dd></div>
+            </dl>
+            {monthSpecial > 0 && <div className="mypage-card-limit">
+              <p><span>이번 달 특별 적립</span><b>{formatPoint(monthSpecial)} / {card.limit}</b></p>
+              <div role="progressbar" aria-label="이번 달 특별 적립 한도 사용률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={specialRatio}><i style={{ width: `${specialRatio}%` }} /></div>
+            </div>}
+            <Link href="/cards">카드 혜택 비교하기 ↗</Link>
+          </article>
+        : <article className="mypage-card"><span>YOUR AURA</span><h3>일상과 취향을 연결하는 혜택</h3><Link href="/cards">카드 혜택 알아보기 ↗</Link></article>}
+    </div>
+    <section className="mypage-history">
+      <div className="mypage-history-head">
+        <Title>포인트 내역</Title>
+        {member.history.length > 0 && <div className="mypage-history-filter" role="group" aria-label="포인트 내역 보기">
+          {([["all", "전체"], ["earn", "적립"], ["redeem", "교환"]] as const).map(([key, label]) => <button key={key} type="button" aria-pressed={filter === key} className={filter === key ? "is-active" : ""} onClick={() => setFilter(key)}>{label}</button>)}
+        </div>}
+      </div>
+      {entries.length
+        ? entries.map(({ entry, balance }) => <article key={entry.id} className={`is-${entry.type}`}>
+            <span><em>{entry.type === "earn" ? "적립" : "교환"}</em>{entry.title}<small>{entry.date} · {entry.detail}</small></span>
+            <span className="mypage-history-amount">
+              <strong>{entry.amount > 0 ? "+" : ""}{formatPoint(entry.amount)}</strong>
+              {entry.reward && <small className="mypage-history-reward">{entry.reward.label} +{formatPoint(entry.reward.amount)}</small>}
+              <small>잔액 {formatPoint(balance)}</small>
+            </span>
+          </article>)
+        : <div className="mypage-history-empty">
+            <strong>{filter === "earn" ? "아직 적립된 포인트가 없어요." : "아직 교환한 향이 없어요."}</strong>
+            <p>{filter === "earn" ? "AURA 카드로 결제하면 포인트가 쌓여요." : "포인트로 컬렉션의 향을 교환하거나, 나만의 향을 직접 만들어 보세요. 교환하면 이곳에 내역이 남아요."}</p>
+            <div>{filter === "earn" ? <CtaLink href="/cards">카드 혜택 알아보기</CtaLink> : <><CtaLink href="/products">컬렉션 둘러보기</CtaLink><CtaLink href="/custom">나만의 향 만들기</CtaLink></>}</div>
+          </div>}
+    </section>
+    {user && <button className="mypage-logout" type="button" onClick={()=>{logout();router.push("/")}}>로그아웃</button>}
   </main>
 }
 

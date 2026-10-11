@@ -50,7 +50,7 @@ export function BlendVessel({ ingredients, onComplete }: { ingredients:string[];
   }
   const complete = progress >= 100
   return <div className={`blend-interaction ${complete ? "is-complete" : ""}`}>
-    <p className="blend-guide">{complete ? "향료가 하나로 어우러졌어요." : "용기를 좌우로 끌어 흔들거나, 아래 버튼으로 천천히 저어 섞어 보세요."}</p>
+    {complete && <p className="blend-guide" role="status">향료가 하나로 어우러졌어요.</p>}
     <div className="blend-touch-target" role="group" aria-label="조향 용기 흔들어 섞기. 좌우 화살표 키로도 섞을 수 있어요." tabIndex={0}
       onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);last.current={x:e.clientX,y:e.clientY}}}
       onPointerMove={e=>{if(!last.current)return;const dx=e.clientX-last.current.x;const dist=Math.hypot(dx,e.clientY-last.current.y);if(dist>8){advance(Math.min(9,dist/9),Math.sign(dx));last.current={x:e.clientX,y:e.clientY}}}}
