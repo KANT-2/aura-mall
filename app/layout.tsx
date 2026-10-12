@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import type { ReactNode } from "react"
 import "./globals.css"
+import "./aura-common-polish.css"
 import { AuraProviders, AuraShell } from "@/components/AuraSite"
 
 export const metadata: Metadata = {
