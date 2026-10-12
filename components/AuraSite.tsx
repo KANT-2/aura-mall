@@ -1359,6 +1359,7 @@ export function AtelierPage() {
 
 export function CardsPage() {
   const cards = auraCards
+  const [issuanceNotice, setIssuanceNotice] = useState(false)
   return (
     <main className="cards-page page-shell">
       <section className="cards-hero">
@@ -1431,7 +1432,13 @@ export function CardsPage() {
           <Title>나에게 맞는 AURA 카드 찾기</Title>
           <p>연회비와 전월 실적, 적립 혜택을 비교하고 나에게 알맞은 카드를 살펴보세요.</p>
         </div>
-        <Link className="issuance-button" href="#benefits">카드 혜택 비교하기 ↗</Link>
+        <div className="issuance-actions">
+          <Link className="issuance-button" href="#benefits">카드 혜택 비교하기 ↗</Link>
+          <button type="button" className="issuance-button issuance-apply" onClick={() => setIssuanceNotice(true)}>카드 발급 신청</button>
+          <p className="issuance-status" role="status">
+            {issuanceNotice && "카드 발급 신청은 순차적으로 오픈돼요. 오픈 소식은 AURA MALL에서 가장 먼저 알려 드릴게요."}
+          </p>
+        </div>
       </section>
     </main>
   )
