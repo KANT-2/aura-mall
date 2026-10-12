@@ -512,7 +512,10 @@ button:disabled { cursor:not-allowed; }
 .issuance-notice { display:flex; justify-content:space-between; align-items:center; gap:3rem; padding:6rem 0; border-bottom:1px solid var(--line); }
 .issuance-notice h2 { margin:0; font-family:var(--font-serif); font-size:3rem; font-weight:400; }
 .issuance-notice div > p:last-child { max-width:38rem; color:var(--muted); line-height:1.8; }
-.issuance-button { min-width:14rem; border:1px solid var(--line); padding:1rem 1.5rem; background:transparent; color:var(--muted); cursor:not-allowed; }
+.issuance-button { min-width:14rem; border:1px solid var(--line); padding:1rem 1.5rem; background:transparent; color:var(--muted); cursor:pointer; font:inherit; text-align:center; }
+.issuance-actions { display:grid; gap:.75rem; min-width:14rem; max-width:22rem; }
+.issuance-apply { border-color:var(--ink); color:inherit; }
+.issuance-status { min-height:1.5em; margin:0; color:var(--muted); font-size:.875rem; line-height:1.6; }
 
 @media (max-width: 900px) {
   .page-shell { width:min(100% - 3rem, 48rem); }
@@ -716,6 +719,7 @@ button:disabled { cursor:not-allowed; }
   .partner-benefit h2 { font-size:2.8rem; }
   .issuance-notice { align-items:flex-start; flex-direction:column; padding:4rem 0; }
   .issuance-button { width:100%; }
+  .issuance-actions { width:100%; max-width:none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
