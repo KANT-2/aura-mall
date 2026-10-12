@@ -17,6 +17,7 @@ import { auraCards } from "@/data/cards"
 import { cardPolicies, calculateCardReward, detectAuraCard, formatAuraCardNumber, type AuraCard } from "@/data/cardPolicies"
 import type { Product } from "@/types/product"
 import NextLink from "next/link"
+import { HomeExperience } from "@/components/home/HomeExperience"
 import { BlendVessel } from "@/components/BlendVessel"
 import { ProductCard } from "@/components/products/ProductCard"
 import { ProductCollection } from "@/components/products/ProductCollection"
@@ -304,6 +305,8 @@ function Button({
   ariaLabel,
   disabled = false,
   ariaPressed,
+  ariaExpanded,
+  ariaControls,
 }: {
   children?: ReactNode
   className?: string
@@ -312,11 +315,15 @@ function Button({
   ariaLabel?: string
   disabled?: boolean
   ariaPressed?: boolean
+  ariaExpanded?: boolean
+  ariaControls?: string
 }) {
   return (
     <button
       aria-label={ariaLabel}
       aria-pressed={ariaPressed}
+      aria-expanded={ariaExpanded}
+      aria-controls={ariaControls}
       className={className}
       disabled={disabled}
       onClick={onClick}
@@ -332,6 +339,16 @@ function Header() {
   const [walletOpen, setWalletOpen] = useState(false)
   const { cart, points, user, logout } = useAppState()
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0)
+  useEffect(() => {
+    if (!open) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      setOpen(false)
+      document.querySelector<HTMLButtonElement>(".mobile-menu")?.focus()
+    }
+    window.addEventListener("keydown", closeOnEscape)
+    return () => window.removeEventListener("keydown", closeOnEscape)
+  }, [open])
   const links = [
     ["/products", "컬렉션"],
     ["/custom", "MY AURA"],
@@ -351,6 +368,8 @@ function Header() {
         <div className="header-inner">
           <Button
             ariaLabel={open ? "메뉴 닫기" : "메뉴 열기"}
+            ariaExpanded={open}
+            ariaControls="aura-primary-nav"
             className="icon-button mobile-menu"
             onClick={() => setOpen(!open)}
           >
@@ -359,7 +378,7 @@ function Header() {
           <Link ariaLabel="AURA 홈" className="brand-logo" href="/">
             AURA
           </Link>
-          <nav className={`primary-nav ${open ? "is-open" : ""}`}>
+          <nav id="aura-primary-nav" aria-label="주요 메뉴" className={`primary-nav ${open ? "is-open" : ""}`}>
             {links.map(([href, label]) => (
               <Link href={href} key={href} onClick={() => setOpen(false)}>
                 {label}
@@ -511,6 +530,7 @@ function PointWallet({ open, onClose }: { open: boolean; onClose: () => void }) 
 }
 
 function Footer() {
+  const { user } = useAppState()
   return (
     <footer className="site-footer">
       <div className="footer-main">
@@ -528,8 +548,8 @@ function Footer() {
           <div>
             <p className="footer-label">SUPPORT</p>
             <Link href="/cards">카드 혜택 안내</Link>
-            <Link href="/mypage">내 포인트</Link>
-            <Link href="/login">내 계정</Link>
+            <Link href={user ? "/mypage" : "/login?next=%2Fmypage"}>{user ? "내 포인트" : "로그인하고 포인트 확인"}</Link>
+            <Link href={user ? "/mypage" : "/login"}>{user ? "내 계정" : "로그인"}</Link>
           </div>
         </div>
       </div>
@@ -596,49 +616,7 @@ function SectionHeading({
 
 export function HomePage() {
   const { points, user } = useAppState()
-  const feature = products.find((item)=>item.slug==="fig-reverie") || products[4]
-  return <main className="editorial-home">
-    <section className="hero hero-story">
-      <div className="hero-copy">
-        <p className="eyebrow">AURA — THE SCENT VEIL</p>
-        <Title as="h1" className="hero-title">From Scent<br/>to <em>Identity.</em></Title>
-        <p className="hero-korean">일상의 포인트가,<br/>나만의 향이 되다.</p>
-        <p className="hero-subcopy">취향에 맞는 향을 발견하고, 마음에 남는 리워드를 AURA 포인트로 만나보세요.</p>
-        <div className="hero-actions"><CtaLink href="/products">컬렉션 둘러보기</CtaLink><Link className="text-link" href="/custom">MY AURA 알아보기 <Icon name="arrow"/></Link></div>
-      </div>
-      <div className="hero-art"><span className="hero-art-caption">AURA EAU DE PARFUM · SCENT COLLECTION</span><AssetImage asset="hero-bottles" label="AURA 향수병 컬렉션"/></div>
-    </section>
-    <section className="featured editorial-section page-shell section-pad" id="collection">
-      <SectionHeading eyebrow="01 — THE AURA EDIT" title="지금, 만나고 싶은 세 가지 향." body="서로 다른 순간을 담은 AURA의 큐레이션. 산뜻한 아침부터 차분한 저녁의 잔향까지."/>
-      <div className="featured-grid">{products.slice(0,3).map((product,index)=><ProductCard key={product.slug} product={product} index={index}/>)}</div>
-      <div className="section-end-link"><CtaLink href="/products">전체 컬렉션 보기</CtaLink></div>
-    </section>
-    <section className="special-showcase" id="showcase">
-      <div className="showcase-art"><AssetImage asset={feature.image} label={`${feature.name} 시그니처 향수`}/><img src="/assets/ingredients/fig.png" alt="무화과 일러스트" className="showcase-fig"/></div>
-      <div className="showcase-copy"><p className="eyebrow">02 — AURA SPECIAL SHOWCASE</p><span className="showcase-index">THE WOODY EDIT / 01</span><Title>Fig Reverie</Title><h3>무화과나무 아래,<br/>조금 느린 오후.</h3><p>푸른 무화과 잎과 부드러운 우드. 익숙한 오후의 풍경을 하나의 향으로 간직하세요.</p><div className="showcase-notes"><span>FIG</span><span>WOODY</span><span>SANDALWOOD</span></div><CtaLink href="/products/fig-reverie" light>향 자세히 보기</CtaLink></div>
-    </section>
-    <section className="families section-pad editorial-section" id="scents"><div className="page-shell">
-      <SectionHeading eyebrow="03 — FIND YOUR SCENT" title="오늘, 어떤 향이 끌리나요?" body="향의 이름보다 먼저 끌리는 감각. 네 가지 향 계열에서 시작해 보세요."/>
-      <div className="family-grid">{[
-        ["Fresh","맑게 시작되는 첫인상","bergamot"],
-        ["Floral","부드럽게 피어나는 향","peony"],
-        ["Woody","차분하고 깊이 남는 잔향","cedarwood"],
-        ["Musk","피부 가까이 머무는 향","white-musk"],
-      ].map(([name,copy,img],index)=><Link className="family-item" href={`/products?family=${name}`} key={name}>
-        <img className="family-illustration" alt="" src={`/assets/ingredients/${img}.png`}/>
-        <span className="family-number">0{index+1}</span><span className="family-copy">{copy}</span><strong>{name}</strong><Icon name="arrow"/>
-      </Link>)}</div>
-    </div></section>
-    <section className="atelier-feature editorial-section" id="atelier"><AssetImage asset="atelier-flasks" label="AURA 조향 플라스크"/><div className="atelier-copy"><p className="eyebrow">04 — MY AURA PERSONAL ATELIER</p><Title>보이지 않는 향을<br/>눈앞의 형태로.</Title><p>TOP, HEART, BASE의 향료를 자유롭게 고르고, 용기를 움직여 향을 직접 섞어 보세요. 지금의 취향이 하나의 향으로 완성됩니다.</p><CtaLink href="/custom" light>나만의 향 구성하기</CtaLink></div></section>
-    <section className="point-experience editorial-section section-pad page-shell"><SectionHeading eyebrow="05 — AURA POINT" title="쌓인 포인트가,
-좋아하는 향으로." body="카드 이용으로 쌓은 포인트로 컬렉션과 MY AURA의 리워드를 만나보세요."/>
-      <div className="journey-grid">{[["01","Earn","일상에서 포인트를 쌓고"],["02","Discover","좋아하는 향을 발견하고"],["03","Redeem","포인트로 리워드를 교환하세요"]].map(([n,title,copy])=><div className="journey-step" key={n}><span>{n}</span><Title as="h3">{title}</Title><p>{copy}</p></div>)}</div>
-      <div className="home-wallet-bridge"><div><span>{user ? "사용 가능 포인트" : "MY AURA POINT"}</span><strong>{user ? formatPoint(points) : "내 포인트를 확인해 보세요"}</strong></div><CtaLink href={user?"/mypage":"/login"}>{user?"포인트 내역 보기":"로그인하기"}</CtaLink></div>
-    </section>
-    <section className="card-preview editorial-section section-pad" id="cards"><div className="page-shell"><SectionHeading eyebrow="06 — AURA CARD" title="일상의 소비가,
-취향을 위한 혜택으로." body="다양한 라이프스타일을 위한 세 가지 카드. 적립한 포인트를 향의 경험으로 연결해 보세요."/><div className="cards-stage"><CreditCard name="Dew" tier="START" className="card-dew"/><CreditCard name="Velvet" tier="TASTE" className="card-velvet"/><CreditCard name="Amber" tier="PRIVILEGE" className="card-amber"/></div><p className="card-perfumery">PARTNER PERFUMERY · 카드 공통 5% 할인 혜택</p><div className="section-end-link"><CtaLink href="/cards">카드 혜택 비교하기</CtaLink></div></div></section>
-    <section className="closing editorial-section"><AssetImage asset="closing-art" label="AURA 유리 아트 오브젝트"/><div><p className="eyebrow">07 — FROM SCENT TO IDENTITY</p><Title>향은 보이지 않지만,<br/>취향은 선명하게 남습니다.</Title><CtaLink href="/products" light>컬렉션 둘러보기</CtaLink></div></section>
-  </main>
+  return <HomeExperience signedIn={Boolean(user)} points={formatPoint(points)} />
 }
 
 function CreditCard({
@@ -1539,6 +1517,7 @@ export function AuthPage({mode}:{mode:"login"|"signup"}) {
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState("")
   const [visible,setVisible]=useState(false)
+  const passwordMismatch = mode === "signup" && confirm.length > 0 && password !== confirm
   const params=useSearchParams()
   const next=params.get("next")
   const destination=next?.startsWith("/") && !next.startsWith("//") ? next : "/mypage"
@@ -1554,13 +1533,13 @@ export function AuthPage({mode}:{mode:"login"|"signup"}) {
   }
   return <main className="auth-layout">
     <section className="auth-brand"><span className="eyebrow">AURA · FROM SCENT TO IDENTITY</span><Title as="h1">Your scent,<br/><em>your identity.</em></Title><p>일상의 포인트가 당신만의 향이 되는 곳.</p><AssetImage asset="hero-bottles" label="AURA 향수 컬렉션"/></section>
-    <section className="auth-form-panel"><div className="auth-form-inner"><p className="eyebrow">AURA ACCOUNT</p><Title as="h2">{mode==="signup"?"AURA에 오신 것을 환영해요.":"다시 만나 반가워요."}</Title><p className="auth-subtitle">{mode==="signup"?"새로운 취향을 만나는 여정을 시작하세요.":"로그인하고 내 포인트와 교환 내역을 확인하세요."}</p>
+    <section className="auth-form-panel"><div className="auth-form-inner"><p className="eyebrow">AURA ACCOUNT</p><Title as="h2">{mode==="signup"?"AURA에 오신 것을 환영해요.":"다시 만나서 반가워요."}</Title><p className="auth-subtitle">{mode==="signup"?"새로운 취향을 만나는 여정을 시작하세요.":"로그인하고 내 포인트와 교환 내역을 확인하세요."}</p>
       {user && <p className="auth-notice">현재 {user.name}님으로 로그인되어 있습니다. 다른 계정으로 이용하려면 먼저 로그아웃해 주세요.</p>}
-      <form className="auth-form" onSubmit={submit}>
+      <form className="auth-form" onSubmit={submit} aria-busy={busy}>
         {mode==="signup"&&<label>이름<input autoComplete="name" maxLength={30} onChange={e=>setName(e.target.value)} placeholder="이름을 입력해 주세요" required value={name}/></label>}
         <label>이메일<input autoComplete="email" type="email" onChange={e=>setEmail(e.target.value)} placeholder="이메일을 입력해 주세요" required value={email}/></label>
-        <label>비밀번호<div className="auth-password"><input autoComplete={mode==="signup"?"new-password":"current-password"} type={visible?"text":"password"} minLength={8} onChange={e=>setPassword(e.target.value)} placeholder="비밀번호를 입력해 주세요 (8자 이상)" required value={password}/><button type="button" onClick={()=>setVisible(v=>!v)} aria-label={visible?"비밀번호 숨기기":"비밀번호 보기"}>{visible?"숨기기":"보기"}</button></div></label>
-        {mode==="signup"&&<label>비밀번호 확인<input autoComplete="new-password" type={visible?"text":"password"} minLength={8} onChange={e=>setConfirm(e.target.value)} placeholder="비밀번호를 한 번 더 입력해 주세요" required value={confirm}/></label>}
+        <label>비밀번호<div className="auth-password"><input autoComplete={mode==="signup"?"new-password":"current-password"} type={visible?"text":"password"} minLength={8} onChange={e=>setPassword(e.target.value)} placeholder="비밀번호를 입력해 주세요 (8자 이상)" required value={password}/><button type="button" aria-pressed={visible} onClick={()=>setVisible(v=>!v)} aria-label={visible?"비밀번호 숨기기":"비밀번호 보기"}>{visible?"숨기기":"보기"}</button></div></label>
+        {mode==="signup"&&<label>비밀번호 확인<input autoComplete="new-password" type={visible?"text":"password"} minLength={8} aria-invalid={passwordMismatch} aria-describedby="aura-password-match" onChange={e=>setConfirm(e.target.value)} placeholder="비밀번호를 한 번 더 입력해 주세요" required value={confirm}/><small id="aura-password-match" className="auth-field-hint" aria-live="polite">{passwordMismatch ? "입력한 비밀번호가 일치하지 않아요." : confirm.length > 0 ? "비밀번호가 일치해요." : "앞에서 입력한 비밀번호와 동일하게 입력해 주세요."}</small></label>}
         {mode==="signup" && <label>AURA 카드 번호
           <input type="text" inputMode="numeric" autoComplete="off" maxLength={19}
             placeholder="0000 0000 0000 0000" value={cardNumber}
@@ -1569,11 +1548,11 @@ export function AuthPage({mode}:{mode:"login"|"signup"}) {
             aria-describedby="aura-card-status" />
           <small id="aura-card-status" aria-live="polite">
             {card ? `${card} 카드 확인됨 · 가입 ${formatPoint(cardPolicies[card].signupBonus)} · 교환 ${cardPolicies[card].rate}% 적립`
-              : cardNumber.replace(/\s/g, "").length === 16 ? "등록된 AURA 카드 번호를 확인해 주세요."
+              : cardNumber.replace(/\s/g, "").length === 16 ? "AURA 카드 번호 형식을 확인해 주세요."
               : "16자리 AURA 카드 번호를 입력해 주세요."}
           </small>
         </label>}
-        {error&&<p className="auth-error" role="alert">{error}</p>}
+        {error&&<p className="auth-error" role="alert" aria-live="assertive">{error}</p>}
         <button className="auth-submit" type="submit" disabled={busy || (mode==="signup" && !card)}>{busy?"처리 중…":mode==="signup"?"회원가입":"로그인"} <span aria-hidden="true">↗</span></button>
       </form>
       <p className="auth-switch">{mode==="signup"?"이미 회원이신가요?":"아직 AURA 회원이 아니신가요?"} <Link href={mode==="signup"?"/login":"/signup"}>{mode==="signup"?"로그인":"회원가입"}</Link></p>
@@ -1966,7 +1945,9 @@ function AuraStateProvider({
 
 export function AuraShell({ children }: { children: ReactNode }) {
   return (<>
+    <a href="#aura-main" className="aura-skip-link">본문으로 바로가기</a>
     <Header />
+    <span id="aura-main" className="aura-skip-target" tabIndex={-1} />
     {children}
     <Footer />
   </>)
