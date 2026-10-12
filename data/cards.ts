@@ -1,4 +1,5 @@
 /** AURA card tiers. Shared by the card comparison page and the member's card on MyPage. */
+// Special rates (beauty, partner) follow the exchange rates in cardPolicies (1/3/5%). Rationale: PRD 5.4
 export const auraCards = [
   {
     name: "Dew",
@@ -20,7 +21,7 @@ export const auraCards = [
     limit: "8,000P",
     basic: "0.7%",
     beauty: "3%",
-    partner: "5%",
+    partner: "3%",
   },
   {
     name: "Amber",
