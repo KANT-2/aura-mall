@@ -4,6 +4,7 @@ import catalog from "./catalog.json";
 import { Vessel } from "../ui/Vessel";
 import ingredients from "./ingredients.json";
 import { AuraWordmark } from "./AuraWordmark";
+import { AuraCollectionArtwork } from "./AuraCollectionArtwork";
 
 export const { products, collections, types } = catalog;
 
@@ -20,9 +21,10 @@ const botanicalNames = new Set([
   "rose","jasmine","neroli","lavender","ylang","muguet","pink-pepper","cardamom",
   "sandalwood","cedarwood","vetiver","white-musk","amber","vanilla","benzoin","tonka"
 ]);
-export const asset=(id:string)=> botanicalNames.has(id)
-  ? `/assets/botanical/${id}.webp`
-  : `/assets/editorial/${assetAliases[id]||id}.svg`;
+export const asset=(id:string)=> {
+  const resolved=assetAliases[id]||id;
+  return botanicalNames.has(resolved) ? `/assets/botanical/${resolved}.webp` : `/assets/editorial/${resolved}.svg`;
+};
 
 
 export function Arrow() {
@@ -36,15 +38,20 @@ export function Asset({
   id: string;
   className?: string;
 }) {
+  if (id === "collection-fresh" || id === "collection-soft" || id === "collection-warm") {
+    return <AuraCollectionArtwork collection={id.slice("collection-".length)} className={className} />;
+  }
   return <img className={className} src={asset(id)} alt="" draggable={false} />;
 }
 
 export function ProductPhoto({
   product: p,
   loading = "lazy",
+  selection = [],
 }: {
   product: Product;
   loading?: "lazy" | "eager";
+  selection?: string[];
 }) {
   return p.type === "gift-set" ? (
     <div
@@ -56,13 +63,11 @@ export function ProductPhoto({
         <AuraWordmark className="a-gift-brand-mark" /> <small>THE GIFT OF SCENT</small>
       </span>
       <div>
-        {["hand-cream", "eau-de-parfum", "candle"].map((t) => (
-          <img
-            key={t}
-            src={"/assets/products/" + p.collection + "-" + t + ".webp"}
-            alt=""
-            loading={loading}
-          />
+        {(selection.length === 3
+          ? selection.map(id => products.find(item => item.id === id)?.image).filter((url): url is string => Boolean(url))
+          : ["hand-cream", "eau-de-parfum", "candle"].map(t => "/assets/products/" + p.collection + "-" + t + ".webp")
+        ).map((url, i) => (
+          <img key={`${url}-${i}`} src={url} alt="" loading={loading} />
         ))}
       </div>
       <span>{p.collection.toUpperCase()} / YOUR THREE SELECTIONS</span>
@@ -117,15 +122,17 @@ export function Beaker({
   color,
   mixing = false,
   drop = 0,
+  stir,
 }: {
   count: number;
   color: string;
   mixing?: boolean;
   drop?: number;
+  stir?: {x:number;y:number;energy:number};
 }) {
   return <div className={"beaker " + (mixing ? "mixing" : "") }>
-    <Vessel total={count} color={color} mixing={mixing} />
-    {drop > 0 && <span key={drop} className="vessel-drop" style={{background:color}} aria-hidden="true" />}
+    <Vessel total={count} color={color} mixing={mixing} stir={stir} />
+    {drop > 0 && <span key={drop} className="vessel-drop a86-vessel-drop" aria-hidden="true"><img src="/assets/editorial/drop-amber-natural.svg" alt="" /></span>}
   </div>;
 }
 
