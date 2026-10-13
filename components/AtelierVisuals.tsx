@@ -24,7 +24,7 @@ const fallbackColor: RGB = [177, 193, 181]
 const toCss = (color: RGB) => `rgb(${color.map(Math.round).join(", ")})`
 const mix = (from: RGB, to: RGB, amount: number) => [0, 1, 2].map((i) => from[i] + (to[i] - from[i]) * amount) as RGB
 
-function averageColor(ingredients: string[]): RGB {
+export function averageColor(ingredients: string[]): RGB {
   const colors = ingredients.map((name) => noteColors[name]).filter(Boolean)
   if (!colors.length) return fallbackColor
   const average = [0, 1, 2].map((channel) => colors.reduce((sum, color) => sum + color[channel], 0) / colors.length) as RGB
@@ -37,14 +37,14 @@ function blendColor(ingredients: string[]) {
   return toCss(averageColor(ingredients))
 }
 
-const ingredientImage = (name: string) => `/assets/ingredients/${name.toLowerCase().replaceAll(" ", "-")}.png`
+export const ingredientImage = (name: string) => `/assets/ingredients/${name.toLowerCase().replaceAll(" ", "-")}.png`
 
-const FLASK_SHAPE = "M130 42 H190 V132 C190 157 257 211 265 289 C273 353 246 373 160 373 C74 373 47 353 55 289 C63 211 130 157 130 132 Z"
-const LIQUID_BOTTOM = 374
-const NOTE_SIZE = 42
+export const FLASK_SHAPE = "M130 42 H190 V132 C190 157 257 211 265 289 C273 353 246 373 160 373 C74 373 47 353 55 289 C63 211 130 157 130 132 Z"
+export const LIQUID_BOTTOM = 374
+export const NOTE_SIZE = 42
 
 /** Stacks the selected notes from the bottom: BASE, HEART, TOP. Empty layers take no space. */
-function stackLayers(ingredients: string[]) {
+export function stackLayers(ingredients: string[]) {
   return [...noteGroups].reverse().reduce<{ label: string; items: string[]; top: number; bottom: number }[]>((layers, group) => {
     const items = group.items.filter((item) => ingredients.includes(item))
     if (!items.length) return layers

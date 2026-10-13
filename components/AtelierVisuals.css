@@ -53,6 +53,8 @@
 /* Blending: the vessel springs back upright after each shake. */
 .atelier-page .blend-illustration { transition:transform .32s cubic-bezier(.34,1.56,.64,1); }
 .atelier-page .blend-controls button:disabled { opacity:.4; cursor:default; }
+/* Canvas blend: fills the touch area and keeps its own proportions. */
+.blend-canvas { display:block; width:100%; height:100%; object-fit:contain; }
 .atelier-page .blend-interaction.is-complete .blend-guide { color:#e8dfd0; }
 .atelier-page .blend-touch-target { height:23rem; }
 .atelier-page .blend-illustration { width:19rem; height:22rem; }
