@@ -57,13 +57,15 @@ export function Shop({
     setType(initialType);
     setQuery(initialQuery);
   }, [initialCollection, initialType, initialQuery]);
-  const update = (co: string, ty: string) => {
+  // q는 기본적으로 현재 검색어를 유지한다. 초기화처럼 같은 클릭에서 검색어를 비울 때는
+  // setQuery 반영 전의 query가 URL에 남지 않도록 값을 직접 넘긴다.
+  const update = (co: string, ty: string, q = query) => {
     setC(co);
     setType(ty);
     const s = new URLSearchParams();
     if (co) s.set("collection", co);
     if (ty) s.set("type", ty);
-    if (query) s.set("q", query);
+    if (q) s.set("q", q);
     router.replace("/shop?" + s.toString(), { scroll: false });
   };
   const list = products
@@ -149,7 +151,8 @@ export function Shop({
           <button
             onClick={() => {
               setQuery("");
-              update("", "");
+              setSort("default");
+              update("", "", "");
             }}
           >
             필터 초기화
