@@ -1,0 +1,310 @@
+[
+  {
+    "route": "/",
+    "width": 1440,
+    "scroll": 1440,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/shop",
+    "width": 1440,
+    "scroll": 1440,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/shop/fresh-hand-cream",
+    "width": 1440,
+    "scroll": 1440,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/shop/soft-gift-set",
+    "width": 1440,
+    "scroll": 1440,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/atelier",
+    "width": 1440,
+    "scroll": 1440,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/login",
+    "width": 1440,
+    "scroll": 1440,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/register",
+    "width": 1440,
+    "scroll": 1440,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/mypage",
+    "width": 1440,
+    "scroll": 1440,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/cart",
+    "width": 1440,
+    "scroll": 1440,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/checkout",
+    "width": 1440,
+    "scroll": 1440,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/partner",
+    "width": 1440,
+    "scroll": 1440,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/",
+    "width": 768,
+    "scroll": 768,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/shop",
+    "width": 768,
+    "scroll": 768,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/shop/fresh-hand-cream",
+    "width": 768,
+    "scroll": 768,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/shop/soft-gift-set",
+    "width": 768,
+    "scroll": 768,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/atelier",
+    "width": 768,
+    "scroll": 768,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/login",
+    "width": 768,
+    "scroll": 768,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/register",
+    "width": 768,
+    "scroll": 768,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/mypage",
+    "width": 768,
+    "scroll": 768,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/cart",
+    "width": 768,
+    "scroll": 768,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/checkout",
+    "width": 768,
+    "scroll": 768,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/partner",
+    "width": 768,
+    "scroll": 768,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/",
+    "width": 390,
+    "scroll": 390,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/shop",
+    "width": 390,
+    "scroll": 390,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/shop/fresh-hand-cream",
+    "width": 390,
+    "scroll": 390,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/shop/soft-gift-set",
+    "width": 390,
+    "scroll": 390,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/atelier",
+    "width": 390,
+    "scroll": 390,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/login",
+    "width": 390,
+    "scroll": 390,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/register",
+    "width": 390,
+    "scroll": 390,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/mypage",
+    "width": 390,
+    "scroll": 390,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/cart",
+    "width": 390,
+    "scroll": 390,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/checkout",
+    "width": 390,
+    "scroll": 390,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/partner",
+    "width": 390,
+    "scroll": 390,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/",
+    "width": 375,
+    "scroll": 375,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/shop",
+    "width": 375,
+    "scroll": 375,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/shop/fresh-hand-cream",
+    "width": 375,
+    "scroll": 375,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/shop/soft-gift-set",
+    "width": 375,
+    "scroll": 375,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/atelier",
+    "width": 375,
+    "scroll": 375,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/login",
+    "width": 375,
+    "scroll": 375,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/register",
+    "width": 375,
+    "scroll": 375,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/mypage",
+    "width": 375,
+    "scroll": 375,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/cart",
+    "width": 375,
+    "scroll": 375,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/checkout",
+    "width": 375,
+    "scroll": 375,
+    "broken": [],
+    "small": 0
+  },
+  {
+    "route": "/partner",
+    "width": 375,
+    "scroll": 375,
+    "broken": [],
+    "small": 0
+  }
+]

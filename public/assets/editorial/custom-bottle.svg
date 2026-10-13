@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 360" fill="none">
+  <defs>
+    <linearGradient id="cap" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#513C2D"/><stop offset=".23" stop-color="#967154"/><stop offset=".6" stop-color="#B58E65"/><stop offset="1" stop-color="#5F4330"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2=".2"><stop stop-color="#FFFDF6" stop-opacity=".61"/><stop offset=".14" stop-color="#D6E0D8" stop-opacity=".12"/><stop offset=".65" stop-color="#FFFFF7" stop-opacity=".05"/><stop offset=".88" stop-color="#F6E9CA" stop-opacity=".3"/><stop offset="1" stop-color="#FDFDF7" stop-opacity=".65"/></linearGradient>
+    <linearGradient id="liquid" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#F5DDAA" stop-opacity=".35"/><stop offset="1" stop-color="#CFA86B" stop-opacity=".67"/></linearGradient>
+    <linearGradient id="silver" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#D7D0BC"/><stop offset=".3" stop-color="#FFFCF1"/><stop offset=".75" stop-color="#B4A797"/><stop offset="1" stop-color="#DDD6C7"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="200%"><feGaussianBlur stdDeviation="8"/></filter>
+  </defs>
+  <ellipse cx="154" cy="325" rx="102" ry="12" fill="#18160F" fill-opacity=".18" filter="url(#shadow)"/>
+  <rect x="118" y="82" width="64" height="37" rx="5" fill="url(#silver)" stroke="#AFA691" stroke-width="1.2"/>
+  <rect x="112" y="40" width="76" height="55" rx="7" fill="url(#cap)" stroke="#5F422F" stroke-width="1.5"/>
+  <path d="M118 45V87 M124 43V89 M131 42V92 M140 42V91 M149 42V93 M158 42V93 M167 42V90 M177 42V91" stroke="#3C3024" stroke-opacity=".19" stroke-width="1.4"/>
+  <path d="M113 46Q150 36 187 46" stroke="#D7B990" stroke-opacity=".65" stroke-width="2"/>
+  <rect x="49" y="110" width="202" height="208" rx="13" fill="url(#glass)" stroke="#B8BAAC" stroke-width="2.5"/>
+  <path d="M63 250H237V303Q237 307 232 307H67Q63 307 63 301V250Z" fill="url(#liquid)"/>
+  <path d="M59 124V297Q59 307 68 308M241 124V298Q241 306 233 309" stroke="#FFFEF4" stroke-width="6" stroke-opacity=".78" stroke-linecap="round"/>
+  <path d="M68 120H231M67 312H234" stroke="#E8E5D7" stroke-width="3" stroke-opacity=".88"/>
+  <rect x="90" y="172" width="120" height="109" rx="1.5" fill="#F3ECE0" stroke="#D0BFAB" stroke-width="1.5"/>
+  <path d="M102 182H198M102 272H198" stroke="#9A8A75" stroke-opacity=".5" stroke-width=".8"/>
+  <path d="M88 177V276" stroke="#FFF8E9" stroke-width="1.5" stroke-opacity=".7"/>
+  <path d="M237 128V285" stroke="#BCADA0" stroke-opacity=".25" stroke-width="2"/>
+</svg>

@@ -1,2 +1,4 @@
-import { CardsPage } from "@/components/AuraSite"
-export default function Page() { return <CardsPage /> }
+import { redirect } from "next/navigation";
+export default function Page() {
+  redirect("/shop");
+}

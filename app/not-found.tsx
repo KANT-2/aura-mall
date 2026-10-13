@@ -1,2 +1,4 @@
-import { NotFoundPage } from "@/components/AuraSite"
-export default function NotFound() { return <NotFoundPage /> }
+import { Missing } from "@/components/editorial/Aura";
+export default function Page() {
+  return <Missing />;
+}

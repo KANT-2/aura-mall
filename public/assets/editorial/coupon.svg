@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" fill="none">
+ <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#E9D8B9"/><stop offset="1" stop-color="#C5A777"/></linearGradient></defs>
+ <path d="M22 32H298V74C284 74 277 86 277 100S284 126 298 126V168H22V126C36 126 43 114 43 100S36 74 22 74V32Z" fill="url(#g)" stroke="#EEDDC0" stroke-width="2"/>
+ <path d="M238 37V163" stroke="#66543F" stroke-opacity=".5" stroke-dasharray="4 7" stroke-width="1.4"/>
+ <path d="M53 61H209" stroke="#695641" stroke-opacity=".48" stroke-width="1"/>
+ <text x="56" y="87" fill="#46382A" font-size="12" letter-spacing="3" font-family="Arial, sans-serif">AURA / WELCOME</text>
+ <text x="56" y="127" fill="#33291F" font-size="31" letter-spacing="-1" font-family="Georgia, serif">3,000</text>
+ <text x="167" y="127" fill="#544333" font-size="14" font-family="Arial,sans-serif">KRW</text>
+ <text x="57" y="149" fill="#5E4C37" font-size="10" letter-spacing="1.5" font-family="Arial,sans-serif">SHIPPING BENEFIT</text>
+ <text x="267" y="112" text-anchor="middle" fill="#544432" font-size="26" font-family="Georgia, serif" transform="rotate(-90 267 112)">AURA</text>
+</svg>

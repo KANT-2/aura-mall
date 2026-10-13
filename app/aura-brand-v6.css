@@ -1,0 +1,84 @@
+/* AURA V6 — brand typography and outlined wordmark. Loaded LAST to override historical design experiments. */
+:root {
+  --font-aura-ko: "Noto Serif KR", "Noto Serif CJK KR", "Nanum Myeongjo", "AppleMyungjo", "Batang", serif;
+  --font-aura-en: "Cormorant Garamond", "EB Garamond", "Baskerville", Georgia, serif;
+  --font-aura-ui: Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
+  --sans: var(--font-aura-ui);
+  --serif: var(--font-aura-en);
+}
+body { font-family: var(--font-aura-ui); }
+/* Scalable vector logo: no network font required, no letter-spacing hacks. */
+.header .logo.aura-brand-link, footer .logo.aura-brand-link {
+  display:inline-flex; flex-direction:column; align-items:flex-start; justify-content:center;
+  flex:0 0 auto; gap:4px; width:max-content; min-width:0;
+  padding:0; letter-spacing:normal; font-size:inherit; font-weight:400;
+  color:var(--ink); line-height:1;
+}
+.header .aura-brand-mark { display:block; width:110px; height:31px; max-width:none; overflow:visible; }
+.header .aura-brand-subline { display:block; font-family:var(--font-aura-en); font-size:8px; line-height:1;
+  letter-spacing:.15em; color:#756f65; margin:0; white-space:nowrap; font-weight:500; }
+.header .aura-brand-link:hover { color:#8d6849; }
+footer .logo.aura-footer-brand { color:#efe6d9; }
+footer .aura-footer-brand .aura-brand-mark { display:block; width:126px; height:38px; max-width:none; }
+.a-gift-brand-mark {width:110px; max-height:35px; display:block; margin:0 auto 5px; color:#453b31;}
+/* Brand mark is part of each bottle label, unlike the former loose sans 'AURA' lettering. */
+.a-v3.a-atelier .a-result-v5 .a-bottle-brand-mark {width:62px;height:18px;flex-shrink:0;color:#5a4330;display:block;overflow:visible;}
+.a-v3.a-atelier .a-result-v5 .label-paper .a-bottle-brand-mark {width:51px;height:15px;}
+.a-v3.a-atelier .a-result-v5 .label-minimal .a-bottle-brand-mark {width:68px;height:19px;}
+/* Editorial title system: Korean serif for featured titles; accessible sans for dense interface. */
+:is(.home .hero h2, .home .section-heading h2, .home .promo-copy h2,
+  .home .partner-intro h2, .home .atelier-intro h2, .home .heading-row h2,
+  .shop-title h1, .detail .detail-copy h1, .detail .product-story h2,
+  .a-atelier .atelier-heading h1, .a-atelier .a-entry h2,
+  .a-atelier .a-result-form h2, .a-atelier .a-blend-copy h3,
+  .mypage h1, .mypage .saved-recipe h2, .mypage .coupon-card h2,
+  .partner-page h1, .auth-form h1, .auth-editorial h2,
+  .cart h1, .checkout h1, .empty h2) {
+  font-family:var(--font-aura-ko)!important;
+  font-weight:500;
+  letter-spacing:-.055em;
+  line-height:1.45;
+  word-break:keep-all;
+  text-wrap:pretty;
+  font-synthesis:none;
+}
+.home .hero h1,
+.home .hero h1 i {font-family:var(--font-aura-en)!important;font-weight:500;letter-spacing:-.02em;}
+.home .hero h1 {line-height:.94; font-size:clamp(46px,5vw,82px);}
+.home .hero h2 {font-size:clamp(21px,2vw,29px); line-height:1.5;}
+.home .section-heading h2 {font-size:clamp(27px,2.8vw,42px);}
+.home .promo-copy h2, .home .partner-intro h2,
+.home .atelier-intro h2 {font-size:clamp(29px,3.15vw,46px);}
+.a-atelier .atelier-heading h1 {font-size:clamp(27px,2.4vw,39px);}
+.a-v3.a-atelier .a-result-v5 .a-result-form h2 {font-size:clamp(26px,2.9vw,43px);line-height:1.45;}
+.mypage h1,.partner-page h1 {font-size:clamp(30px,3vw,44px);}
+/* Compact information remains sans: product tile titles, cart contents, forms, navigation, chips. */
+:is(.product-card h3, .a-ingredient h3, .a-recipe-chip, .nav, .button,
+ .a-label-styles legend, .a-name-field label, .filter-row, input, button, select, textarea) {
+  font-family:var(--font-aura-ui);
+}
+/* Editorial quotation and fragrance name typography connects bottle label to site title. */
+.a-v3.a-atelier .a-result-v5 .a-bottle-label strong,
+.mypage .saved-recipe .saved-name,
+.mypage .saved-recipe h2 {font-family:var(--font-aura-ko)!important; font-weight:500;letter-spacing:-.06em;}
+.a-v3.a-atelier .a-result-v5 .label-minimal .a-bottle-label strong {font-family:var(--font-aura-ui)!important;letter-spacing:-.025em;}
+.a-v3.a-atelier .a-result-v5 .a-bottle-label {gap:4px;}
+/* Preserve a readable hierarchy and never allow oversized dynamic titles to spill horizontally. */
+:is(.a-result-form h2, .partner-page h1,.shop-title h1,.home .hero h2) {overflow-wrap:break-word;}
+@media (max-width:850px) {
+ .header .aura-brand-mark {width:98px;height:28px;}
+ .header .aura-brand-subline{font-size:7px;letter-spacing:.12em;}
+ .home .hero h1{font-size:clamp(41px,6vw,65px);}
+}
+@media (max-width:600px) {
+ .header .logo.aura-brand-link {gap:0;}
+ .header .aura-brand-mark{width:90px;height:27px;}
+ .header .aura-brand-subline {display:none;}
+ footer .aura-footer-brand .aura-brand-mark{width:110px;height:34px;}
+ .home .hero h1{font-size:clamp(43px,9vw,63px);line-height:1.02;}
+ .home .hero h2 {font-size:22px;}
+ .home .section-heading h2 {font-size:28px;}
+ .a-atelier .atelier-heading h1 {font-size:27px;}
+ .a-v3.a-atelier .a-result-v5 .a-bottle-brand-mark {width:50px;height:15px;}
+}
+@media (prefers-reduced-motion:reduce){.aura-brand-link,.aura-brand-mark{transition:none!important;}}
