@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { collections, types, Arrow, Asset } from "./Shared";
 import { useAura } from "./Provider";
 import { AuraWordmark } from "./AuraWordmark";
+import { WelcomeJourney } from "./WelcomeJourney";
 
 export function Shell({ children }: { children: ReactNode }) {
   const { user, cart } = useAura(),
@@ -155,6 +156,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       )}
       <div id="main-content">{children}</div>
+      <WelcomeJourney/>
       <footer>
         <div>
           <Link className="logo aura-brand-link aura-footer-brand" href="/" aria-label="AURA 홈">

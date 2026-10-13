@@ -54,11 +54,11 @@ export function Auth({ mode }: { mode: "login" | "register" }) {
           )
         : await accounts.login(email, pw);
       setUser(u);
-      notify(
-        signup
-          ? "가입을 환영해요. 배송비 쿠폰이 준비되었어요."
-          : "로그인했어요.",
-      );
+      if(signup){
+        sessionStorage.setItem("aura_welcome_pending_v8", "1");
+        window.dispatchEvent(new Event("aura:welcome"));
+      }
+      notify(signup ? "회원가입을 환영해요." : "로그인했어요.");
       const next = new URLSearchParams(window.location.search).get("next");
       router.push(
         next?.startsWith("/") && !next.startsWith("//") ? next : "/mypage",
@@ -290,7 +290,7 @@ export function MyPage() {
                       {Object.entries(r.counts).map(([id,n])=><p key={id}>{ingredients.find(x=>x.id===id)?.name} — {n}회</p>)}
                     </details>
                     <Link className="text-link" href={"/atelier?recipe="+r.id}>이 향으로 다시 만들기 <Arrow /></Link>
-                    <small>제조 가능 여부 확인 후 구매할 수 있어요.</small>
+                    <small>이 향을 다시 열어 장바구니에 담을 수 있어요. 실제 제조·가격은 확인이 필요해요.</small>
                   </div>
                 </article>
               ))}
@@ -315,12 +315,10 @@ export function MyPage() {
           <div>
             <span className="eyebrow">WELCOME BENEFIT</span>
             <h2>첫 주문 배송비 쿠폰</h2>
-            <p>기본 배송비 3,000원 혜택</p>
-            <p className="micro">
-              사용 기한과 최소 주문금액은 운영 정책 확정 후 안내해요.
-            </p>
+            <p>{user?.coupon ? "3,000원 배송비 혜택 · 5만 원 이상 주문은 자동 무료배송" : "사용 가능한 쿠폰이 없습니다."}</p>
+            <p className="micro">결제 기능 준비 전까지 쿠폰 사용 완료는 처리되지 않아요.</p>
           </div>
-          <span className="chip">보유 중</span>
+          <span className="chip">{user?.coupon ? "사용 가능" : "미보유"}</span>
         </article>
       ) : tab === "orders" ? (
         <div className="empty">
