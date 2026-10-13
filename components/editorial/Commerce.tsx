@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { StyledSelect } from "../ui/StyledSelect";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   products,
   collections,
@@ -54,6 +54,9 @@ export function Shop({
     [sort, setSort] = useState("default");
   const collection = collections.find((x) => x.id === c);
   const router = useRouter();
+  // Last q this component wrote to the URL. Its echo through `initialQuery`
+  // must not overwrite the input while the user is still typing (e.g. "white ").
+  const pushedQuery = useRef(initialQuery);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       // A fresh filter reset from PR #14 still removes the stale q parameter.
@@ -61,6 +64,7 @@ export function Shop({
       const q = query.trim();
       if(q) current.set("q",q); else current.delete("q");
       if((current.get("q")||"") !== initialQuery) {
+        pushedQuery.current = q;
         router.replace("/shop" + (current.toString() ? "?" + current : ""), {scroll:false});
       }
     }, 320);
@@ -69,7 +73,11 @@ export function Shop({
   useEffect(() => {
     setC(initialCollection);
     setType(initialType);
-    setQuery(initialQuery);
+    // Only external URL changes (header search, back/forward, reset) replace the input.
+    if (initialQuery !== pushedQuery.current) {
+      pushedQuery.current = initialQuery;
+      setQuery(initialQuery);
+    }
   }, [initialCollection, initialType, initialQuery]);
   const update = (co: string, ty: string, q = query) => {
     setC(co);
@@ -77,9 +85,11 @@ export function Shop({
     const s = new URLSearchParams();
     if (co) s.set("collection", co);
     if (ty) s.set("type", ty);
-    if (q) s.set("q", q);
+    pushedQuery.current = q.trim();
+    if (q.trim()) s.set("q", q.trim());
     router.replace("/shop?" + s.toString(), { scroll: false });
   };
+  const keyword = query.trim().toLowerCase();
   const list = products
     .filter(
       (p) =>
@@ -88,7 +98,7 @@ export function Shop({
         [p.name, p.englishName, p.typeName, p.description]
           .join(" ")
           .toLowerCase()
-          .includes(query.toLowerCase()),
+          .includes(keyword),
     )
     .sort((a, b) =>
       sort === "low"
