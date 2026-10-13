@@ -1,0 +1,580 @@
+{
+  "report": [
+    {
+      "route": "/atelier",
+      "width": 1440,
+      "state": "select",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 762,
+          "bottom": 820
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 1440,
+      "state": "mix",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 762,
+          "bottom": 820
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 1440,
+      "state": "scent",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 762,
+          "bottom": 820
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 1440,
+      "state": "result",
+      "height": 1063,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/",
+      "width": 1440,
+      "state": "",
+      "height": 3840,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/shop",
+      "width": 1440,
+      "state": "",
+      "height": 6929,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/shop/soft-gift-set",
+      "width": 1440,
+      "state": "",
+      "height": 4463,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/login",
+      "width": 1440,
+      "state": "",
+      "height": 1087,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/register",
+      "width": 1440,
+      "state": "",
+      "height": 1292,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/partner",
+      "width": 1440,
+      "state": "",
+      "height": 1324,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/atelier",
+      "width": 1024,
+      "state": "select",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 758,
+          "bottom": 808
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 1024,
+      "state": "mix",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 758,
+          "bottom": 808
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 1024,
+      "state": "scent",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 758,
+          "bottom": 808
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 1024,
+      "state": "result",
+      "height": 1063,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/",
+      "width": 1024,
+      "state": "",
+      "height": 3608,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/shop",
+      "width": 1024,
+      "state": "",
+      "height": 6116,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/shop/soft-gift-set",
+      "width": 1024,
+      "state": "",
+      "height": 4162,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/login",
+      "width": 1024,
+      "state": "",
+      "height": 1087,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/register",
+      "width": 1024,
+      "state": "",
+      "height": 1292,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/partner",
+      "width": 1024,
+      "state": "",
+      "height": 1324,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/atelier",
+      "width": 768,
+      "state": "select",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 758,
+          "bottom": 808
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 768,
+      "state": "mix",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 758,
+          "bottom": 808
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 768,
+      "state": "scent",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 758,
+          "bottom": 808
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 768,
+      "state": "result",
+      "height": 1063,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/",
+      "width": 768,
+      "state": "",
+      "height": 3389,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/shop",
+      "width": 768,
+      "state": "",
+      "height": 5094,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/shop/soft-gift-set",
+      "width": 768,
+      "state": "",
+      "height": 3817,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/login",
+      "width": 768,
+      "state": "",
+      "height": 1087,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/register",
+      "width": 768,
+      "state": "",
+      "height": 1292,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/partner",
+      "width": 768,
+      "state": "",
+      "height": 1424,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/atelier",
+      "width": 390,
+      "state": "select",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 786,
+          "bottom": 834
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 390,
+      "state": "mix",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 786,
+          "bottom": 834
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 390,
+      "state": "scent",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 786,
+          "bottom": 834
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 390,
+      "state": "result",
+      "height": 1468,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/",
+      "width": 390,
+      "state": "",
+      "height": 3769,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/shop",
+      "width": 390,
+      "state": "",
+      "height": 6133,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/shop/soft-gift-set",
+      "width": 390,
+      "state": "",
+      "height": 4529,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/login",
+      "width": 390,
+      "state": "",
+      "height": 1137,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/register",
+      "width": 390,
+      "state": "",
+      "height": 1487,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/partner",
+      "width": 390,
+      "state": "",
+      "height": 1919,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/atelier",
+      "width": 375,
+      "state": "select",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 786,
+          "bottom": 834
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 375,
+      "state": "mix",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 786,
+          "bottom": 834
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 375,
+      "state": "scent",
+      "height": 844,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": [
+        {
+          "top": 786,
+          "bottom": 834
+        }
+      ]
+    },
+    {
+      "route": "/atelier",
+      "width": 375,
+      "state": "result",
+      "height": 1468,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/",
+      "width": 375,
+      "state": "",
+      "height": 3757,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/shop",
+      "width": 375,
+      "state": "",
+      "height": 6004,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/shop/soft-gift-set",
+      "width": 375,
+      "state": "",
+      "height": 4483,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/login",
+      "width": 375,
+      "state": "",
+      "height": 1137,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/register",
+      "width": 375,
+      "state": "",
+      "height": 1487,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    },
+    {
+      "route": "/partner",
+      "width": 375,
+      "state": "",
+      "height": 1919,
+      "overflow": false,
+      "broken": 0,
+      "small": 0,
+      "blendButtons": []
+    }
+  ],
+  "issues": []
+}

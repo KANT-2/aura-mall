@@ -1,2 +1,4 @@
-import { redirect } from "next/navigation"
-export default function Page() { redirect("/custom") }
+import { Atelier } from "@/components/editorial/Aura";
+export default function Page() {
+  return <Atelier />;
+}

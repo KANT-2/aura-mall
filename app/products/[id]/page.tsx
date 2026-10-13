@@ -1,22 +1,24 @@
-import type { Metadata } from "next"
-import { notFound } from "next/navigation"
-import { ProductDetailPage } from "@/components/AuraSite"
-import { findProductBySlug, products } from "@/data/products"
-
-// 폴더명은 [id]지만 실제 값은 slug (예: /products/bergamot-veil)
+import { ProductDetail } from "@/components/editorial/Aura";
+import catalog from "@/components/editorial/catalog.json";
+import { notFound } from "next/navigation";
 export function generateStaticParams() {
-  return products.map(({ slug }) => ({ id: slug }))
+  return catalog.products.map((p) => ({ id: p.id }));
 }
-
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const { id } = await params
-  const product = findProductBySlug(id)
-  return product ? { title: `${product.name} — AURA`, description: product.description } : {}
-}
-
-export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const product = findProductBySlug(id)
-  if (!product) notFound()
-  return <ProductDetailPage product={product} />
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const aliases: Record<string, string> = {
+    "bergamot-veil": "fresh-eau-de-parfum",
+    "petal-haze": "soft-eau-de-parfum",
+    "cedar-trace": "warm-eau-de-parfum",
+    "soft-skin": "soft-eau-de-parfum",
+    "fig-reverie": "soft-eau-de-parfum",
+    "amber-dusk": "warm-eau-de-parfum",
+  };
+  const p = catalog.products.find((p) => p.id === (aliases[id] || id));
+  if (!p) notFound();
+  return <ProductDetail product={p} />;
 }

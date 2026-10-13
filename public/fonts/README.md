@@ -1,0 +1,1 @@
+AURA V6 uses Korean/Latin font stacks with browser fallbacks. Font binaries are not distributed here. If you already have the Pretendard asset in your original local project, APPLY_TO_LOCAL.py preserves it. Editorial display fonts use Google Fonts with local serif fallbacks.

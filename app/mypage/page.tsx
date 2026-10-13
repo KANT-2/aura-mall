@@ -1,2 +1,4 @@
-import { MyPage } from "@/components/AuraSite"
-export default function Page(){return <MyPage/>}
+import { MyPage } from "@/components/editorial/Aura";
+export default function Page() {
+  return <MyPage />;
+}
