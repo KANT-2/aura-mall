@@ -10,6 +10,19 @@ import * as accounts from "./accounts";
 import { Arrow, Asset, totalCount } from "./Shared";
 import { useAura } from "./Provider";
 
+/** Same-origin path only; browsers normalize `/\host` and tab-split slashes to `//host`. */
+function safeReturnPath(next: string | null, fallback = "/mypage") {
+  if (!next?.startsWith("/")) return fallback;
+  try {
+    const url = new URL(next, window.location.origin);
+    return url.origin === window.location.origin
+      ? url.pathname + url.search + url.hash
+      : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function Auth({ mode }: { mode: "login" | "register" }) {
   const { setUser, notify } = useAura(),
     router = useRouter(),
@@ -24,7 +37,7 @@ export function Auth({ mode }: { mode: "login" | "register" }) {
   const signup = mode === "register";
   useEffect(() => {
     const next = new URLSearchParams(window.location.search).get("next");
-    if (next?.startsWith("/") && !next.startsWith("//")) setReturnTo(next);
+    setReturnTo(safeReturnPath(next));
   }, []);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -60,9 +73,7 @@ export function Auth({ mode }: { mode: "login" | "register" }) {
       }
       notify(signup ? "회원가입을 환영해요." : "로그인했어요.");
       const next = new URLSearchParams(window.location.search).get("next");
-      router.push(
-        next?.startsWith("/") && !next.startsWith("//") ? next : "/mypage",
-      );
+      router.push(safeReturnPath(next));
     } catch (e) {
       setError(e instanceof Error ? e.message : "다시 시도해 주세요.");
     } finally {
