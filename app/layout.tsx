@@ -12,6 +12,7 @@ import "./aura-v8-integrated.css";
 import "./aura-v85-detail-assets.css";
 import "./aura-v85-motion.css";
 import "./aura-v86-qa-fixes.css";
+import "./aura-v87-mobile-shake.css";
 export const metadata: Metadata = {
   title: "AURA — From Scent to Identity",
   description: "향을 발견하고, 나만의 취향을 완성하는 프래그런스 셀렉트 스토어",

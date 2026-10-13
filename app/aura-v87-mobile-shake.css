@@ -1,0 +1,39 @@
+/* AURA V8.7 — mobile device-motion, touch and gentle blending.
+   Overrides only the blending UI. Commerce and team-owned components remain unchanged. */
+.a-v3.a-atelier .a-sheet-blend.a-blend-experience{padding:clamp(25px,4.5vw,42px) clamp(18px,4vw,38px) 30px!important;}
+.a-v3.a-atelier .a-sheet-blend .a-blend-stage{padding-top:12px!important;gap:17px!important;}
+.a-v3.a-atelier .a-sheet-blend .a-blend-beaker{cursor:grab!important;touch-action:none!important;user-select:none;width:min(86%,295px)!important;height:min(43vh,300px)!important;max-width:295px;min-height:205px;overflow:visible!important;margin-inline:auto;}
+.a-v3.a-atelier .a-sheet-blend .a-blend-beaker.dragging{cursor:grabbing!important;}
+.a-v3.a-atelier .a-sheet-blend .a-blend-beaker *{cursor:inherit!important;}
+.a-v3.a-atelier .a-sheet-blend .a-blend-beaker:focus-visible{outline:2px solid #d1b68d;outline-offset:5px;}
+.a-v3.a-atelier .a-sheet-blend .a-blend-copy{margin:16px auto 22px!important;max-width:550px;}
+.a-v3.a-atelier .a-sheet-blend .a-blend-copy h3{line-height:1.45!important;font-size:clamp(20px,2.3vw,27px)!important;}
+.a-v3.a-atelier .a-sheet-blend .a-blend-copy p{line-height:1.65!important;font-size:clamp(13px,1.5vw,15px)!important;}
+.a-v3.a-atelier .a-sheet-blend .a-stir-layout{max-width:600px!important;grid-template-columns:minmax(130px,190px) minmax(0,1fr)!important;gap:22px!important;padding:20px 22px!important;margin:20px auto 16px!important;align-items:center;}
+.a-v3.a-atelier .a-sheet-blend .a-stir-actions p{font-size:13px!important;line-height:1.65!important;}
+.a-v3.a-atelier .a-sheet-blend .a-stir-actions strong{font-size:16px!important;}
+.a-v3.a-atelier .a-sheet-blend .a87-blend-controls{display:flex;flex-direction:column;gap:9px;margin-top:14px;}
+.a-v3.a-atelier .a-sheet-blend .a87-sensor-button{min-height:44px;border-radius:4px;border:1px solid #bda47d;background:transparent;color:#eadac1;padding:10px 13px;font-size:13px;text-align:center;cursor:pointer;transition:background .18s ease,border-color .18s ease;}
+.a-v3.a-atelier .a-sheet-blend .a87-sensor-button:hover:not(:disabled){background:rgba(221,195,157,.12)}
+.a-v3.a-atelier .a-sheet-blend .a87-sensor-button[aria-pressed=true]{border-color:#9cb48c;background:rgba(111,135,95,.2);color:#e2eddc;}
+.a-v3.a-atelier .a-sheet-blend .a87-sensor-button:disabled,.a-v3.a-atelier .a-sheet-blend .a-stir-auto:disabled{opacity:.78!important;cursor:default!important;filter:none!important;}
+.a-v3.a-atelier .a-sheet-blend .a87-sensor-status{display:block;margin:9px 0 0;color:#cbbda8;font-size:12px;line-height:1.55;}
+.a-v3.a-atelier .a-sheet-blend .a-stir-actions .a-stir-auto{width:100%!important;max-width:none!important;min-height:44px;}
+.a-v3.a-atelier .a-sheet-blend .a-blend-progress{margin-top:15px!important;}
+.a-v3.a-atelier .a-modal>header{min-height:70px;padding:17px 26px!important;}
+.a-v3.a-atelier .a-sheet-blend .a-stir-soft-light{pointer-events:none;}
+/* Never use previously defined circular whirlwind / spinning liquid visual. */
+.a-v3.a-atelier .a-sheet-blend .a-blend-beaker .liquid-ripple{animation:none!important;}
+@media(max-width:680px){
+ .a-v3.a-atelier .a-modal-backdrop{padding:10px!important;align-items:center;}
+ .a-v3.a-atelier .a-modal{max-height:calc(100dvh - 20px)!important;}
+ .a-v3.a-atelier .a-modal>header{min-height:64px;padding:14px 18px!important;}
+ .a-v3.a-atelier .a-sheet-blend.a-blend-experience{padding:22px 16px calc(20px + env(safe-area-inset-bottom))!important;}
+ .a-v3.a-atelier .a-sheet-blend .a-blend-beaker{width:min(78vw,265px)!important;height:min(32vh,265px)!important;min-height:175px!important;}
+ .a-v3.a-atelier .a-sheet-blend .a-blend-copy{margin:9px auto 14px!important;}
+ .a-v3.a-atelier .a-sheet-blend .a-stir-layout{grid-template-columns:100px minmax(0,1fr)!important;gap:12px!important;padding:13px 14px!important;margin:12px 0!important;}
+ .a-v3.a-atelier .a-sheet-blend .a-stir-actions p{font-size:12px!important;line-height:1.5!important;}
+ .a-v3.a-atelier .a-sheet-blend .a-stir-actions strong{font-size:14px!important;}
+ .a-v3.a-atelier .a-sheet-blend .a87-sensor-button,.a-v3.a-atelier .a-sheet-blend .a-stir-auto{font-size:12px!important;padding:9px 10px!important;min-height:42px!important;}
+}
+@media(prefers-reduced-motion:reduce){.a-v3.a-atelier .a-sheet-blend .a87-sensor-button{transition:none!important;}}

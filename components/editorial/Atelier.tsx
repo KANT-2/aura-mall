@@ -10,6 +10,10 @@ import { AtelierModal, ProgressRing, UtilityIcon } from "../ui/AtelierControls";
 
 type Note = (typeof ingredients)[number];
 type Stage = "top" | "middle" | "base";
+type MotionAccess = "idle" | "requesting" | "active" | "denied" | "unavailable";
+type MotionWithPermission = typeof DeviceMotionEvent & { requestPermission?: () => Promise<"granted" | "denied"> };
+const MOTION_APPROVED = "aura_atelier_motion_granted_v1";
+
 const stageLabels: Record<Stage, string> = {top:"TOP · 첫인상", middle:"HEART · 중심", base:"BASE · 잔향"};
 const stageDescriptions:Record<Stage,string> = {top:"처음 마주하는 맑은 인상",middle:"오래 머무는 향의 중심",base:"마지막까지 남는 잔향"};
 const stageOrder:Stage[] = ["top","middle","base"];
@@ -86,7 +90,14 @@ export function Atelier(){
   const [rod,setRod]=useState({x:50,y:50,energy:0});
   const [showRatio,setShowRatio]=useState(false);
   const [overlay,setOverlay]=useState<"blend"|"recipe"|"info"|null>(null);
-  const [blendMode,setBlendMode]=useState<"ready"|"manual"|"auto"|"done">("ready");
+  const [blendMode,setBlendMode]=useState<"ready"|"manual"|"shake"|"auto"|"done">("ready");
+  const [motionAccess,setMotionAccess]=useState<MotionAccess>("idle");
+  const shakeData=useRef({gravity:0, last:0, peaks:0, lastPeak:0, count:0});
+  const motionAccessRef=useRef<MotionAccess>("idle");
+  const motionSeen=useRef(false);
+  const shakeCount=useRef(0);
+  const [shakeUiCount,setShakeUiCount]=useState(0);
+
   const [gestureActive,setGestureActive]=useState(false);
   const [settling,setSettling]=useState(false);
   const [dragActive,setDragActive]=useState(false);
@@ -103,6 +114,8 @@ export function Atelier(){
   const ratio=useMemo(()=>percentages(counts),[counts]);
   const stages=stageOrder.map(s=>selected.filter(i=>i.stage===s));
   const blendComplete=progress>=100;
+  const motionAvailable=typeof window!=="undefined" && typeof window.DeviceMotionEvent!=="undefined" && window.isSecureContext;
+
   const mixHint = progress<30 ? "톡톡 눌러 보거나 천천히 저어 보세요" : progress<75 ? "막대를 움직이면 액체가 따라와요" : "액체가 차분하게 어우러졌어요";
   const customPerfumePrice = products.find(product=>product.type==="eau-de-parfum")?.price ?? 98000; // shared catalog source
   const mood = stageRatiosForNames(counts);
@@ -164,14 +177,88 @@ export function Atelier(){
     try{sessionStorage.removeItem(DRAFT_KEY);}catch{}
     window.scrollTo({top:0,behavior:"instant"});
   }
+  // Auto mode animates the actual rod AND liquid; progress alone must never move.
+  // A slow elliptical hand movement replaces the earlier stationary rod and vortex artwork.
   useEffect(()=>{
     if(overlay!=="blend" || blendMode!=="auto" || blendComplete)return;
+    let raf=0; let last=0; const start=performance.now();
+    const tick=(now:number)=>{
+      if(now-last>=48){
+        const seconds=(now-start)/1000;
+        const phase=seconds*Math.PI*.70;
+        setRod({x:50+24*Math.cos(phase),y:50+19*Math.sin(phase),energy:.48+.08*Math.sin(phase*.5)});
+        last=now;
+      }
+      raf=requestAnimationFrame(tick);
+    };
+    raf=requestAnimationFrame(tick);
     const timer=window.setInterval(()=>setProgress(value=>Math.min(100,value+1)),85);
-    return ()=>window.clearInterval(timer);
+    return ()=>{window.clearInterval(timer);cancelAnimationFrame(raf);};
   },[overlay,blendMode,blendComplete]);
-  useEffect(()=>{ if(overlay==="blend" && blendComplete)setBlendMode("done"); },[overlay,blendComplete]);
-  // Gentle liquid response fades after the pointer stops; no frozen ripple when the mouse is idle.
-  useEffect(()=>{if(blendMode!=="manual" || rod.energy<.03)return;const timer=window.setTimeout(()=>{setRod(current=>({...current,energy:0}));setGestureActive(false);},560);return ()=>window.clearTimeout(timer);},[blendMode,rod]);
+  useEffect(()=>{
+    if(overlay==="blend" && blendComplete){setBlendMode("done");setRod(r=>({...r,energy:0}));}
+  },[overlay,blendComplete]);
+  // A small damped ripple settles after manual or sensor stirring stops.
+  useEffect(()=>{if(!(["manual","shake"] as const).includes(blendMode as "manual"|"shake") || rod.energy<.03)return;const timer=window.setTimeout(()=>{setRod(current=>({...current,energy:0}));setGestureActive(false);},620);return ()=>window.clearTimeout(timer);},[blendMode,rod]);
+  useEffect(()=>{motionAccessRef.current=motionAccess;},[motionAccess]);
+  // An accepted permission is remembered; the browser owns the real permission.
+  // On iOS Safari, requestPermission MUST be invoked by a direct user click.
+  async function enableShake(){
+    if(!window.isSecureContext || !("DeviceMotionEvent" in window)){
+      setMotionAccess("unavailable");return;
+    }
+    setMotionAccess("requesting");
+    try{
+      const constructor=window.DeviceMotionEvent as MotionWithPermission;
+      if(typeof constructor.requestPermission==="function"){
+        const result=await constructor.requestPermission();
+        if(result!=="granted"){setMotionAccess("denied");return;}
+      }
+      localStorage.setItem(MOTION_APPROVED,"1");
+      motionSeen.current=false;
+      shakeData.current={gravity:0,last:0,peaks:0,lastPeak:0,count:0};
+      setMotionAccess("active");setBlendMode("shake");
+      setGestureActive(false);
+    }catch{
+      setMotionAccess("denied");
+    }
+  }
+  useEffect(()=>{
+    if(overlay!=="blend" || !motionAvailable || blendComplete || blendMode==="auto" || motionAccess!=="active")return;
+    const onMotion=(event:DeviceMotionEvent)=>{
+      motionSeen.current=true;
+      if(motionAccessRef.current!=="active" || event.timeStamp===0 && !event.accelerationIncludingGravity)return;
+      const a=event.acceleration;
+      const g=event.accelerationIncludingGravity;
+      const magnitude=a && a.x!==null && a.y!==null && a.z!==null
+        ? Math.hypot(a.x,a.y,a.z)
+        : g && g.x!==null && g.y!==null && g.z!==null ? Math.hypot(g.x,g.y,g.z):0;
+      const now=performance.now();const tracker=shakeData.current;
+      const jerk=Math.abs(magnitude-tracker.gravity);
+      tracker.gravity=tracker.gravity ? tracker.gravity*.72+magnitude*.28 : magnitude;
+      if(now-tracker.last<420)return;
+      if(jerk<8.5 && magnitude<15)return;
+      // Debounced meaningful shakes, not every tiny sensor fluctuation.
+      if(now-tracker.lastPeak<850)tracker.peaks++;else tracker.peaks=1;
+      tracker.lastPeak=now;
+      if(tracker.peaks<2)return;
+      tracker.peaks=0;tracker.last=now;
+      shakeCount.current++;
+      setShakeUiCount(shakeCount.current);
+      setBlendMode(current=>current==="auto"?current:"shake");
+      const direction=shakeCount.current%4;
+      setRod({x:[31,70,44,63][direction],y:[42,60,64,36][direction],energy:.64});
+      setProgress(p=>Math.min(100,p+9));
+    };
+    window.addEventListener("devicemotion",onMotion,{passive:true});
+    const timeout=window.setTimeout(()=>{if(!motionSeen.current)setMotionAccess("unavailable");},4200);
+    return ()=>{window.removeEventListener("devicemotion",onMotion);window.clearTimeout(timeout);};
+  },[overlay,motionAccess,blendComplete,motionAvailable,blendMode]);
+  // Resume listening after an already approved permission on later modal visits.
+  useEffect(()=>{
+    if(overlay!=="blend" || !motionAvailable || blendMode==="auto" || motionAccess!=="idle")return;
+    try{if(localStorage.getItem(MOTION_APPROVED)==="1")setMotionAccess("active");}catch{}
+  },[overlay,motionAvailable,motionAccess,blendMode]);
   useEffect(()=>{
     if(!settling)return;
     const timer=window.setTimeout(()=>{setSettling(false);setRod(r=>({...r,energy:0}));},950);
@@ -189,7 +276,7 @@ export function Atelier(){
     setRecommended(family?[...family.notes]:[]);
     setTab("top");setStep("select");
   }
-  function startBlend(){if(total===0)return;setProgress(0);setBlendMode("ready");setGestureActive(false);setSettling(false);setRod({x:50,y:50,energy:0});setOverlay("blend");}
+  function startBlend(){if(total===0)return;setProgress(0);setBlendMode("ready");setGestureActive(false);setSettling(false);setRod({x:50,y:50,energy:0});setShakeUiCount(0);shakeCount.current=0;setMotionAccess("idle");setOverlay("blend");}
   function closeOverlay(){setOverlay(null);gesture.current=null;setGestureActive(false);}
   function dropIngredient(event:DragEvent<HTMLElement>){
     event.preventDefault(); setDragActive(false);
@@ -204,7 +291,7 @@ export function Atelier(){
     gesture.current={x:event.clientX,y:event.clientY,last:performance.now()};
     setBlendMode("manual");setSettling(false);setGestureActive(true);
     setProgress(v=>Math.min(100,v+9));
-    setRod({x:Math.max(25,Math.min(75,(event.clientX-rect.left)/rect.width*100)),y:Math.max(20,Math.min(76,(event.clientY-rect.top)/rect.height*100)),energy:.5});
+    setRod({x:Math.max(12,Math.min(88,(event.clientX-rect.left)/rect.width*100)),y:Math.max(12,Math.min(88,(event.clientY-rect.top)/rect.height*100)),energy:.5});
     if(event.pointerType!=="mouse")event.currentTarget.setPointerCapture(event.pointerId);
   }
   function moveGesture(event:PointerEvent<HTMLDivElement>){
@@ -218,13 +305,13 @@ export function Atelier(){
     const rect=event.currentTarget.getBoundingClientRect();
     const x=(event.clientX-rect.left)/rect.width*100;
     const y=(event.clientY-rect.top)/rect.height*100;
-    if(x<5||x>95||y<5||y>95){gesture.current=null;setSettling(true);setGestureActive(false);return;}
+    // Clamp close-to-edge pointer motion without cancelling the active gesture.
     g.x=event.clientX;g.y=event.clientY;g.last=now;
     if(distance<3)return;
     const energy=Math.min(.85,Math.max(.1,distance/dt*1.3));
     // Small, bounded progress; fast cursor jumps cannot immediately finish blending.
     setProgress(v=>Math.min(100,v+Math.min(1.8,distance*.028)));
-    setRod({x:Math.max(25,Math.min(75,x)),y:Math.max(20,Math.min(75,y)),energy});
+    setRod({x:Math.max(12,Math.min(88,x)),y:Math.max(12,Math.min(88,y)),energy});
     setGestureActive(true);
     setSettling(false);
   }
@@ -330,7 +417,7 @@ export function Atelier(){
             onKeyDown={e=>{if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," ","Enter"].includes(e.key)){e.preventDefault();setBlendMode("manual");setProgress(v=>Math.min(100,v+8));setRod(r=>({...r,energy:.45,x:Math.max(35,Math.min(65,r.x+(e.key==="ArrowLeft"?-3:3)))}));}}}
             onPointerDown={startGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onPointerCancel={endGesture} onPointerLeave={()=>{gesture.current=null;setGestureActive(false);setSettling(true);}}>
             <Beaker count={total} color={color} mixing={false} stir={rod}/>
-            <svg className="a86-stir-layer" viewBox="0 0 360 360" aria-hidden="true" focusable="false"><defs><linearGradient id="a86-rod-glass" x1="0" x2="1"><stop offset="0" stopColor="#b2b8ac" stopOpacity=".3"/><stop offset=".28" stopColor="#fffdf6" stopOpacity=".94"/><stop offset=".64" stopColor="#d1ded8" stopOpacity=".55"/><stop offset="1" stopColor="#fffdfa" stopOpacity=".83"/></linearGradient></defs><g className="a86-stir-rod-group" style={{transform:`translate(${(rod.x-50)*.46}px,${(rod.y-50)*.16}px) rotate(${(rod.x-50)*.05}deg)`,transformOrigin:"180px 205px"}}><path d={`M180 25 L177 ${liquidY + 10} Q176 ${liquidY + 17} 181 ${liquidY + 17} Q186 ${liquidY + 17} 185 ${liquidY + 10} L183 25 Z`} fill="url(#a86-rod-glass)" stroke="#c4c0b4" strokeWidth="1.4"/><path d={`M180 33 L179 ${liquidY + 8}`} stroke="#fff" strokeOpacity=".72" strokeWidth="1.4"/></g><ellipse className="a86-rod-ripple" cx={180+(rod.x-50)*.46} cy={liquidY+(rod.y-50)*.16} rx={21+rod.energy*8} ry={3+rod.energy*2} fill="none" stroke="#fff5db" strokeWidth="1.6" style={{opacity:rod.energy*.52}}/></svg>
+            <svg className="a86-stir-layer" viewBox="0 0 360 360" aria-hidden="true" focusable="false"><defs><linearGradient id="a86-rod-glass" x1="0" x2="1"><stop offset="0" stopColor="#b2b8ac" stopOpacity=".3"/><stop offset=".28" stopColor="#fffdf6" stopOpacity=".94"/><stop offset=".64" stopColor="#d1ded8" stopOpacity=".55"/><stop offset="1" stopColor="#fffdfa" stopOpacity=".83"/></linearGradient></defs><g className="a86-stir-rod-group" style={{transform:`translate(${(rod.x-50)*.8}px,${(rod.y-50)*.28}px) rotate(${(rod.x-50)*.05}deg)`,transformOrigin:"180px 205px"}}><path d={`M180 25 L177 ${liquidY + 10} Q176 ${liquidY + 17} 181 ${liquidY + 17} Q186 ${liquidY + 17} 185 ${liquidY + 10} L183 25 Z`} fill="url(#a86-rod-glass)" stroke="#c4c0b4" strokeWidth="1.4"/><path d={`M180 33 L179 ${liquidY + 8}`} stroke="#fff" strokeOpacity=".72" strokeWidth="1.4"/></g><ellipse className="a86-rod-ripple" cx={180+(rod.x-50)*.8} cy={liquidY+(rod.y-50)*.28} rx={21+rod.energy*8} ry={3+rod.energy*2} fill="none" stroke="#fff5db" strokeWidth="1.6" style={{opacity:rod.energy*.52}}/></svg>
           </div>
           <div className="a-stir-soft-light" aria-hidden="true"/>
         </div>
@@ -342,7 +429,13 @@ export function Atelier(){
               <span className="a-stir-instruction">GENTLE STIR</span>
               <span className="a-stir-percent">{Math.round(progress)}%</span>
             </div>
-            <div className="a-stir-actions"><strong>{blendMode==="ready"?"나만의 조향 방식":"당신의 조합을 만드는 중"}</strong><p>비커를 톡톡 누르거나, 클릭한 뒤 마우스를 천천히 움직여 주세요. 모바일은 짧게 쓸어도 돼요.</p><button className="button a-stir-auto" onClick={()=>{setSettling(false);setBlendMode("auto");}} disabled={blendMode==="auto"}>{blendMode==="auto"?"천천히 섞이는 중…":"자동 섞기 · 약 9초"}<UtilityIcon name="arrow"/></button><small className="a-turns-hint">{blendMode==="auto"?"향료가 부드럽게 어우러지는 중이에요":`${mixHint} · 방향키로도 조작 가능`}</small></div>
+            <div className="a-stir-actions"><strong>{blendMode==="ready"?"나만의 조향 방식":"당신의 조합을 만드는 중"}</strong><p>휴대폰을 가볍게 흔들거나 비커를 터치해 천천히 저어 보세요. PC에서는 클릭 후 마우스를 움직이면 돼요.</p><div className="a87-blend-controls">
+              {motionAvailable && <button type="button" className="a87-sensor-button" onClick={enableShake} disabled={motionAccess==="requesting" || (motionAccess==="active" && blendMode!=="auto")} aria-pressed={motionAccess==="active"}>
+                {motionAccess==="active"?`휴대폰 흔들기 인식 중${shakeUiCount?` · ${shakeUiCount}회`:""}`:motionAccess==="requesting"?"센서 권한 확인 중…":motionAccess==="denied"?"흔들기 권한 다시 요청":motionAccess==="unavailable"?"센서 확인 후 다시 시도":"휴대폰 흔들기 켜기"}
+              </button>}
+              <button type="button" className="button a-stir-auto" onClick={()=>{setSettling(false);setMotionAccess("idle");setBlendMode("auto");}} disabled={blendMode==="auto"}>{blendMode==="auto"?"천천히 섞이는 중…":"자동으로 섞기 · 약 9초"}<UtilityIcon name="arrow"/></button>
+            </div>
+            <small className="a87-sensor-status" role="status">{!motionAvailable?"센서가 없는 환경에서도 터치·자동 섞기를 사용할 수 있어요.":motionAccess==="active"?"흔들기 활성화됨 · 가볍게 좌우로 흔들어 주세요.":motionAccess==="denied"?"권한이 없어도 터치나 자동 섞기로 계속할 수 있어요.":motionAccess==="unavailable"?"센서 신호를 받지 못했어요. 터치나 자동 섞기를 이용해 주세요.":"첫 이용 시 센서 사용을 허용하면 이후 허용 상태를 기억해요."}</small><small className="a-turns-hint">{blendMode==="auto"?"향료가 부드럽게 어우러지는 중이에요":`${mixHint} · 방향키로도 조작 가능`}</small></div>
           </div>
           <div className="a-blend-progress"><div role="progressbar" aria-label="블렌딩 진행" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><span style={{width:`${progress}%`}}/></div><small>BLENDING / {Math.round(progress)}%</small></div>
         </>:<><div className="a-finished-badges">{ranked.slice(0,3).map(n=><span key={n.id}><Asset id={n.id}/>{n.name}</span>)}</div><button className="button a-finish-button" onClick={enterResult}>이 향에 이름 붙이기 <UtilityIcon name="arrow"/></button></>}
