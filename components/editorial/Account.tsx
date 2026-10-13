@@ -292,7 +292,7 @@ export function MyPage() {
                     <Asset id="custom-bottle" /><span className="saved-name">{r.name}</span>
                   </div>
                   <div className="saved-recipe-body">
-                    <span className="eyebrow">VERSION {r.version} / {new Date(r.created).toLocaleDateString("ko-KR")}</span>
+                    <span className="eyebrow">VERSION {r.version}{Number.isNaN(Date.parse(r.created)) ? "" : ` / ${new Date(r.created).toLocaleDateString("ko-KR")}`}</span>
                     <h2>{r.name}</h2>
                     <p className="saved-topnotes">{Object.entries(r.counts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([id])=>ingredients.find(x=>x.id===id)?.name).filter(Boolean).join(" · ")}{Object.keys(r.counts).length>3?` 외 ${Object.keys(r.counts).length-3}종`:""}</p>
                     <details>
