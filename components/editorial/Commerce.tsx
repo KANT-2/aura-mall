@@ -39,6 +39,9 @@ export function ProductCard({ product: p }: { product: Product }) {
   );
 }
 
+const knownCollection = (v = "") => (collections.some((x) => x.id === v) ? v : "");
+const knownType = (v = "") => (types.some((t) => t.id === v) ? v : "");
+
 export function Shop({
   initialCollection = "",
   initialType = "",
@@ -48,8 +51,8 @@ export function Shop({
   initialType?: string;
   initialQuery?: string;
 }) {
-  const [c, setC] = useState(initialCollection),
-    [type, setType] = useState(initialType),
+  const [c, setC] = useState(knownCollection(initialCollection)),
+    [type, setType] = useState(knownType(initialType)),
     [query, setQuery] = useState(initialQuery),
     [sort, setSort] = useState("default");
   const collection = collections.find((x) => x.id === c);
@@ -71,14 +74,23 @@ export function Shop({
     return () => window.clearTimeout(timer);
   },[query,initialQuery,router]);
   useEffect(() => {
-    setC(initialCollection);
-    setType(initialType);
+    const co = knownCollection(initialCollection),
+      ty = knownType(initialType);
+    setC(co);
+    setType(ty);
+    // Unknown collection/type values are dropped so URL, tabs and results agree.
+    if (co !== initialCollection || ty !== initialType) {
+      const s = new URLSearchParams(window.location.search);
+      if (co !== initialCollection) s.delete("collection");
+      if (ty !== initialType) s.delete("type");
+      router.replace("/shop" + (s.toString() ? "?" + s : ""), { scroll: false });
+    }
     // Only external URL changes (header search, back/forward, reset) replace the input.
     if (initialQuery !== pushedQuery.current) {
       pushedQuery.current = initialQuery;
       setQuery(initialQuery);
     }
-  }, [initialCollection, initialType, initialQuery]);
+  }, [initialCollection, initialType, initialQuery, router]);
   const update = (co: string, ty: string, q = query) => {
     setC(co);
     setType(ty);
