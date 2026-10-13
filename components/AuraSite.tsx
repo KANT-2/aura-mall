@@ -17,7 +17,7 @@ import { auraCards } from "@/data/cards"
 import { cardPolicies, calculateCardReward, detectAuraCard, formatAuraCardNumber, type AuraCard } from "@/data/cardPolicies"
 import type { Product } from "@/types/product"
 import NextLink from "next/link"
-import { BlendVessel } from "@/components/BlendVessel"
+import { BlendVessel, requestBlendMotion } from "@/components/BlendVessel"
 import { ProductCard } from "@/components/products/ProductCard"
 import { ProductCollection } from "@/components/products/ProductCollection"
 import { ProductDetail } from "@/components/products/ProductDetail"
@@ -958,6 +958,12 @@ export function AtelierPage() {
       [recipeId]: { ...current[recipeId], ...next },
     }))
 
+  /** Starts blending from this tap, which is also when iOS may ask for motion access. */
+  const startBlending = () => {
+    requestBlendMotion()
+    updateSession({ stage: "BLENDING" })
+  }
+
   const selectIngredient = (ingredient: string) => {
     setSessions((current) => {
       const currentSession = current[recipeId]
@@ -984,7 +990,7 @@ export function AtelierPage() {
 
   const notesLocked = ["BLENDING", "REVEAL", "BOTTLE", "PRODUCT_SELECTION", "SUMMARY"].includes(session.stage)
   const stageHints: Partial<Record<AtelierStage, string>> = {
-    BLENDING: "용기를 좌우로 끌거나, 아래 버튼으로 천천히 저어 주세요.",
+    BLENDING: "용기의 목을 잡고 좌우로 흔들거나, 아래 버튼으로 가볍게 흔들어 주세요.",
     REVEAL: "완성된 향을 확인하고 다음 단계에서 이름을 붙여 주세요.",
     BOTTLE: "추천 이름을 고르거나 직접 입력해 주세요. 보틀 라벨에 새겨져요.",
     PRODUCT_SELECTION: "제품 종류와 용량을 골라 주세요. 향료 구성은 그대로 유지돼요.",
@@ -1178,7 +1184,7 @@ export function AtelierPage() {
           </div>
           {!notesLocked && <div className="atelier-mobile-selection">
             <span>{session.selected.length}가지 선택 · {notesLocked ? "구성 확정" : missingNotes.length ? `${missingNotes.length}개 노트 남음` : "블렌딩 준비 완료"}</span>
-            {session.stage === "READY" && <Button onClick={() => updateSession({ stage: "BLENDING" })}>선택한 향료 섞기</Button>}
+            {session.stage === "READY" && <Button onClick={startBlending}>선택한 향료 섞기</Button>}
           </div>}
         </aside>
 
@@ -1232,7 +1238,7 @@ export function AtelierPage() {
             {session.stage === "READY" && (
               <Button
                 className="atelier-primary"
-                onClick={() => updateSession({ stage: "BLENDING" })}
+                onClick={startBlending}
               >
                 선택한 향료 섞기
               </Button>
