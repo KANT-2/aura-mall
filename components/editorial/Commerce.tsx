@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { StyledSelect } from "../ui/StyledSelect";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   products,
   collections,
@@ -19,6 +19,8 @@ import {
   Quantity,
 } from "./Shared";
 import { useAura } from "./Provider";
+import { ProductDetailContentDock } from "./ProductDetailContentDock";
+import { amountUntilFreeShipping, itemPrice, shippingFee } from "./pricing";
 
 export function ProductCard({ product: p }: { product: Product }) {
   return (
@@ -32,10 +34,13 @@ export function ProductCard({ product: p }: { product: Product }) {
       <p>
         {p.typeName} · {p.volume}
       </p>
-      <strong>{money(p.price)}</strong>
+      <strong>{p.type === "gift-set" ? "선택 상품 합계" : money(p.price)}</strong>
     </Link>
   );
 }
+
+const knownCollection = (v = "") => (collections.some((x) => x.id === v) ? v : "");
+const knownType = (v = "") => (types.some((t) => t.id === v) ? v : "");
 
 export function Shop({
   initialCollection = "",
@@ -46,28 +51,57 @@ export function Shop({
   initialType?: string;
   initialQuery?: string;
 }) {
-  const [c, setC] = useState(initialCollection),
-    [type, setType] = useState(initialType),
+  const [c, setC] = useState(knownCollection(initialCollection)),
+    [type, setType] = useState(knownType(initialType)),
     [query, setQuery] = useState(initialQuery),
     [sort, setSort] = useState("default");
   const collection = collections.find((x) => x.id === c);
   const router = useRouter();
+  // Last q this component wrote to the URL. Its echo through `initialQuery`
+  // must not overwrite the input while the user is still typing (e.g. "white ").
+  const pushedQuery = useRef(initialQuery);
   useEffect(() => {
-    setC(initialCollection);
-    setType(initialType);
-    setQuery(initialQuery);
-  }, [initialCollection, initialType, initialQuery]);
-  // q는 기본적으로 현재 검색어를 유지한다. 초기화처럼 같은 클릭에서 검색어를 비울 때는
-  // setQuery 반영 전의 query가 URL에 남지 않도록 값을 직접 넘긴다.
+    const timer = window.setTimeout(() => {
+      // A fresh filter reset from PR #14 still removes the stale q parameter.
+      const current = new URLSearchParams(window.location.search);
+      const q = query.trim();
+      if(q) current.set("q",q); else current.delete("q");
+      if((current.get("q")||"") !== initialQuery) {
+        pushedQuery.current = q;
+        router.replace("/shop" + (current.toString() ? "?" + current : ""), {scroll:false});
+      }
+    }, 320);
+    return () => window.clearTimeout(timer);
+  },[query,initialQuery,router]);
+  useEffect(() => {
+    const co = knownCollection(initialCollection),
+      ty = knownType(initialType);
+    setC(co);
+    setType(ty);
+    // Unknown collection/type values are dropped so URL, tabs and results agree.
+    if (co !== initialCollection || ty !== initialType) {
+      const s = new URLSearchParams(window.location.search);
+      if (co !== initialCollection) s.delete("collection");
+      if (ty !== initialType) s.delete("type");
+      router.replace("/shop" + (s.toString() ? "?" + s : ""), { scroll: false });
+    }
+    // Only external URL changes (header search, back/forward, reset) replace the input.
+    if (initialQuery !== pushedQuery.current) {
+      pushedQuery.current = initialQuery;
+      setQuery(initialQuery);
+    }
+  }, [initialCollection, initialType, initialQuery, router]);
   const update = (co: string, ty: string, q = query) => {
     setC(co);
     setType(ty);
     const s = new URLSearchParams();
     if (co) s.set("collection", co);
     if (ty) s.set("type", ty);
-    if (q) s.set("q", q);
+    pushedQuery.current = q.trim();
+    if (q.trim()) s.set("q", q.trim());
     router.replace("/shop?" + s.toString(), { scroll: false });
   };
+  const keyword = query.trim().toLowerCase();
   const list = products
     .filter(
       (p) =>
@@ -76,7 +110,7 @@ export function Shop({
         [p.name, p.englishName, p.typeName, p.description]
           .join(" ")
           .toLowerCase()
-          .includes(query.toLowerCase()),
+          .includes(keyword),
     )
     .sort((a, b) =>
       sort === "low"
@@ -187,14 +221,14 @@ export function ProductDetail({ product: p }: { product: Product }) {
       </nav>
       <section className="detail-top">
         <div className="detail-image">
-          <ProductPhoto product={p} loading="eager" />
+          <ProductPhoto product={p} loading="eager" selection={selection} />
         </div>
         <div className="detail-copy">
           <span className="eyebrow">{col.name} COLLECTION</span>
           <h1>{p.name}</h1>
           <span className="english-title">{p.englishName}</span>
           <p className="lead">{p.description}</p>
-          <strong className="price">{money(p.price)}</strong>
+          <strong className="price">{gift ? (selection.length===3 ? money(selection.reduce((sum,id)=>sum+(products.find(x=>x.id===id)?.price ?? 0),0)) : "구성에 따라 가격이 달라져요") : money(p.price)}</strong>
           <dl className="specs">
             <div>
               <dt>구성 / 용량</dt>
@@ -202,7 +236,7 @@ export function ProductDetail({ product: p }: { product: Product }) {
             </div>
             <div>
               <dt>배송비</dt>
-              <dd>3,000원</dd>
+              <dd>50,000원 이상 구매 시 무료 · 기본 3,000원</dd>
             </div>
             <div>
               <dt>향의 무드</dt>
@@ -263,11 +297,7 @@ export function ProductDetail({ product: p }: { product: Product }) {
               장바구니에서 확인하기 →
             </Link>
           )}
-          {p.price === null && (
-            <p className="micro">
-              판매가를 확인하고 있어요. 결제 전 최종 금액을 안내해 드립니다.
-            </p>
-          )}
+          {gift && <p className="micro">선택한 3개 상품 판매가의 합계이며, 별도 기프트 할인 및 포장 추가금은 적용하지 않았어요.</p>}
         </div>
       </section>
       {gift && (
@@ -299,51 +329,7 @@ export function ProductDetail({ product: p }: { product: Product }) {
           </div>
         </section>
       )}
-      <section className="product-story">
-        <span className="eyebrow">THE SCENT STORY</span>
-        <h2>{col.title}</h2>
-        <p>
-          {col.description}
-          <br />
-          좋아하는 향이 작은 순간에 스며들도록.
-        </p>
-        <div className="note-grid">
-          {p.notes.map((note, i) => (
-            <div key={note}>
-              <span className="eyebrow">
-                {["TOP", "MIDDLE", "BASE"][i]} NOTE
-              </span>
-              <h3>{note}</h3>
-              <p>
-                {
-                  [
-                    "처음 만나는 선명한 인상",
-                    "천천히 피어나는 향의 중심",
-                    "오래도록 남는 잔잔한 여운",
-                  ][i]
-                }
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="product-guide">
-        <details>
-          <summary>사용과 보관 안내</summary>
-          <p>
-            직사광선과 고온을 피하고 뚜껑을 닫아 보관해 주세요. 제품별 확정
-            사용법과 전성분은 판매 정보 확정 후 안내합니다.
-          </p>
-        </details>
-        <details>
-          <summary>배송 및 교환 안내</summary>
-          <p>
-            기본 배송비는 3,000원입니다. 출고 일정과 지역별 추가 배송비는 주문
-            전 확인할 수 있습니다. 교환·반품은 제품 상태와 관련 규정에 따라
-            안내합니다.
-          </p>
-        </details>
-      </section>
+      <ProductDetailContentDock product={p} collectionTitle={col.title} collectionDescription={col.description} />
       <section className="related">
         <SectionHeading
           number="02"
@@ -365,94 +351,50 @@ export function ProductDetail({ product: p }: { product: Product }) {
 
 export function Cart() {
   const { cart, quantity, user } = useAura();
-  const known = cart.every((x) => x.product.price !== null),
-    total = cart.reduce((s, x) => s + (x.product.price || 0) * x.quantity, 0);
+  const known = cart.every(item => itemPrice(item) !== null);
+  const subtotal = cart.reduce((sum, item) => sum + (itemPrice(item) ?? 0) * item.quantity, 0);
+  const delivery = shippingFee(subtotal, false);
+  const remaining = amountUntilFreeShipping(subtotal);
   return (
-    <main className="page-width cart-page">
-      <span className="eyebrow">YOUR SELECTION</span>
-      <h1>장바구니</h1>
+    <main className="page-width cart-page a86-cart">
+      <div className="a86-cart-heading"><span className="eyebrow">YOUR SELECTION</span><h1>장바구니 <small>{cart.length}</small></h1></div>
       {!cart.length ? (
-        <div className="empty">
-          <Asset id="empty-bag" />
-          <h2>아직 담은 향이 없어요.</h2>
-          <p>당신의 일상에 어울리는 향을 찾아보세요.</p>
-          <Link className="button" href="/shop">
-            컬렉션 둘러보기 <Arrow />
-          </Link>
-        </div>
+        <div className="empty"><Asset id="empty-bag"/><h2>아직 담은 향이 없어요.</h2><p>당신의 일상에 어울리는 향을 찾아보세요.</p><Link className="button" href="/shop">컬렉션 둘러보기 <Arrow/></Link></div>
       ) : (
-        <div className="cart-layout">
-          <div>
-            {cart.map((x) => (
-              <article className="cart-item" key={x.key}>
-                <Link href={"/shop/" + x.product.id}>
-                  <img src={x.product.image} alt={x.product.name} />
-                </Link>
-                <div>
-                  <span className="eyebrow">
-                    {x.product.collection.toUpperCase()}
-                  </span>
-                  <Link href={"/shop/" + x.product.id}>
-                    <h3>{x.product.name}</h3>
-                  </Link>
-                  <p>{x.product.volume}</p>
-                  {x.selection.length > 0 && (
-                    <ul>
-                      {x.selection.map((id) => (
-                        <li key={id}>
-                          {products.find((p) => p.id === id)?.name}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <Quantity n={x.quantity} set={(n) => quantity(x.key, n)} />
-                </div>
-                <div>
-                  <strong>
-                    {money(
-                      x.product.price === null
-                        ? null
-                        : x.product.price * x.quantity,
-                    )}
-                  </strong>
-                  <button
-                    className="text-link"
-                    onClick={() => quantity(x.key, 0)}
-                  >
-                    삭제
-                  </button>
-                </div>
-              </article>
-            ))}
+        <>
+          <p className="a86-shipping-hint" role="status">{known ? (delivery === 0 ? "50,000원 이상 구매 혜택 · 무료배송 적용" : `${money(remaining)} 더 담으면 무료배송 · 기본 배송비 3,000원`) : "확인이 필요한 상품이 있어 배송비는 주문 단계에서 안내돼요."}</p>
+          <div className="cart-layout">
+            <div className="a86-cart-list">
+              {cart.map(item => {
+                const amount = itemPrice(item);
+                const isLegacyCustom = Boolean(item.custom && item.product.type !== "eau-de-parfum");
+                return (
+                  <article className="cart-item a86-cart-item" key={item.key}>
+                    <div className="a86-cart-thumb">
+                      {item.custom ? <Asset id="custom-bottle"/> : <Link href={`/shop/${item.product.id}`}><ProductPhoto product={item.product} selection={item.selection}/></Link>}
+                    </div>
+                    <div className="a86-cart-info">
+                      <span className="eyebrow">{item.custom ? "PERSONAL ATELIER" : `${item.product.collection.toUpperCase()} COLLECTION`}</span>
+                      {item.custom ? <h3>{item.custom.name}</h3> : <Link href={`/shop/${item.product.id}`}><h3>{item.product.name}</h3></Link>}
+                      <p>{item.custom ? "커스텀 오 드 퍼퓸" : item.product.typeName} · {item.product.volume}</p>
+                      {item.custom ? <p className="a86-cart-meta">{item.custom.label === "paper" ? "페이퍼" : item.custom.label === "minimal" ? "미니멀" : "클래식"} 라벨 · {Object.keys(item.custom.counts).length}종의 향료</p> : null}
+                      {item.selection.length > 0 && <p className="a86-cart-meta">{item.selection.map(id => products.find(p => p.id === id)?.typeName).filter(Boolean).join(" · ")}</p>}
+                      {isLegacyCustom && <p className="a86-cart-warning">이전에 담은 커스텀 제품 유형은 현재 제공하지 않아요. 조향에서 오 드 퍼퓸으로 다시 담아 주세요.</p>}
+                      <div className="a86-cart-row-actions"><Quantity n={item.quantity} set={n => quantity(item.key, n)}/><button type="button" className="a86-cart-remove" onClick={() => quantity(item.key, 0)}>삭제</button></div>
+                    </div>
+                    <strong className="a86-cart-item-price">{amount === null || isLegacyCustom ? "확인 필요" : money(amount * item.quantity)}</strong>
+                  </article>
+                );
+              })}
+            </div>
+            <aside className="order-summary a86-order-summary">
+              <h2>주문 예상 금액</h2>
+              <dl><div><dt>상품금액</dt><dd>{known ? money(subtotal) : "확인 필요"}</dd></div><div><dt>배송비</dt><dd>{known ? (delivery === 0 ? "무료" : money(delivery)) : "확인 필요"}</dd></div><div className="a86-coupon-line"><dt>배송비 쿠폰</dt><dd>{user?.coupon ? "주문 화면에서 선택" : "사용 가능 쿠폰 없음"}</dd></div><div className="total"><dt>예상 결제금액</dt><dd>{known ? money(subtotal + delivery) : "확인 필요"}</dd></div></dl>
+              {known ? <Link className="button" href="/checkout">주문 정보 확인 <Arrow/></Link> : <button className="button" disabled>상품 정보 확인 후 진행</button>}
+              <p className="micro">쿠폰 혜택은 주문 정보 확인 단계에서 적용돼요.</p>
+            </aside>
           </div>
-          <aside className="order-summary">
-            <h2>주문 예상 금액</h2>
-            <dl>
-              <div>
-                <dt>상품금액</dt>
-                <dd>{known ? money(total) : "가격 확인 필요"}</dd>
-              </div>
-              <div>
-                <dt>기본 배송비</dt>
-                <dd>3,000원</dd>
-              </div>
-              <div>
-                <dt>배송비 쿠폰</dt>
-                <dd>{user?.coupon ? "보유 중" : "가입 시 제공"}</dd>
-              </div>
-              <div className="total">
-                <dt>예상 결제금액</dt>
-                <dd>{known ? money(total + 3000) : "가격 확인 필요"}</dd>
-              </div>
-            </dl>
-            <Link className="button" href="/checkout">
-              주문 정보 확인 <Arrow />
-            </Link>
-            <p className="micro">
-              최종 배송비와 쿠폰은 주문 단계에서 확인해 주세요.
-            </p>
-          </aside>
-        </div>
+        </>
       )}
     </main>
   );
@@ -461,8 +403,8 @@ export function Cart() {
 export function Checkout() {
   const { cart, user } = useAura(),
     [coupon, setCoupon] = useState(false);
-  const known = cart.every((x) => x.product.price !== null),
-    total = cart.reduce((s, x) => s + (x.product.price || 0) * x.quantity, 0);
+  const known = cart.every(x=>itemPrice(x)!==null),
+    total = cart.reduce((sum,x)=>sum + (itemPrice(x)??0)*x.quantity,0);
   return (
     <main className="page-width checkout">
       <span className="eyebrow">ORDER DETAILS</span>
@@ -525,7 +467,7 @@ export function Checkout() {
             <h2>선택한 상품</h2>
             {cart.map((x) => (
               <p key={x.key}>
-                {x.product.name} × {x.quantity}
+                {x.custom?`${x.custom.name} (커스텀 향)`:x.product.name} × {x.quantity}
                 {x.selection.length > 0 && (
                   <small>
                     {x.selection
@@ -542,13 +484,13 @@ export function Checkout() {
               </div>
               <div>
                 <dt>배송비</dt>
-                <dd>{coupon ? "0원" : "3,000원"}</dd>
+                <dd>{known ? (shippingFee(total,Boolean(user?.coupon && coupon))===0 ? "무료" : "3,000원") : "금액 확인 필요"}</dd>
               </div>
               <div className="total">
                 <dt>합계</dt>
                 <dd>
                   {known
-                    ? money(total + (coupon ? 0 : 3000))
+                    ? money(total + shippingFee(total, Boolean(user?.coupon && coupon)))
                     : "가격 확인 필요"}
                 </dd>
               </div>
@@ -557,8 +499,7 @@ export function Checkout() {
               결제 준비 중
             </button>
             <p className="micro">
-              현재 결제를 이용할 수 없습니다. 결제 가능 시 최종 금액과 배송
-              정보를 확인할 수 있어요.
+              현재 주문 접수·결제는 지원되지 않아요. 커스텀 향은 제조 가능 여부 및 제작 정책 확인이 필요해요.
             </p>
           </aside>
         </div>

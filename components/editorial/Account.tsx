@@ -10,6 +10,19 @@ import * as accounts from "./accounts";
 import { Arrow, Asset, totalCount } from "./Shared";
 import { useAura } from "./Provider";
 
+/** Same-origin path only; browsers normalize `/\host` and tab-split slashes to `//host`. */
+function safeReturnPath(next: string | null, fallback = "/mypage") {
+  if (!next?.startsWith("/")) return fallback;
+  try {
+    const url = new URL(next, window.location.origin);
+    return url.origin === window.location.origin
+      ? url.pathname + url.search + url.hash
+      : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function Auth({ mode }: { mode: "login" | "register" }) {
   const { setUser, notify } = useAura(),
     router = useRouter(),
@@ -24,7 +37,7 @@ export function Auth({ mode }: { mode: "login" | "register" }) {
   const signup = mode === "register";
   useEffect(() => {
     const next = new URLSearchParams(window.location.search).get("next");
-    if (next?.startsWith("/") && !next.startsWith("//")) setReturnTo(next);
+    setReturnTo(safeReturnPath(next));
   }, []);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -54,15 +67,13 @@ export function Auth({ mode }: { mode: "login" | "register" }) {
           )
         : await accounts.login(email, pw);
       setUser(u);
-      notify(
-        signup
-          ? "가입을 환영해요. 배송비 쿠폰이 준비되었어요."
-          : "로그인했어요.",
-      );
+      if(signup){
+        sessionStorage.setItem("aura_welcome_pending_v8", "1");
+        window.dispatchEvent(new Event("aura:welcome"));
+      }
+      notify(signup ? "회원가입을 환영해요." : "로그인했어요.");
       const next = new URLSearchParams(window.location.search).get("next");
-      router.push(
-        next?.startsWith("/") && !next.startsWith("//") ? next : "/mypage",
-      );
+      router.push(safeReturnPath(next));
     } catch (e) {
       setError(e instanceof Error ? e.message : "다시 시도해 주세요.");
     } finally {
@@ -281,7 +292,7 @@ export function MyPage() {
                     <Asset id="custom-bottle" /><span className="saved-name">{r.name}</span>
                   </div>
                   <div className="saved-recipe-body">
-                    <span className="eyebrow">VERSION {r.version} / {new Date(r.created).toLocaleDateString("ko-KR")}</span>
+                    <span className="eyebrow">VERSION {r.version}{Number.isNaN(Date.parse(r.created)) ? "" : ` / ${new Date(r.created).toLocaleDateString("ko-KR")}`}</span>
                     <h2>{r.name}</h2>
                     <p className="saved-topnotes">{Object.entries(r.counts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([id])=>ingredients.find(x=>x.id===id)?.name).filter(Boolean).join(" · ")}{Object.keys(r.counts).length>3?` 외 ${Object.keys(r.counts).length-3}종`:""}</p>
                     <details>
@@ -290,7 +301,7 @@ export function MyPage() {
                       {Object.entries(r.counts).map(([id,n])=><p key={id}>{ingredients.find(x=>x.id===id)?.name} — {n}회</p>)}
                     </details>
                     <Link className="text-link" href={"/atelier?recipe="+r.id}>이 향으로 다시 만들기 <Arrow /></Link>
-                    <small>제조 가능 여부 확인 후 구매할 수 있어요.</small>
+                    <small>이 향을 다시 열어 장바구니에 담을 수 있어요. 실제 제조·가격은 확인이 필요해요.</small>
                   </div>
                 </article>
               ))}
@@ -315,12 +326,10 @@ export function MyPage() {
           <div>
             <span className="eyebrow">WELCOME BENEFIT</span>
             <h2>첫 주문 배송비 쿠폰</h2>
-            <p>기본 배송비 3,000원 혜택</p>
-            <p className="micro">
-              사용 기한과 최소 주문금액은 운영 정책 확정 후 안내해요.
-            </p>
+            <p>{user?.coupon ? "3,000원 배송비 혜택 · 5만 원 이상 주문은 자동 무료배송" : "사용 가능한 쿠폰이 없습니다."}</p>
+            <p className="micro">결제 기능 준비 전까지 쿠폰 사용 완료는 처리되지 않아요.</p>
           </div>
-          <span className="chip">보유 중</span>
+          <span className="chip">{user?.coupon ? "사용 가능" : "미보유"}</span>
         </article>
       ) : tab === "orders" ? (
         <div className="empty">
