@@ -125,6 +125,20 @@ function restoreCart(raw: unknown): CartItem[] {
   return [...merged.values()];
 }
 
+/**
+ * Carts are kept per browser account: one key per signed-in email and one for guests.
+ * This separates accounts sharing a browser; it is not a server-side security boundary.
+ * The legacy shared `aura_cart_v2` key has no owner, so it is left untouched (not read or migrated).
+ */
+const cartKey = (email?: string | null) => "aura_cart_v3_" + (email ? "member:" + email : "guest");
+function loadCart(email?: string | null): CartItem[] {
+  try {
+    return restoreCart(JSON.parse(localStorage.getItem(cartKey(email)) || "[]"));
+  } catch {
+    return [];
+  }
+}
+
 /** Keeps saved recipes that can be opened again; malformed optional fields get safe defaults. */
 function restoreRecipes(raw: unknown): Recipe[] {
   if (!Array.isArray(raw)) return [];
@@ -153,26 +167,35 @@ export function useAura() {
 }
 
 export function AuraProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<accounts.Member | null>(null),
+  const [user, setUserState] = useState<accounts.Member | null>(null),
     [cart, setCart] = useState<CartItem[]>([]),
+    // Storage key the in-memory cart belongs to; saving never follows `user` directly.
+    [cartStore, setCartStore] = useState(cartKey(null)),
     [recipes, setRecipes] = useState<Recipe[]>([]),
     [ready, setReady] = useState(false),
     [toast, setToast] = useState("");
+  // Switching account swaps user, owner key and cart in one batch so the
+  // previous member's items are never written to the next member's key.
+  const setUser = (u: accounts.Member | null) => {
+    setUserState(u);
+    setCartStore(cartKey(u?.email));
+    setCart(loadCart(u?.email));
+  };
   useEffect(() => {
-    try {
-      setUser(accounts.current());
-      setCart(restoreCart(JSON.parse(localStorage.getItem("aura_cart_v2") || "[]")));
-    } catch {}
+    const u = accounts.current();
+    setUserState(u);
+    setCartStore(cartKey(u?.email));
+    setCart(loadCart(u?.email));
     setReady(true);
   }, []);
   useEffect(() => {
     if (!ready) return;
     try {
-      localStorage.setItem("aura_cart_v2", JSON.stringify(cart));
+      localStorage.setItem(cartStore, JSON.stringify(cart));
     } catch {
       setToast("저장 공간을 확인해 주세요.");
     }
-  }, [cart, ready]);
+  }, [cart, cartStore, ready]);
   useEffect(() => {
     if (!ready) return;
     try {
