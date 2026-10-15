@@ -5,8 +5,8 @@ export type Member = {
   marketing?: boolean;
 };
 type Account = Member & { salt: string; hash: string };
-const ACCOUNTS = "aura_members_v2",
-  SESSION = "aura_session_v2";
+const ACCOUNTS = "aura_members_v2";
+export const SESSION = "aura_session_v2";
 function records(): Account[] {
   try {
     const x = JSON.parse(localStorage.getItem(ACCOUNTS) || "[]");
