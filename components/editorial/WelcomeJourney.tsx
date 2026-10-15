@@ -17,6 +17,7 @@ export function WelcomeJourney(){
   const [page,setPage]=useState(0);
   const [drops,setDrops]=useState(0);
   const start=useRef<number|null>(null);
+  const dialog=useRef<HTMLElement>(null);
   const close=()=>{
     setOpen(false);
     try{sessionStorage.removeItem(KEY);sessionStorage.setItem("aura_welcome_seen_v8","1");}catch{}
@@ -29,14 +30,25 @@ export function WelcomeJourney(){
   },[]);
   useEffect(()=>{
     if(!open) return;
+    // Same focus handling as AtelierModal: move in, keep Tab inside, restore on close.
+    const before=document.activeElement as HTMLElement|null;
+    dialog.current?.focus();
     const keyboard=(e:KeyboardEvent)=>{
       if(e.key==="Escape")close();
       if(e.key==="ArrowRight")setPage(p=>Math.min(4,p+1));
       if(e.key==="ArrowLeft")setPage(p=>Math.max(0,p-1));
+      const root=dialog.current;
+      if(e.key!=="Tab"||!root)return;
+      const items=[...root.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),[tabindex="0"]')].filter(el=>el.getClientRects().length);
+      if(!items.length){e.preventDefault();return;}
+      const first=items[0],last=items[items.length-1];
+      if(e.shiftKey&&(document.activeElement===first||document.activeElement===root)){e.preventDefault();last.focus();}
+      else if(!e.shiftKey&&(document.activeElement===last||document.activeElement===root)){e.preventDefault();first.focus();}
+      else if(!root.contains(document.activeElement)){e.preventDefault();first.focus();}
     };
     window.addEventListener("keydown",keyboard);
     const old=document.body.style.overflow;document.body.style.overflow="hidden";
-    return ()=>{window.removeEventListener("keydown",keyboard);document.body.style.overflow=old;};
+    return ()=>{window.removeEventListener("keydown",keyboard);document.body.style.overflow=old;if(before?.isConnected)before.focus();};
   },[open]);
   const onPointerUp=(e:PointerEvent<HTMLElement>)=>{
     if(start.current===null)return;
@@ -45,7 +57,7 @@ export function WelcomeJourney(){
   };
   if(!open)return null;
   return <div className="a-welcome-overlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)close();}}>
-    <section className="a-welcome-dialog" role="dialog" aria-modal="true" aria-label="AURA 첫 이용 안내" onPointerDown={e=>{start.current=e.clientX;}} onPointerUp={onPointerUp}>
+    <section ref={dialog} tabIndex={-1} className="a-welcome-dialog" role="dialog" aria-modal="true" aria-label="AURA 첫 이용 안내" onPointerDown={e=>{start.current=e.clientX;}} onPointerUp={onPointerUp}>
       <header><span className="eyebrow">AURA / AN INVITATION</span><button aria-label="안내 닫기" onClick={close}>×</button></header>
       <div className="a-welcome-copy" key={page}><span className="eyebrow">0{page+1} / 05 · {screens[page].note}</span><h2>{screens[page].title}</h2><p>{screens[page].description}</p></div>
       <div className="a-welcome-art" key={`art-${page}`}>

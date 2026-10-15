@@ -65,6 +65,85 @@ export function customProduct(name:string, productType="eau-de-parfum"):Product 
     notes:[],featured:false,imageUrl:"/assets/editorial/custom-bottle.svg",category:"커스텀 향",isNew:false
   } as unknown as Product;
 }
+const MAX_QUANTITY = 15;
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === "object" && !Array.isArray(v);
+/** Ingredient counts must be non-negative integers with at least one drop; zero entries are dropped. */
+function validCounts(v: unknown): Record<string, number> | null {
+  if (!isRecord(v)) return null;
+  const entries = Object.entries(v);
+  if (!entries.every(([, n]) => Number.isInteger(n) && (n as number) >= 0)) return null;
+  const used = entries.filter(([, n]) => (n as number) > 0);
+  return used.length ? (Object.fromEntries(used) as Record<string, number>) : null;
+}
+const clampQuantity = (v: unknown) => {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) ? Math.min(MAX_QUANTITY, Math.max(1, n)) : 1;
+};
+const productKey = (id: string, selection: string[]) => id + ":" + [...selection].sort().join(",");
+// Identical saved composition is consolidated; edited compositions remain separate.
+function customKey(recipe: CustomRecipeItem) {
+  const signature=JSON.stringify([recipe.name.trim(),recipe.label,recipe.productType || "eau-de-parfum",Object.entries(recipe.counts).sort()]);
+  return "custom:"+Array.from(signature).reduce((h,c)=>((h*31+c.charCodeAt(0))>>>0),2166136261).toString(36);
+}
+
+/** Rebuild stored cart rows from the catalog; drops corrupt rows and merges duplicate keys. */
+function restoreCart(raw: unknown): CartItem[] {
+  if (!Array.isArray(raw)) return [];
+  const merged = new Map<string, CartItem>();
+  for (const i of raw) {
+    if (!isRecord(i) || !isRecord(i.product)) continue;
+    const stored = i.product, id = stored.id;
+    if (typeof id !== "string") continue;
+    const quantity = clampQuantity(i.quantity);
+    let item: CartItem;
+    if (id === "custom-atelier") {
+      const c = i.custom;
+      const counts = isRecord(c) ? validCounts(c.counts) : null;
+      if (!isRecord(c) || typeof c.name !== "string" || !c.name.trim() || !counts) continue;
+      const custom: CustomRecipeItem = {
+        name: c.name.trim(),
+        label: typeof c.label === "string" ? c.label : "classic",
+        color: typeof c.color === "string" ? c.color : "#d5b575",
+        counts,
+        recipeKey: typeof c.recipeKey === "string" ? c.recipeKey : undefined,
+        productType: typeof c.productType === "string" ? c.productType
+          : typeof stored.type === "string" ? stored.type : undefined,
+      };
+      item = { key: customKey(custom), product: customProduct(custom.name, custom.productType), quantity, selection: [], custom };
+    } else {
+      const product = products.find((p) => p.id === id);
+      if (!product) continue;
+      const gift = product.type === "gift-set";
+      const selection = gift && Array.isArray(i.selection) ? i.selection.filter((s): s is string => typeof s === "string") : [];
+      if (gift && !isGiftSelectionValid(product, selection)) continue;
+      item = { key: productKey(product.id, selection), product, quantity, selection };
+    }
+    const existing = merged.get(item.key);
+    merged.set(item.key, existing ? { ...existing, quantity: Math.min(MAX_QUANTITY, existing.quantity + item.quantity) } : item);
+  }
+  return [...merged.values()];
+}
+
+/** Keeps saved recipes that can be opened again; malformed optional fields get safe defaults. */
+function restoreRecipes(raw: unknown): Recipe[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((r): Recipe[] => {
+    const counts = isRecord(r) ? validCounts(r.counts) : null;
+    if (!isRecord(r) || typeof r.id !== "string" || typeof r.name !== "string" || !counts) return [];
+    return [{
+      id: r.id,
+      parent: typeof r.parent === "string" ? r.parent : undefined,
+      version: Number.isInteger(r.version) && (r.version as number) > 0 ? (r.version as number) : 1,
+      name: r.name,
+      label: typeof r.label === "string" ? r.label : "classic",
+      counts,
+      color: typeof r.color === "string" ? r.color : "#d5b575",
+      created: typeof r.created === "string" ? r.created : "",
+    }];
+  });
+}
+
 export const Context = createContext<State | null>(null);
 
 export function useAura() {
@@ -82,22 +161,7 @@ export function AuraProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       setUser(accounts.current());
-      const x = JSON.parse(localStorage.getItem("aura_cart_v2") || "[]");
-      setCart(
-        Array.isArray(x)
-          ? x
-              .filter(
-                (i) =>
-                  i?.product && (products.some((p) => p.id === i.product.id) || (i.product.id === "custom-atelier" && i.custom && typeof i.custom.name === "string")) &&
-                  (i.product.id === "custom-atelier" || (i.product.type !== "gift-set" || isGiftSelectionValid(products.find(p=>p.id===i.product.id)!, Array.isArray(i.selection)?i.selection:[]))),
-              )
-              .map((i) => ({
-                ...i,
-                selection: Array.isArray(i.selection) ? i.selection : [],
-                product: i.product.id === "custom-atelier" ? customProduct(i.custom.name, i.custom.productType || i.product.type) : products.find((p) => p.id === i.product.id)!,
-              }))
-          : [],
-      );
+      setCart(restoreCart(JSON.parse(localStorage.getItem("aura_cart_v2") || "[]")));
     } catch {}
     setReady(true);
   }, []);
@@ -116,7 +180,7 @@ export function AuraProvider({ children }: { children: ReactNode }) {
         localStorage.getItem("aura_recipes_v2_" + (user?.email || "guest")) ||
           "[]",
       );
-      setRecipes(Array.isArray(x) ? x : []);
+      setRecipes(restoreRecipes(x));
     } catch {
       setRecipes([]);
     }
@@ -148,9 +212,7 @@ export function AuraProvider({ children }: { children: ReactNode }) {
     if(!recipe.name.trim() || !Object.values(recipe.counts).some(n=>n>0)) {
       setToast("향 이름과 향료 조합을 확인해 주세요.");return false;
     }
-    // Identical saved composition is consolidated; edited compositions remain separate.
-    const signature=JSON.stringify([recipe.name.trim(),recipe.label,recipe.productType || "eau-de-parfum",Object.entries(recipe.counts).sort()]);
-    const key="custom:"+Array.from(signature).reduce((h,c)=>((h*31+c.charCodeAt(0))>>>0),2166136261).toString(36);
+    const key=customKey(recipe);
     setCart(previous=>{
       const existing=previous.find(item=>item.key===key);
       return existing ? previous.map(item=>item.key===key?{...item,quantity:Math.min(15,item.quantity+1)}:item)
@@ -177,7 +239,7 @@ export function AuraProvider({ children }: { children: ReactNode }) {
       setToast("같은 컬렉션의 제품 3개를 선택해 주세요.");
       return;
     }
-    const key = p.id + ":" + [...s].sort().join(",");
+    const key = productKey(p.id, s);
     setCart((c) => {
       const old = c.find((x) => x.key === key);
       return old

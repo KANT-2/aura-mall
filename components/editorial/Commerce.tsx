@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { StyledSelect } from "../ui/StyledSelect";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   products,
   collections,
@@ -39,6 +39,9 @@ export function ProductCard({ product: p }: { product: Product }) {
   );
 }
 
+const knownCollection = (v = "") => (collections.some((x) => x.id === v) ? v : "");
+const knownType = (v = "") => (types.some((t) => t.id === v) ? v : "");
+
 export function Shop({
   initialCollection = "",
   initialType = "",
@@ -48,12 +51,15 @@ export function Shop({
   initialType?: string;
   initialQuery?: string;
 }) {
-  const [c, setC] = useState(initialCollection),
-    [type, setType] = useState(initialType),
+  const [c, setC] = useState(knownCollection(initialCollection)),
+    [type, setType] = useState(knownType(initialType)),
     [query, setQuery] = useState(initialQuery),
     [sort, setSort] = useState("default");
   const collection = collections.find((x) => x.id === c);
   const router = useRouter();
+  // Last q this component wrote to the URL. Its echo through `initialQuery`
+  // must not overwrite the input while the user is still typing (e.g. "white ").
+  const pushedQuery = useRef(initialQuery);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       // A fresh filter reset from PR #14 still removes the stale q parameter.
@@ -61,25 +67,41 @@ export function Shop({
       const q = query.trim();
       if(q) current.set("q",q); else current.delete("q");
       if((current.get("q")||"") !== initialQuery) {
+        pushedQuery.current = q;
         router.replace("/shop" + (current.toString() ? "?" + current : ""), {scroll:false});
       }
     }, 320);
     return () => window.clearTimeout(timer);
   },[query,initialQuery,router]);
   useEffect(() => {
-    setC(initialCollection);
-    setType(initialType);
-    setQuery(initialQuery);
-  }, [initialCollection, initialType, initialQuery]);
+    const co = knownCollection(initialCollection),
+      ty = knownType(initialType);
+    setC(co);
+    setType(ty);
+    // Unknown collection/type values are dropped so URL, tabs and results agree.
+    if (co !== initialCollection || ty !== initialType) {
+      const s = new URLSearchParams(window.location.search);
+      if (co !== initialCollection) s.delete("collection");
+      if (ty !== initialType) s.delete("type");
+      router.replace("/shop" + (s.toString() ? "?" + s : ""), { scroll: false });
+    }
+    // Only external URL changes (header search, back/forward, reset) replace the input.
+    if (initialQuery !== pushedQuery.current) {
+      pushedQuery.current = initialQuery;
+      setQuery(initialQuery);
+    }
+  }, [initialCollection, initialType, initialQuery, router]);
   const update = (co: string, ty: string, q = query) => {
     setC(co);
     setType(ty);
     const s = new URLSearchParams();
     if (co) s.set("collection", co);
     if (ty) s.set("type", ty);
-    if (q) s.set("q", q);
+    pushedQuery.current = q.trim();
+    if (q.trim()) s.set("q", q.trim());
     router.replace("/shop?" + s.toString(), { scroll: false });
   };
+  const keyword = query.trim().toLowerCase();
   const list = products
     .filter(
       (p) =>
@@ -88,7 +110,7 @@ export function Shop({
         [p.name, p.englishName, p.typeName, p.description]
           .join(" ")
           .toLowerCase()
-          .includes(query.toLowerCase()),
+          .includes(keyword),
     )
     .sort((a, b) =>
       sort === "low"
