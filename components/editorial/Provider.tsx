@@ -191,11 +191,33 @@ export function AuraProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     try {
-      localStorage.setItem(cartStore, JSON.stringify(cart));
+      const json = JSON.stringify(cart);
+      // Skipping identical writes keeps tabs from echoing storage events back and forth.
+      if (localStorage.getItem(cartStore) !== json) localStorage.setItem(cartStore, json);
     } catch {
       setToast("저장 공간을 확인해 주세요.");
     }
   }, [cart, cartStore, ready]);
+  // Another tab signed in/out, or changed this account's cart: follow it without a reload.
+  // `storage` events only fire in other tabs, so this tab's own writes are not re-read.
+  useEffect(() => {
+    if (!ready) return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.storageArea !== localStorage) return;
+      if (e.key === null || e.key === accounts.SESSION) {
+        const next = accounts.current();
+        if ((next?.email ?? null) !== (user?.email ?? null)) {
+          setUserState(next);
+          setCartStore(cartKey(next?.email));
+          setCart(loadCart(next?.email));
+          return;
+        }
+      }
+      if (e.key === null || e.key === cartStore) setCart(loadCart(user?.email));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [ready, user, cartStore]);
   useEffect(() => {
     if (!ready) return;
     try {
