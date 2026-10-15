@@ -10,7 +10,6 @@ import {
   Arrow,
   Asset,
   SectionHeading,
-  Beaker,
 } from "./Shared";
 import { useAura } from "./Provider";
 import { ProductCard } from "./Commerce";
@@ -18,11 +17,11 @@ import { ProductCard } from "./Commerce";
 export function Home() {
   const { user } = useAura();
   const [promo, setPromo] = useState(0),
-    [stage, setStage] = useState(0),
     [position, setPosition] = useState(0),
     [end, setEnd] = useState(false);
-  const atelier = useRef<HTMLElement>(null),
-    rail = useRef<HTMLDivElement>(null);
+  const rail = useRef<HTMLDivElement>(null);
+  const bestsellerIds = ["warm-eau-de-parfum", "fresh-hand-cream", "soft-perfume-oil", "warm-diffuser", "fresh-hand-wash", "soft-candle"];
+  const bestsellers = bestsellerIds.map(id => products.find(p => p.id === id)).filter((p): p is (typeof products)[number] => Boolean(p));
   const promos = user
     ? [
         {
@@ -30,21 +29,21 @@ export function Home() {
           copy: "저장한 조합에서 새로운 취향을 이어가 보세요.",
           cta: "내가 만든 향",
           url: "/mypage",
-          asset: "custom-bottle",
+          image: "/assets/products/soft-eau-de-parfum.webp",
         },
         {
           title: "취향을 담아 전하는 선물",
           copy: "같은 컬렉션에서 고른 세 가지 제품으로 마음을 전하세요.",
           cta: "선물 둘러보기",
           url: "/shop?type=gift-set",
-          asset: "gift",
+          image: "/assets/products/warm-eau-de-parfum.webp",
         },
         {
           title: "좋아하는 향을 완성하는 시간",
           copy: "향료를 고르고 섞어, 나만의 향을 기록하세요.",
           cta: "향 만들기",
           url: "/atelier",
-          asset: "dropper",
+          image: "/assets/products/fresh-eau-de-parfum.webp",
         },
       ]
     : [
@@ -53,21 +52,21 @@ export function Home() {
           copy: "회원가입하고 첫 주문에 사용할 배송비 쿠폰을 받아보세요.",
           cta: "회원가입하기",
           url: "/register",
-          asset: "coupon",
+          image: "/assets/products/soft-eau-de-parfum.webp",
         },
         {
           title: "좋아하는 향을 완성하는 시간",
           copy: "향료를 고르고 섞어, 나만의 향을 기록하세요.",
           cta: "향 만들기",
           url: "/atelier",
-          asset: "dropper",
+          image: "/assets/products/fresh-eau-de-parfum.webp",
         },
         {
           title: "취향을 담아 전하는 선물",
           copy: "같은 컬렉션에서 고른 세 가지 제품으로 마음을 전하세요.",
           cta: "선물 둘러보기",
           url: "/shop?type=gift-set",
-          asset: "gift",
+          image: "/assets/products/warm-eau-de-parfum.webp",
         },
       ];
   const p = promos[promo % promos.length];
@@ -80,27 +79,8 @@ export function Home() {
       { threshold: 0.12 },
     );
     document.querySelectorAll(".reveal").forEach((e) => observer.observe(e));
-    const onScroll = () => {
-      if (!atelier.current) return;
-      const b = atelier.current.getBoundingClientRect();
-      setStage(
-        Math.max(
-          0,
-          Math.min(
-            3,
-            Math.floor(
-              ((window.innerHeight - b.top) / (window.innerHeight + b.height)) *
-                5,
-            ),
-          ),
-        ),
-      );
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
     return () => {
       observer.disconnect();
-      window.removeEventListener("scroll", onScroll);
     };
   }, []);
   return (
@@ -184,7 +164,7 @@ export function Home() {
             {p.cta} <Arrow />
           </Link>
         </div>
-        <div className="promo-visual" aria-hidden="true"><div className="promo-visual-inner"><span className="promo-visual-overline">AN INVITATION TO AURA</span><Asset id={p.asset} /><span className="promo-visual-caption">THE EVERYDAY SCENT / AURA</span></div></div>
+        <div className="promo-visual" aria-hidden="true"><img key={p.image} className="a86-promo-photo" src={p.image} alt="" loading="lazy"/><span className="a86-promo-photo-caption">AURA / AN INVITATION TO SCENT</span></div>
         <div className="carousel-control">
           <button
             aria-label="이전 소식"
@@ -209,8 +189,8 @@ export function Home() {
         <div className="heading-row">
           <SectionHeading
             number="04"
-            title="일상에 들이는 향"
-            copy="AURA가 고른 컬렉션의 시작. 가까운 순간부터 만나보세요."
+            title="지금, 사랑받는 향"
+            copy="한 가지 향에 머물지 않고, 다양한 제품으로 취향을 발견해 보세요."
           />
           <Link className="text-link" href="/shop">
             전체 보기 <Arrow />
@@ -229,11 +209,9 @@ export function Home() {
             }
           }}
         >
-          {products
-            .filter((p) => p.featured)
-            .map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
+          {bestsellers.map((p) => (
+            <ProductCard key={p.id} product={p} />
+          ))}
         </div>
         <div className="rail-controls">
           <span>AURA SELECTED / 06</span>
@@ -257,57 +235,24 @@ export function Home() {
           </button>
         </div>
       </section>
-      <section className={"atelier-intro stage-" + stage} ref={atelier}>
-        <div className="intro-art">
-          {stage === 3 ? (
-            <Asset id="custom-bottle" />
-          ) : (
-            <>
-              <Asset id="bergamot" className="floating one" />
-              <Asset id="jasmine" className="floating two" />
-              <Beaker
-                count={stage * 6 + 1}
-                color={stage < 2 ? "#d5b575" : "#c5985c"}
-                mixing={stage === 2}
-              />
-            </>
-          )}
-          <span className="eyebrow">
-            0{stage + 1} /{" "}
-            {
-              [
-                "향을 고르고",
-                "용기에 담고",
-                "하나의 향으로",
-                "당신의 향을 기록하세요",
-              ][stage]
-            }
-          </span>
-        </div>
-        <div>
-          <span className="eyebrow">05 / AURA PERSONAL ATELIER</span>
-          <h2>
-            보이지 않는 향을,
-            <br />
-            <i>나만의 것으로.</i>
-          </h2>
-          <p>
-            좋아하는 향을 하나씩 고르고,
-            <br />
-            직접 섞어 나만의 향수를 완성해 보세요.
-          </p>
-          <ol>
-            <li>향을 고르고</li>
-            <li>용기에 담고</li>
-            <li>하나의 향으로</li>
+      <section className="atelier-intro a86-atelier-intro">
+        <div className="a86-atelier-intro-backdrop" aria-hidden="true"/>
+        <div className="a86-atelier-intro-inner">
+          <div className="a86-atelier-intro-main">
+            <span className="eyebrow">05 / AURA PERSONAL ATELIER</span>
+            <h2>당신만의 향을,<br/><i>천천히 완성해 보세요.</i></h2>
+            <p>좋아하는 향료를 고르고, 한 방울씩 더한 뒤<br/>유리 막대로 직접 저어 나만의 향을 만들어 보세요.</p>
+            <Link className="button light" href="/atelier">나만의 향 만들기 <Arrow /></Link>
+          </div>
+          <ol className="a86-atelier-steps">
+            <li><strong>향료 선택</strong><span>좋아하는 노트를 골라요</span></li>
+            <li><strong>천천히 조향</strong><span>한 방울씩 담고 저어요</span></li>
+            <li><strong>나의 향 완성</strong><span>이름과 라벨을 기록해요</span></li>
           </ol>
-          <Link className="button light" href="/atelier">
-            나만의 향 만들기 <Arrow />
-          </Link>
         </div>
       </section>
       <section className="partner-intro section reveal">
-        <div className="partner-accent" aria-hidden="true"><Asset id="paper-tag"/></div><span className="eyebrow">06 / PARTNER WITH AURA</span>
+<span className="eyebrow">06 / PARTNER WITH AURA</span>
         <h2>
           당신의 향을
           <br />
