@@ -1,0 +1,754 @@
+{
+  "collections": [
+    {
+      "id": "fresh",
+      "name": "FRESH",
+      "title": "맑은 순간의 향",
+      "description": "시트러스의 선명함과 그린 허브의 산뜻한 여운.",
+      "color": "#e6eadf",
+      "notes": [
+        "베르가못",
+        "네롤리",
+        "화이트 머스크"
+      ]
+    },
+    {
+      "id": "soft",
+      "name": "SOFT",
+      "title": "살결 가까이, 부드럽게",
+      "description": "은은한 꽃과 머스크가 만드는 편안한 온기.",
+      "color": "#eee2d9",
+      "notes": [
+        "피치",
+        "자스민",
+        "화이트 머스크"
+      ]
+    },
+    {
+      "id": "warm",
+      "name": "WARM",
+      "title": "깊고 따뜻한 잔향",
+      "description": "우드와 앰버가 천천히 채우는 차분한 깊이.",
+      "color": "#e4d6be",
+      "notes": [
+        "만다린",
+        "카더멈",
+        "샌달우드"
+      ]
+    }
+  ],
+  "types": [
+    {
+      "id": "hand-cream",
+      "name": "Hand Cream",
+      "label": "핸드크림"
+    },
+    {
+      "id": "hand-wash",
+      "name": "Hand Wash",
+      "label": "핸드워시"
+    },
+    {
+      "id": "body-lotion",
+      "name": "Body Lotion",
+      "label": "바디로션"
+    },
+    {
+      "id": "eau-de-parfum",
+      "name": "Eau de Parfum",
+      "label": "오 드 퍼퓸"
+    },
+    {
+      "id": "body-wash",
+      "name": "Body Wash",
+      "label": "바디워시"
+    },
+    {
+      "id": "perfume-oil",
+      "name": "Perfume Oil",
+      "label": "퍼퓸 오일"
+    },
+    {
+      "id": "diffuser",
+      "name": "Diffuser",
+      "label": "디퓨저"
+    },
+    {
+      "id": "hair-mist",
+      "name": "Hair Mist",
+      "label": "헤어 미스트"
+    },
+    {
+      "id": "candle",
+      "name": "Candle",
+      "label": "캔들"
+    },
+    {
+      "id": "gift-set",
+      "name": "Gift Set",
+      "label": "기프트 세트"
+    }
+  ],
+  "products": [
+    {
+      "id": "fresh-hand-cream",
+      "collection": "fresh",
+      "type": "hand-cream",
+      "typeName": "Hand Cream",
+      "name": "FRESH 핸드크림",
+      "englishName": "Fresh Hand Cream",
+      "volume": "50 mL",
+      "price": 28000,
+      "stock": 15,
+      "image": "/assets/products/fresh-hand-cream.webp",
+      "description": "시트러스의 선명함과 그린 허브의 산뜻한 여운.",
+      "notes": [
+        "베르가못",
+        "네롤리",
+        "화이트 머스크"
+      ],
+      "featured": true,
+      "imageUrl": "/assets/products/fresh-hand-cream.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "fresh-hand-wash",
+      "collection": "fresh",
+      "type": "hand-wash",
+      "typeName": "Hand Wash",
+      "name": "FRESH 핸드워시",
+      "englishName": "Fresh Hand Wash",
+      "volume": "300 mL",
+      "price": 32000,
+      "stock": 15,
+      "image": "/assets/products/fresh-hand-wash.webp",
+      "description": "시트러스의 선명함과 그린 허브의 산뜻한 여운.",
+      "notes": [
+        "베르가못",
+        "네롤리",
+        "화이트 머스크"
+      ],
+      "featured": true,
+      "imageUrl": "/assets/products/fresh-hand-wash.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "fresh-body-lotion",
+      "collection": "fresh",
+      "type": "body-lotion",
+      "typeName": "Body Lotion",
+      "name": "FRESH 바디로션",
+      "englishName": "Fresh Body Lotion",
+      "volume": "300 mL",
+      "price": 42000,
+      "stock": 15,
+      "image": "/assets/products/fresh-body-lotion.webp",
+      "description": "시트러스의 선명함과 그린 허브의 산뜻한 여운.",
+      "notes": [
+        "베르가못",
+        "네롤리",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/fresh-body-lotion.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "fresh-eau-de-parfum",
+      "collection": "fresh",
+      "type": "eau-de-parfum",
+      "typeName": "Eau de Parfum",
+      "name": "FRESH 오 드 퍼퓸",
+      "englishName": "Fresh Eau de Parfum",
+      "volume": "50 mL",
+      "price": 98000,
+      "stock": 15,
+      "image": "/assets/products/fresh-eau-de-parfum.webp",
+      "description": "시트러스의 선명함과 그린 허브의 산뜻한 여운.",
+      "notes": [
+        "베르가못",
+        "네롤리",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/fresh-eau-de-parfum.webp",
+      "category": "향수",
+      "isNew": false
+    },
+    {
+      "id": "fresh-body-wash",
+      "collection": "fresh",
+      "type": "body-wash",
+      "typeName": "Body Wash",
+      "name": "FRESH 바디워시",
+      "englishName": "Fresh Body Wash",
+      "volume": "300 mL",
+      "price": 36000,
+      "stock": 15,
+      "image": "/assets/products/fresh-body-wash.webp",
+      "description": "시트러스의 선명함과 그린 허브의 산뜻한 여운.",
+      "notes": [
+        "베르가못",
+        "네롤리",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/fresh-body-wash.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "fresh-perfume-oil",
+      "collection": "fresh",
+      "type": "perfume-oil",
+      "typeName": "Perfume Oil",
+      "name": "FRESH 퍼퓸 오일",
+      "englishName": "Fresh Perfume Oil",
+      "volume": "10 mL",
+      "price": 48000,
+      "stock": 15,
+      "image": "/assets/products/fresh-perfume-oil.webp",
+      "description": "시트러스의 선명함과 그린 허브의 산뜻한 여운.",
+      "notes": [
+        "베르가못",
+        "네롤리",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/fresh-perfume-oil.webp",
+      "category": "향수",
+      "isNew": false
+    },
+    {
+      "id": "fresh-diffuser",
+      "collection": "fresh",
+      "type": "diffuser",
+      "typeName": "Diffuser",
+      "name": "FRESH 디퓨저",
+      "englishName": "Fresh Diffuser",
+      "volume": "200 mL",
+      "price": 68000,
+      "stock": 15,
+      "image": "/assets/products/fresh-diffuser.webp",
+      "description": "시트러스의 선명함과 그린 허브의 산뜻한 여운.",
+      "notes": [
+        "베르가못",
+        "네롤리",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/fresh-diffuser.webp",
+      "category": "홈 프래그런스",
+      "isNew": false
+    },
+    {
+      "id": "fresh-hair-mist",
+      "collection": "fresh",
+      "type": "hair-mist",
+      "typeName": "Hair Mist",
+      "name": "FRESH 헤어 미스트",
+      "englishName": "Fresh Hair Mist",
+      "volume": "50 mL",
+      "price": 45000,
+      "stock": 15,
+      "image": "/assets/products/fresh-hair-mist.webp",
+      "description": "시트러스의 선명함과 그린 허브의 산뜻한 여운.",
+      "notes": [
+        "베르가못",
+        "네롤리",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/fresh-hair-mist.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "fresh-candle",
+      "collection": "fresh",
+      "type": "candle",
+      "typeName": "Candle",
+      "name": "FRESH 캔들",
+      "englishName": "Fresh Candle",
+      "volume": "200 g",
+      "price": 62000,
+      "stock": 15,
+      "image": "/assets/products/fresh-candle.webp",
+      "description": "시트러스의 선명함과 그린 허브의 산뜻한 여운.",
+      "notes": [
+        "베르가못",
+        "네롤리",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/fresh-candle.webp",
+      "category": "홈 프래그런스",
+      "isNew": false
+    },
+    {
+      "id": "fresh-gift-set",
+      "collection": "fresh",
+      "type": "gift-set",
+      "typeName": "Gift Set",
+      "name": "FRESH 기프트 세트",
+      "englishName": "Fresh Gift Set",
+      "volume": "3종 선택",
+      "price": null,
+      "stock": 15,
+      "image": "/assets/products/fresh-eau-de-parfum.webp",
+      "description": "시트러스의 선명함과 그린 허브의 산뜻한 여운.",
+      "notes": [
+        "베르가못",
+        "네롤리",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/fresh-eau-de-parfum.webp",
+      "category": "기프트",
+      "isNew": false
+    },
+    {
+      "id": "soft-hand-cream",
+      "collection": "soft",
+      "type": "hand-cream",
+      "typeName": "Hand Cream",
+      "name": "SOFT 핸드크림",
+      "englishName": "Soft Hand Cream",
+      "volume": "50 mL",
+      "price": 28000,
+      "stock": 15,
+      "image": "/assets/products/soft-hand-cream.webp",
+      "description": "은은한 꽃과 머스크가 만드는 편안한 온기.",
+      "notes": [
+        "피치",
+        "자스민",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/soft-hand-cream.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "soft-hand-wash",
+      "collection": "soft",
+      "type": "hand-wash",
+      "typeName": "Hand Wash",
+      "name": "SOFT 핸드워시",
+      "englishName": "Soft Hand Wash",
+      "volume": "300 mL",
+      "price": 32000,
+      "stock": 15,
+      "image": "/assets/products/soft-hand-wash.webp",
+      "description": "은은한 꽃과 머스크가 만드는 편안한 온기.",
+      "notes": [
+        "피치",
+        "자스민",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/soft-hand-wash.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "soft-body-lotion",
+      "collection": "soft",
+      "type": "body-lotion",
+      "typeName": "Body Lotion",
+      "name": "SOFT 바디로션",
+      "englishName": "Soft Body Lotion",
+      "volume": "300 mL",
+      "price": 42000,
+      "stock": 15,
+      "image": "/assets/products/soft-body-lotion.webp",
+      "description": "은은한 꽃과 머스크가 만드는 편안한 온기.",
+      "notes": [
+        "피치",
+        "자스민",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/soft-body-lotion.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "soft-eau-de-parfum",
+      "collection": "soft",
+      "type": "eau-de-parfum",
+      "typeName": "Eau de Parfum",
+      "name": "SOFT 오 드 퍼퓸",
+      "englishName": "Soft Eau de Parfum",
+      "volume": "50 mL",
+      "price": 98000,
+      "stock": 15,
+      "image": "/assets/products/soft-eau-de-parfum.webp",
+      "description": "은은한 꽃과 머스크가 만드는 편안한 온기.",
+      "notes": [
+        "피치",
+        "자스민",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/soft-eau-de-parfum.webp",
+      "category": "향수",
+      "isNew": false
+    },
+    {
+      "id": "soft-body-wash",
+      "collection": "soft",
+      "type": "body-wash",
+      "typeName": "Body Wash",
+      "name": "SOFT 바디워시",
+      "englishName": "Soft Body Wash",
+      "volume": "300 mL",
+      "price": 36000,
+      "stock": 15,
+      "image": "/assets/products/soft-body-wash.webp",
+      "description": "은은한 꽃과 머스크가 만드는 편안한 온기.",
+      "notes": [
+        "피치",
+        "자스민",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/soft-body-wash.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "soft-perfume-oil",
+      "collection": "soft",
+      "type": "perfume-oil",
+      "typeName": "Perfume Oil",
+      "name": "SOFT 퍼퓸 오일",
+      "englishName": "Soft Perfume Oil",
+      "volume": "10 mL",
+      "price": 48000,
+      "stock": 15,
+      "image": "/assets/products/soft-perfume-oil.webp",
+      "description": "은은한 꽃과 머스크가 만드는 편안한 온기.",
+      "notes": [
+        "피치",
+        "자스민",
+        "화이트 머스크"
+      ],
+      "featured": true,
+      "imageUrl": "/assets/products/soft-perfume-oil.webp",
+      "category": "향수",
+      "isNew": false
+    },
+    {
+      "id": "soft-diffuser",
+      "collection": "soft",
+      "type": "diffuser",
+      "typeName": "Diffuser",
+      "name": "SOFT 디퓨저",
+      "englishName": "Soft Diffuser",
+      "volume": "200 mL",
+      "price": 68000,
+      "stock": 15,
+      "image": "/assets/products/soft-diffuser.webp",
+      "description": "은은한 꽃과 머스크가 만드는 편안한 온기.",
+      "notes": [
+        "피치",
+        "자스민",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/soft-diffuser.webp",
+      "category": "홈 프래그런스",
+      "isNew": false
+    },
+    {
+      "id": "soft-hair-mist",
+      "collection": "soft",
+      "type": "hair-mist",
+      "typeName": "Hair Mist",
+      "name": "SOFT 헤어 미스트",
+      "englishName": "Soft Hair Mist",
+      "volume": "50 mL",
+      "price": 45000,
+      "stock": 15,
+      "image": "/assets/products/soft-hair-mist.webp",
+      "description": "은은한 꽃과 머스크가 만드는 편안한 온기.",
+      "notes": [
+        "피치",
+        "자스민",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/soft-hair-mist.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "soft-candle",
+      "collection": "soft",
+      "type": "candle",
+      "typeName": "Candle",
+      "name": "SOFT 캔들",
+      "englishName": "Soft Candle",
+      "volume": "200 g",
+      "price": 62000,
+      "stock": 15,
+      "image": "/assets/products/soft-candle.webp",
+      "description": "은은한 꽃과 머스크가 만드는 편안한 온기.",
+      "notes": [
+        "피치",
+        "자스민",
+        "화이트 머스크"
+      ],
+      "featured": true,
+      "imageUrl": "/assets/products/soft-candle.webp",
+      "category": "홈 프래그런스",
+      "isNew": false
+    },
+    {
+      "id": "soft-gift-set",
+      "collection": "soft",
+      "type": "gift-set",
+      "typeName": "Gift Set",
+      "name": "SOFT 기프트 세트",
+      "englishName": "Soft Gift Set",
+      "volume": "3종 선택",
+      "price": null,
+      "stock": 15,
+      "image": "/assets/products/soft-eau-de-parfum.webp",
+      "description": "은은한 꽃과 머스크가 만드는 편안한 온기.",
+      "notes": [
+        "피치",
+        "자스민",
+        "화이트 머스크"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/soft-eau-de-parfum.webp",
+      "category": "기프트",
+      "isNew": false
+    },
+    {
+      "id": "warm-hand-cream",
+      "collection": "warm",
+      "type": "hand-cream",
+      "typeName": "Hand Cream",
+      "name": "WARM 핸드크림",
+      "englishName": "Warm Hand Cream",
+      "volume": "50 mL",
+      "price": 28000,
+      "stock": 15,
+      "image": "/assets/products/warm-hand-cream.webp",
+      "description": "우드와 앰버가 천천히 채우는 차분한 깊이.",
+      "notes": [
+        "만다린",
+        "카더멈",
+        "샌달우드"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/warm-hand-cream.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "warm-hand-wash",
+      "collection": "warm",
+      "type": "hand-wash",
+      "typeName": "Hand Wash",
+      "name": "WARM 핸드워시",
+      "englishName": "Warm Hand Wash",
+      "volume": "300 mL",
+      "price": 32000,
+      "stock": 15,
+      "image": "/assets/products/warm-hand-wash.webp",
+      "description": "우드와 앰버가 천천히 채우는 차분한 깊이.",
+      "notes": [
+        "만다린",
+        "카더멈",
+        "샌달우드"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/warm-hand-wash.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "warm-body-lotion",
+      "collection": "warm",
+      "type": "body-lotion",
+      "typeName": "Body Lotion",
+      "name": "WARM 바디로션",
+      "englishName": "Warm Body Lotion",
+      "volume": "300 mL",
+      "price": 42000,
+      "stock": 15,
+      "image": "/assets/products/warm-body-lotion.webp",
+      "description": "우드와 앰버가 천천히 채우는 차분한 깊이.",
+      "notes": [
+        "만다린",
+        "카더멈",
+        "샌달우드"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/warm-body-lotion.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "warm-eau-de-parfum",
+      "collection": "warm",
+      "type": "eau-de-parfum",
+      "typeName": "Eau de Parfum",
+      "name": "WARM 오 드 퍼퓸",
+      "englishName": "Warm Eau de Parfum",
+      "volume": "50 mL",
+      "price": 98000,
+      "stock": 15,
+      "image": "/assets/products/warm-eau-de-parfum.webp",
+      "description": "우드와 앰버가 천천히 채우는 차분한 깊이.",
+      "notes": [
+        "만다린",
+        "카더멈",
+        "샌달우드"
+      ],
+      "featured": true,
+      "imageUrl": "/assets/products/warm-eau-de-parfum.webp",
+      "category": "향수",
+      "isNew": false
+    },
+    {
+      "id": "warm-body-wash",
+      "collection": "warm",
+      "type": "body-wash",
+      "typeName": "Body Wash",
+      "name": "WARM 바디워시",
+      "englishName": "Warm Body Wash",
+      "volume": "300 mL",
+      "price": 36000,
+      "stock": 15,
+      "image": "/assets/products/warm-body-wash.webp",
+      "description": "우드와 앰버가 천천히 채우는 차분한 깊이.",
+      "notes": [
+        "만다린",
+        "카더멈",
+        "샌달우드"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/warm-body-wash.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "warm-perfume-oil",
+      "collection": "warm",
+      "type": "perfume-oil",
+      "typeName": "Perfume Oil",
+      "name": "WARM 퍼퓸 오일",
+      "englishName": "Warm Perfume Oil",
+      "volume": "10 mL",
+      "price": 48000,
+      "stock": 15,
+      "image": "/assets/products/warm-perfume-oil.webp",
+      "description": "우드와 앰버가 천천히 채우는 차분한 깊이.",
+      "notes": [
+        "만다린",
+        "카더멈",
+        "샌달우드"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/warm-perfume-oil.webp",
+      "category": "향수",
+      "isNew": false
+    },
+    {
+      "id": "warm-diffuser",
+      "collection": "warm",
+      "type": "diffuser",
+      "typeName": "Diffuser",
+      "name": "WARM 디퓨저",
+      "englishName": "Warm Diffuser",
+      "volume": "200 mL",
+      "price": 68000,
+      "stock": 15,
+      "image": "/assets/products/warm-diffuser.webp",
+      "description": "우드와 앰버가 천천히 채우는 차분한 깊이.",
+      "notes": [
+        "만다린",
+        "카더멈",
+        "샌달우드"
+      ],
+      "featured": true,
+      "imageUrl": "/assets/products/warm-diffuser.webp",
+      "category": "홈 프래그런스",
+      "isNew": false
+    },
+    {
+      "id": "warm-hair-mist",
+      "collection": "warm",
+      "type": "hair-mist",
+      "typeName": "Hair Mist",
+      "name": "WARM 헤어 미스트",
+      "englishName": "Warm Hair Mist",
+      "volume": "50 mL",
+      "price": 45000,
+      "stock": 15,
+      "image": "/assets/products/warm-hair-mist.webp",
+      "description": "우드와 앰버가 천천히 채우는 차분한 깊이.",
+      "notes": [
+        "만다린",
+        "카더멈",
+        "샌달우드"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/warm-hair-mist.webp",
+      "category": "바디 · 헤어",
+      "isNew": false
+    },
+    {
+      "id": "warm-candle",
+      "collection": "warm",
+      "type": "candle",
+      "typeName": "Candle",
+      "name": "WARM 캔들",
+      "englishName": "Warm Candle",
+      "volume": "200 g",
+      "price": 62000,
+      "stock": 15,
+      "image": "/assets/products/warm-candle.webp",
+      "description": "우드와 앰버가 천천히 채우는 차분한 깊이.",
+      "notes": [
+        "만다린",
+        "카더멈",
+        "샌달우드"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/warm-candle.webp",
+      "category": "홈 프래그런스",
+      "isNew": false
+    },
+    {
+      "id": "warm-gift-set",
+      "collection": "warm",
+      "type": "gift-set",
+      "typeName": "Gift Set",
+      "name": "WARM 기프트 세트",
+      "englishName": "Warm Gift Set",
+      "volume": "3종 선택",
+      "price": null,
+      "stock": 15,
+      "image": "/assets/products/warm-eau-de-parfum.webp",
+      "description": "우드와 앰버가 천천히 채우는 차분한 깊이.",
+      "notes": [
+        "만다린",
+        "카더멈",
+        "샌달우드"
+      ],
+      "featured": false,
+      "imageUrl": "/assets/products/warm-eau-de-parfum.webp",
+      "category": "기프트",
+      "isNew": false
+    }
+  ]
+}
