@@ -1,0 +1,44 @@
+/* AURA V7: deliberate adjustments only. No new content sections on commerce pages. */
+.a-v7 .a-families { display:grid;grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:22px 0 17px; }
+.a-v7 .a-families button { min-height:156px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 10px;gap:5px;border-radius:6px;min-width:0; }
+.a-v7 .a-families button img { width:79px;height:77px;object-fit:contain;filter:drop-shadow(0 5px 8px #00000018); }
+.a-v7 .a-families button strong { font-size:15px;letter-spacing:-.03em; }
+.a-v7 .a-families button span {text-align:center;font-size:11px;line-height:1.5;max-width:145px;}
+.a-v7 .a-resume-card { display:flex;align-items:center;justify-content:space-between;gap:18px;background:#eee0c726;border:1px solid #ad937860;padding:16px 18px;border-radius:6px;margin:15px 0; }
+.a-v7 .a-resume-card strong {font-size:15px;color:#f1e3d0;}
+.a-v7 .a-resume-card p {font-size:12px;margin:4px 0 0;}
+.a-v7 .a-resume-card button {white-space:nowrap;flex-shrink:0;min-height:42px;font-size:12px;}
+.a-v7 .a-direct-start {margin-top:3px;}
+.a-v7 .a-sheet-blend .a-blend-beaker {touch-action:none;user-select:none;cursor:grab;}
+.a-v7 .a-sheet-blend .a-blend-beaker.dragging {cursor:grabbing;}
+.a-v7 .a-sheet-blend .a-blend-stage .beaker {pointer-events:none;}
+.a-v7 .a-sheet-blend .a-stir-surface {pointer-events:none;}
+.a-v7 .a-blend-beaker .live-vessel {will-change:transform;}
+.a-v7 .a-blend-beaker.dragging .liquid-ripple {animation-duration:1.4s;}
+.a-v7 .a-sheet-blend .a-stir-actions p {font-size:12px;line-height:1.6;}
+.a-v7 .a-sheet-blend .a-turns-hint {display:block;font-size:12px;margin-top:8px;}
+.a-v7 .a-result-purchase-note { background:#f6f1e9; border:1px solid #d7cab7; padding:17px 18px; border-radius:6px; margin:18px 0 0; color:#4a382a; }
+.a-v7 .a-result-purchase-note strong {font-family:var(--korean-serif,'Noto Serif KR',serif);font-size:17px;}
+.a-v7 .a-result-purchase-note p {margin:6px 0 0;font-size:12px;line-height:1.7;color:#766b61;}
+.a-v7 .a-v7-result-actions {flex-wrap:wrap;gap:8px;}
+.a-v7 .a-v7-result-actions .a-buy-custom {background:#503924!important;color:#f9efe2!important;border:1px solid #503924;min-width:180px;}
+.a-v7 .a-v7-result-actions .a-cart-link {background:transparent;color:#503924;border:1px solid #9e8f7e;}
+.a-custom-cart-photo {background:#f4e9dd;border-radius:5px;display:grid;place-items:center;min-height:125px;}
+.a-custom-cart-photo img {max-height:132px;object-fit:contain;width:100%;}
+.a-custom-cart-detail {display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:10px 0;}
+.a-custom-cart-detail span {border:1px solid #e0d6ca;border-radius:4px;padding:3px 8px;font-size:11px;}
+.a-custom-cart-detail a {font-size:12px;}
+.a-custom-cart-detail p {width:100%;font-size:12px;color:#7a7067;margin:4px 0 0;}
+.a-cart-policy {padding:15px;background:#f5f0e9;border:1px solid #ddd0bf;border-radius:6px;}
+.a-cart-policy strong {font-size:14px;}
+.a-cart-policy p {font-size:12px;line-height:1.7;margin:7px 0 13px;color:#685e52;}
+.a-cart-policy .button {width:100%;opacity:.62;cursor:not-allowed;}
+@media(max-width:790px){.a-v7 .a-families{grid-template-columns:repeat(2,minmax(0,1fr))}.a-v7 .a-resume-card{flex-direction:column;align-items:stretch}.a-v7 .a-resume-card button{justify-content:center}.a-v7 .a-result-purchase-note{padding:14px}.a-v7 .a-v7-result-actions .button{width:100%}}
+@media(max-width:375px){.a-v7 .a-families button {min-height:143px;padding:11px 7px}.a-v7 .a-families button img{height:64px;width:65px}.a-v7 .a-families button span{font-size:10px}}
+@media(prefers-reduced-motion:reduce){.a-v7 .liquid-ripple,.a-v7 .a-floating-ingredient,.a-v7 .vessel-drop{animation:none!important}}
+
+.a-v7 .a-ratio-toggle {border:1px solid #af9b795c;border-radius:5px;padding:9px 12px;background:transparent;color:#d7c9b5;font-size:12px;display:block;width:100%;margin:7px 0;text-align:left}.a-v7 .a-ratio-toggle:hover{background:#ceb0841a}.a-v7 .a-note-ratio{margin:9px 0;}
+
+.a-v7 .a-blend-beaker.settling .liquid-ripple{animation-duration:3.5s;opacity:.38;transition:opacity .95s ease-out}
+
+@media(max-width:790px){.a-v7 .a-vessel .a-ratio-toggle,.a-v7 .a-vessel .a-note-ratio{display:none!important}}

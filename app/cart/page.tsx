@@ -1,2 +1,4 @@
-import { CartPage } from "@/components/AuraSite"
-export default function Page() { return <CartPage /> }
+import { Cart } from "@/components/editorial/Aura";
+export default function Page() {
+  return <Cart />;
+}
