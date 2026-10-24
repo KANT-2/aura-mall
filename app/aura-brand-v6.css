@@ -1,7 +1,7 @@
 /* AURA V6 — brand typography and outlined wordmark. Loaded LAST to override historical design experiments. */
 :root {
-  --font-aura-ko: "Noto Serif KR", "Noto Serif CJK KR", "Nanum Myeongjo", "AppleMyungjo", "Batang", serif;
-  --font-aura-en: "Cormorant Garamond", "EB Garamond", "Baskerville", Georgia, serif;
+  --font-aura-ko: var(--font-noto-serif-kr), "Noto Serif CJK KR", "Nanum Myeongjo", "AppleMyungjo", "Batang", serif;
+  --font-aura-en: var(--font-cormorant-garamond), "EB Garamond", "Baskerville", Georgia, serif;
   --font-aura-ui: Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
   --sans: var(--font-aura-ui);
   --serif: var(--font-aura-en);

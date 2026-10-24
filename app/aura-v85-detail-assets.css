@@ -25,13 +25,13 @@
 .shop-title .a85-collection-art img{max-width:none;filter:drop-shadow(0 4px 3px rgba(45,37,26,.07))}
 /* Preserve product imagery; never stretch a low-resolution 2D asset to fill a wide hero. */
 .detail .detail-top{align-items:start}
-.detail .detail-copy h1{font-family:"Noto Serif KR",Georgia,serif;font-size:clamp(25px,2.7vw,34px);line-height:1.35;word-break:keep-all}
+.detail .detail-copy h1{font-family:var(--font-noto-serif-kr),Georgia,serif;font-size:clamp(25px,2.7vw,34px);line-height:1.35;word-break:keep-all}
 .detail .detail-copy .lead{font-size:clamp(14px,1.15vw,16px);line-height:1.7}
 .detail .detail-copy :is(button,a){min-height:40px}
 /* Product detail: compact information hierarchy, no additional long scrollytelling. */
 .detail .a85-detail-dock{margin-block:clamp(45px,6vw,75px);max-width:100%;color:#3b322b}
 .a85-detail-dock__headline{display:flex;align-items:end;justify-content:space-between;gap:15px;padding-bottom:16px}
-.a85-detail-dock__headline h2{font-family:"Noto Serif KR",Georgia,serif;font-size:clamp(20px,2.1vw,27px);font-weight:500;margin:0;letter-spacing:-.045em}
+.a85-detail-dock__headline h2{font-family:var(--font-noto-serif-kr),Georgia,serif;font-size:clamp(20px,2.1vw,27px);font-weight:500;margin:0;letter-spacing:-.045em}
 .a85-detail-dock__headline .eyebrow{font-size:11px;letter-spacing:.13em;opacity:.72}
 .a85-detail-dock__tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid #b5a998;border-bottom:1px solid #dcd4c9}
 .a85-detail-dock__tabs button{appearance:none;border:0;border-bottom:2px solid transparent;padding:16px 10px;background:transparent;color:#7a7167;font-size:clamp(13px,1.15vw,15px);font-family:inherit;line-height:1.4;cursor:pointer;white-space:nowrap;min-height:50px}
@@ -40,7 +40,7 @@
 .a85-detail-dock__tabs button:focus-visible{outline:2px solid #826442;outline-offset:-3px}
 .a85-detail-dock__panel{padding:clamp(22px,3.5vw,40px) clamp(4px,2vw,22px) 12px;min-height:210px;outline-offset:-2px}
 .a85-detail-dock__overline{font-size:11px;letter-spacing:.18em;color:#928372;margin:0 0 12px}
-.a85-detail-dock__story h3{font-family:"Noto Serif KR",Georgia,serif;font-size:clamp(20px,2.2vw,27px);line-height:1.5;font-weight:500;margin:0 0 10px}
+.a85-detail-dock__story h3{font-family:var(--font-noto-serif-kr),Georgia,serif;font-size:clamp(20px,2.2vw,27px);line-height:1.5;font-weight:500;margin:0 0 10px}
 .a85-detail-dock__intro{font-size:clamp(14px,1.2vw,16px);line-height:1.8;color:#746b62;max-width:760px;margin:0}
 .a85-detail-dock__notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:25px}
 .a85-note{display:grid;grid-template-rows:110px auto auto;justify-items:center;align-content:center;gap:5px;padding:15px 10px;border:1px solid #ded7cb;background:#f6f2eb;min-width:0}

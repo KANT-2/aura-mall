@@ -44,7 +44,7 @@
 /* Restore minimalist cart layout instead of extending a bordered widget across the content. */
 .a86-cart{padding-top:56px;padding-bottom:94px}
 .a86-cart-heading{margin-bottom:25px}
-.a86-cart-heading h1{font-family:'Noto Serif KR',Georgia,serif;font-size:clamp(29px,3vw,37px);margin-top:10px;letter-spacing:-.045em}
+.a86-cart-heading h1{font-family:var(--font-noto-serif-kr),Georgia,serif;font-size:clamp(29px,3vw,37px);margin-top:10px;letter-spacing:-.045em}
 .a86-cart-heading small{font-family:inherit;font-size:16px;font-weight:400;color:#82786b;margin-left:6px}
 .a86-cart .a86-shipping-hint{margin-bottom:27px;color:#6b6258;font-size:13px;line-height:1.55;padding:0 0 11px;border-bottom:1px solid #e1dacf}
 .a86-cart .cart-layout{gap:clamp(26px,4vw,54px);grid-template-columns:minmax(0,1.6fr) minmax(280px,.9fr)}

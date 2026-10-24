@@ -1,14 +1,14 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 import Link from "next/link";
+import Image from "next/image";
 import { AuraWordmark } from "./AuraWordmark";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent } from "react";
 import ingredients from "./ingredients.json";
 import { Asset, Beaker, totalCount, mixColor, money, products } from "./Shared";
 import { type Recipe, useAura } from "./Provider";
-import { AtelierModal, ProgressRing, UtilityIcon } from "../ui/AtelierControls";
+import { AtelierModal, UtilityIcon } from "../ui/AtelierControls";
 
-type Note = (typeof ingredients)[number];
 type Stage = "top" | "middle" | "base";
 type MotionAccess = "idle" | "requesting" | "active" | "denied" | "unavailable";
 type MotionWithPermission = typeof DeviceMotionEvent & { requestPermission?: () => Promise<"granted" | "denied"> };
@@ -50,17 +50,6 @@ function percentages(counts:Record<string,number>) {
   sorted.sort((a,b)=>(b.exact-b.value)-(a.exact-a.value) || a.id.localeCompare(b.id));
   for(const entry of sorted) if(left-->0) entry.value++;
   return Object.fromEntries(sorted.map(({id,value})=>[id,value])) as Record<string,number>;
-}
-
-function FloatingComposition({ notes, className="", compact=false }:{notes:Note[];className?:string;compact?:boolean}) {
-  // Limit the artwork to the leading notes; the complete recipe remains accessible as text.
-  const chosen = [...notes].slice(0, compact?4:3);
-  return <div className={`a-note-composition ${compact?"compact":""} ${className}`} aria-hidden="true">
-    <span className="a-composition-line"/>
-    {chosen.map((note,index)=><span className={`a-floating-ingredient a-float-${index%6}`} key={note.id} style={{"--float-order":index} as CSSProperties}>
-      <Asset id={note.id}/><small>{note.name}</small>
-    </span>)}
-  </div>;
 }
 
 function stageRatiosForNames(counts:Record<string,number>):"fresh"|"soft"|"warm"{
@@ -388,7 +377,7 @@ export function Atelier(){
     <header className="atelier-heading a-heading"><div><span className="eyebrow">PERSONAL ATELIER / AURA</span><h1>{step==="entry"?"취향을 한 방울씩":step==="result"?"나만의 향을 기록하다":"향을 만드는 시간"}</h1></div>
       <div className="a-step-nav" aria-label="진행 단계"><span className={step!=="result"&&overlay!=="blend"?"active":""}>01 고르기</span><span className={overlay==="blend"?"active":""}>02 섞기</span><span className={step==="result"?"active":""}>03 기록하기</span></div>
     </header>
-    {step==="entry"?<section className="atelier-entry page-width a-entry"><div className="entry-visual" aria-label="AURA 조향 안내 이미지"><img className="a-entry-photo" src="/assets/products/warm-eau-de-parfum.webp" alt="AURA의 향수병과 자연 소재" loading="eager"/><span className="a-entry-caption">A PERSONAL SCENT / AURA ATELIER</span></div><div><span className="eyebrow">A SCENT OF YOUR OWN</span><h2>어떤 향 계열을 좋아하시나요?</h2><p>익숙한 향의 계열에서 출발하거나, 원하는 향료를 자유롭게 골라 보세요.</p>
+    {step==="entry"?<section className="atelier-entry page-width a-entry"><div className="entry-visual" aria-label="AURA 조향 안내 이미지"><Image className="a-entry-photo" src="/assets/products/warm-eau-de-parfum.webp" alt="AURA의 향수병과 자연 소재" fill sizes="(max-width: 900px) 100vw, 45vw" loading="eager"/><span className="a-entry-caption">A PERSONAL SCENT / AURA ATELIER</span></div><div><span className="eyebrow">A SCENT OF YOUR OWN</span><h2>어떤 향 계열을 좋아하시나요?</h2><p>익숙한 향의 계열에서 출발하거나, 원하는 향료를 자유롭게 골라 보세요.</p>
       {pendingDraft&&<div className="a-resume-card"><div><strong>만들던 향이 있어요</strong><p>{Object.keys(pendingDraft.counts).length}종의 향료를 다시 이어서 선택할 수 있어요.</p></div><button className="button" onClick={resumeDraft}>이어서 만들기 <UtilityIcon name="arrow"/></button></div>}
       <div className="recommend-cards a-families">{scentFamilies.map(f=><button key={f.id} type="button" data-aura-family={f.id} onClick={()=>recommend(f.id)}><Asset id={f.asset}/><strong>{f.name}</strong><span>{f.english} · {f.description}</span></button>)}</div>
       <button className="button a-direct-start" onClick={()=>openSelection()}>향료 직접 고르기 <UtilityIcon name="arrow"/></button></div></section>
