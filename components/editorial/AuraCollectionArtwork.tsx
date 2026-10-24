@@ -3,9 +3,8 @@
 
 /**
  * AURA collection illustration composition.
- * Uses the *existing* transparent botanical assets at modest rendered sizes.
- * Nothing is raster-upscaled and no existing botanical master is overwritten.
- * New master artwork can replace each layer via the registry later.
+ * Composes shared transparent WebP illustrations at modest rendered sizes.
+ * Each layer can be replaced via the registry later.
  */
 const variants = {
   fresh: ["bergamot", "neroli", "rosemary"],

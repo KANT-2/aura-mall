@@ -20,6 +20,7 @@ export function Home() {
     [position, setPosition] = useState(0),
     [end, setEnd] = useState(false);
   const rail = useRef<HTMLDivElement>(null);
+  const promoTouch = useRef<{x:number;y:number}|null>(null);
   const bestsellerIds = ["warm-eau-de-parfum", "fresh-hand-cream", "soft-perfume-oil", "warm-diffuser", "fresh-hand-wash", "soft-candle"];
   const bestsellers = bestsellerIds.map(id => products.find(p => p.id === id)).filter((p): p is (typeof products)[number] => Boolean(p));
   const promos = user
@@ -155,6 +156,19 @@ export function Home() {
         className="promotion reveal"
         aria-roledescription="캐러셀"
         aria-label="AURA 소식"
+        tabIndex={0}
+        onKeyDown={event=>{
+          if(event.target!==event.currentTarget)return;
+          if(event.key==="ArrowRight"){event.preventDefault();setPromo(i=>(i+1)%promos.length);}
+          if(event.key==="ArrowLeft"){event.preventDefault();setPromo(i=>(i+promos.length-1)%promos.length);}
+        }}
+        onTouchStart={event=>{const t=event.touches[0];promoTouch.current={x:t.clientX,y:t.clientY};}}
+        onTouchEnd={event=>{
+          const start=promoTouch.current;promoTouch.current=null;
+          if(!start)return;
+          const t=event.changedTouches[0];const dx=t.clientX-start.x;const dy=t.clientY-start.y;
+          if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.2)setPromo(i=>(i+(dx<0?1:promos.length-1))%promos.length);
+        }}
       >
         <div className="promo-copy" key={p.title}>
           <span className="eyebrow">03 / AURA INVITATION</span>
