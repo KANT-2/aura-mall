@@ -2,7 +2,7 @@
 :root { --a-v8-ink:#332b25; --a-v8-paper:#f7f4ee; --a-v8-accent:#997750; }
 .a-shipping-banner{background:#f4efe6;border:1px solid #e3d9c9;border-radius:6px;padding:13px 16px;color:#5d4a38;font-size:14px;line-height:1.6}
 .a-result-product-choose{display:grid;gap:9px;margin:18px 0 13px;padding:20px;border:1px solid #ddd0bf;border-radius:7px;background:rgba(245,239,227,.75)}
-.a-result-product-choose label{font-family:'Noto Serif KR',serif;font-size:18px}
+.a-result-product-choose label{font-family:var(--font-noto-serif-kr),serif;font-size:18px}
 .a-result-product-choose select{width:100%;padding:12px 14px;background:#fffaf2;color:#30271f;border:1px solid #bba88f;font:inherit;font-size:15px;border-radius:4px}
 .a-result-product-choose strong{font-size:20px;font-weight:600}
 .a-result-product-choose p{font-size:13px;line-height:1.65;color:#74665a;margin:0}
@@ -22,7 +22,7 @@
 .a-welcome-dialog header{display:flex;justify-content:space-between;align-items:center}
 .a-welcome-dialog header button{font-size:25px;border:0;background:transparent;color:inherit;cursor:pointer;line-height:1}
 .a-welcome-copy{text-align:center;animation:a-welcome-enter .4s ease both}
-.a-welcome-copy h2{font-family:'Noto Serif KR',Georgia,serif;font-weight:500;font-size:clamp(23px,3.5vw,29px);line-height:1.48;letter-spacing:-.045em;margin:12px 0}
+.a-welcome-copy h2{font-family:var(--font-noto-serif-kr),Georgia,serif;font-weight:500;font-size:clamp(23px,3.5vw,29px);line-height:1.48;letter-spacing:-.045em;margin:12px 0}
 .a-welcome-copy p{font-size:14px;color:#776b5f;min-height:48px}
 .a-welcome-art{height:235px;display:grid;place-items:center;border-radius:7px;background:linear-gradient(160deg,#f8f5ee,#eee5d8);position:relative;overflow:hidden;animation:a-welcome-enter .35s ease both}
 .a-welcome-coupon{display:flex;flex-direction:column;gap:9px;text-align:center;align-items:center;padding:12px}.a-welcome-coupon img{height:92px;max-width:180px;object-fit:contain}.a-welcome-coupon strong{font-size:16px}.a-welcome-coupon small{font-size:12px;color:#776b5f}

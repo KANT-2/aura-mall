@@ -18,7 +18,7 @@
 .a-v7 .a-sheet-blend .a-stir-actions p {font-size:12px;line-height:1.6;}
 .a-v7 .a-sheet-blend .a-turns-hint {display:block;font-size:12px;margin-top:8px;}
 .a-v7 .a-result-purchase-note { background:#f6f1e9; border:1px solid #d7cab7; padding:17px 18px; border-radius:6px; margin:18px 0 0; color:#4a382a; }
-.a-v7 .a-result-purchase-note strong {font-family:var(--korean-serif,'Noto Serif KR',serif);font-size:17px;}
+.a-v7 .a-result-purchase-note strong {font-family:var(--korean-serif,var(--font-noto-serif-kr),serif);font-size:17px;}
 .a-v7 .a-result-purchase-note p {margin:6px 0 0;font-size:12px;line-height:1.7;color:#766b61;}
 .a-v7 .a-v7-result-actions {flex-wrap:wrap;gap:8px;}
 .a-v7 .a-v7-result-actions .a-buy-custom {background:#503924!important;color:#f9efe2!important;border:1px solid #503924;min-width:180px;}

@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { Asset, Beaker } from "./Shared";
 import { useAura } from "./Provider";
@@ -12,6 +13,7 @@ const screens = [
 ];
 const KEY="aura_welcome_pending_v8";
 export function WelcomeJourney(){
+  const router=useRouter();
   const {user}=useAura();
   const [open,setOpen]=useState(false);
   const [page,setPage]=useState(0);
@@ -67,7 +69,7 @@ export function WelcomeJourney(){
         {page===3?<div className="a-welcome-stir"><Beaker count={8} color="#bc976b"/><span className="a-welcome-stir-rod"/><span>유리 막대로 천천히 저어요</span></div>:null}
         {page===4?<div className="a-welcome-result"><Asset id="custom-bottle"/><small>PERSONAL COMPOSITION</small></div>:null}
       </div>
-      <div className="a-welcome-footer"><div className="a-welcome-dots" aria-label="온보딩 단계">{screens.map((_,i)=><button key={i} aria-label={`${i+1}번째 안내`} aria-current={i===page?"step":undefined} className={page===i?"active":""} onClick={()=>setPage(i)}/>)}</div><div className="a-welcome-nav"><button className="a-welcome-skip" onClick={close}>건너뛰기</button><button className="a-welcome-prev" disabled={page===0} onClick={()=>setPage(p=>p-1)}>이전</button><button className="button" onClick={()=>{if(page===4){close();window.location.assign('/atelier');}else setPage(p=>p+1);}}>{page===4?"나만의 향 만들기":"다음 →"}</button></div></div>
+      <div className="a-welcome-footer"><div className="a-welcome-dots" aria-label="온보딩 단계">{screens.map((_,i)=><button key={i} aria-label={`${i+1}번째 안내`} aria-current={i===page?"step":undefined} className={page===i?"active":""} onClick={()=>setPage(i)}/>)}</div><div className="a-welcome-nav"><button className="a-welcome-skip" onClick={close}>건너뛰기</button><button className="a-welcome-prev" disabled={page===0} onClick={()=>setPage(p=>p-1)}>이전</button><button className="button" onClick={()=>{if(page===4){close();router.push('/atelier');}else setPage(p=>p+1);}}>{page===4?"나만의 향 만들기":"다음 →"}</button></div></div>
     </section>
   </div>;
 }
