@@ -97,6 +97,8 @@ export function Atelier(){
   const motionSeen=useRef(false);
   const shakeCount=useRef(0);
   const [shakeUiCount,setShakeUiCount]=useState(0);
+  const [shakePose,setShakePose]=useState({tilt:0,wave:0,energy:0});
+  const shakeReset=useRef<number|null>(null);
 
   const [gestureActive,setGestureActive]=useState(false);
   const [settling,setSettling]=useState(false);
@@ -104,7 +106,27 @@ export function Atelier(){
   const gesture=useRef<{x:number;y:number;last:number}|null>(null);
   const rodUpdate=useRef(0);
   const [canNativeShare,setCanNativeShare]=useState(false);
+  const [isHandheld,setIsHandheld]=useState(false);
+  useEffect(()=>{
+    // Desktop Chrome exposes DeviceMotionEvent even without a phone sensor.
+    // Require both mobile-sized viewport AND coarse touch pointer.
+    const refresh=()=>setIsHandheld(window.matchMedia("(max-width: 900px) and (pointer: coarse)").matches);
+    refresh();
+    const media=window.matchMedia("(max-width: 900px) and (pointer: coarse)");
+    media.addEventListener?.("change",refresh);
+    window.addEventListener("resize",refresh,{passive:true});
+    return ()=>{media.removeEventListener?.("change",refresh);window.removeEventListener("resize",refresh);};
+  },[]);
 
+
+  useEffect(()=>{
+    if(step!=="select")return;
+    const frame=requestAnimationFrame(()=>{
+      window.scrollTo({top:0,behavior:"instant"});
+      document.querySelector(".a-ingredients")?.scrollTo({top:0,behavior:"instant"});
+    });
+    return ()=>cancelAnimationFrame(frame);
+  },[step]);
 
   const total=totalCount(counts);
   const liquidY = 270 - Math.min(20, total) * 6;
@@ -114,7 +136,7 @@ export function Atelier(){
   const ratio=useMemo(()=>percentages(counts),[counts]);
   const stages=stageOrder.map(s=>selected.filter(i=>i.stage===s));
   const blendComplete=progress>=100;
-  const motionAvailable=typeof window!=="undefined" && typeof window.DeviceMotionEvent!=="undefined" && window.isSecureContext;
+  const motionAvailable=isHandheld && typeof window!=="undefined" && typeof window.DeviceMotionEvent!=="undefined" && window.isSecureContext;
 
   const mixHint = progress<30 ? "톡톡 눌러 보거나 천천히 저어 보세요" : progress<75 ? "막대를 움직이면 액체가 따라와요" : "액체가 차분하게 어우러졌어요";
   const customPerfumePrice = products.find(product=>product.type==="eau-de-parfum")?.price ?? 98000; // shared catalog source
@@ -214,7 +236,7 @@ export function Atelier(){
         const result=await constructor.requestPermission();
         if(result!=="granted"){setMotionAccess("denied");return;}
       }
-      localStorage.setItem(MOTION_APPROVED,"1");
+      try{localStorage.setItem(MOTION_APPROVED,"1");}catch{}
       motionSeen.current=false;
       shakeData.current={gravity:0,last:0,peaks:0,lastPeak:0,count:0};
       setMotionAccess("active");setBlendMode("shake");
@@ -223,42 +245,47 @@ export function Atelier(){
       setMotionAccess("denied");
     }
   }
+  // The browser must receive a new direct user action for iOS sensor permission.
+  // A stored previous grant is *not* proof that Safari is listening this session.
   useEffect(()=>{
-    if(overlay!=="blend" || !motionAvailable || blendComplete || blendMode==="auto" || motionAccess!=="active")return;
+    if(overlay!=="blend" || !motionAvailable || blendComplete || blendMode!=="shake" || motionAccess!=="active")return;
+    let lastVisual=0;
     const onMotion=(event:DeviceMotionEvent)=>{
-      motionSeen.current=true;
-      if(motionAccessRef.current!=="active" || event.timeStamp===0 && !event.accelerationIncludingGravity)return;
       const a=event.acceleration;
       const g=event.accelerationIncludingGravity;
-      const magnitude=a && a.x!==null && a.y!==null && a.z!==null
+      if(!a && !g)return;
+      motionSeen.current=true;
+      const now=performance.now();
+      const accel=a && a.x!==null && a.y!==null && a.z!==null
         ? Math.hypot(a.x,a.y,a.z)
-        : g && g.x!==null && g.y!==null && g.z!==null ? Math.hypot(g.x,g.y,g.z):0;
-      const now=performance.now();const tracker=shakeData.current;
-      const jerk=Math.abs(magnitude-tracker.gravity);
-      tracker.gravity=tracker.gravity ? tracker.gravity*.72+magnitude*.28 : magnitude;
-      if(now-tracker.last<420)return;
-      if(jerk<8.5 && magnitude<15)return;
-      // Debounced meaningful shakes, not every tiny sensor fluctuation.
-      if(now-tracker.lastPeak<850)tracker.peaks++;else tracker.peaks=1;
+        : g && g.x!==null && g.y!==null && g.z!==null ? Math.max(0, Math.hypot(g.x,g.y,g.z)-9.81):0;
+      const x=a?.x ?? g?.x ?? 0;
+      const y=a?.y ?? g?.y ?? 0;
+      const tracker=shakeData.current;
+      const jerk=Math.abs(accel-tracker.gravity);
+      tracker.gravity=tracker.gravity*.82+accel*.18;
+      if(now-lastVisual>52){
+        const tilt=Math.max(-12,Math.min(12,x*2.5));
+        setShakePose({tilt,wave:Math.max(-14,Math.min(14,y*1.7 + x*.9)),energy:Math.min(1,accel/14)});
+        lastVisual=now;
+        if(shakeReset.current!==null)window.clearTimeout(shakeReset.current);
+        shakeReset.current=window.setTimeout(()=>setShakePose({tilt:0,wave:0,energy:0}),190);
+      }
+      if(now-tracker.last<440 || (accel<3.8 && jerk<3.2))return;
+      if(now-tracker.lastPeak<1050)tracker.peaks++;else tracker.peaks=1;
       tracker.lastPeak=now;
       if(tracker.peaks<2)return;
-      tracker.peaks=0;tracker.last=now;
+      tracker.peaks=0;
+      tracker.last=now;
       shakeCount.current++;
       setShakeUiCount(shakeCount.current);
-      setBlendMode(current=>current==="auto"?current:"shake");
-      const direction=shakeCount.current%4;
-      setRod({x:[31,70,44,63][direction],y:[42,60,64,36][direction],energy:.64});
-      setProgress(p=>Math.min(100,p+9));
+      // Repeated intentional shakes advance the blend, never a single sensor sample.
+      setProgress(p=>Math.min(100,p+Math.min(9,5+Math.round(accel*.22))));
     };
     window.addEventListener("devicemotion",onMotion,{passive:true});
-    const timeout=window.setTimeout(()=>{if(!motionSeen.current)setMotionAccess("unavailable");},4200);
-    return ()=>{window.removeEventListener("devicemotion",onMotion);window.clearTimeout(timeout);};
+    const timeout=window.setTimeout(()=>{if(!motionSeen.current)setMotionAccess("unavailable");},4500);
+    return ()=>{window.removeEventListener("devicemotion",onMotion);window.clearTimeout(timeout);if(shakeReset.current!==null)window.clearTimeout(shakeReset.current);setShakePose({tilt:0,wave:0,energy:0});};
   },[overlay,motionAccess,blendComplete,motionAvailable,blendMode]);
-  // Resume listening after an already approved permission on later modal visits.
-  useEffect(()=>{
-    if(overlay!=="blend" || !motionAvailable || blendMode==="auto" || motionAccess!=="idle")return;
-    try{if(localStorage.getItem(MOTION_APPROVED)==="1")setMotionAccess("active");}catch{}
-  },[overlay,motionAvailable,motionAccess,blendMode]);
   useEffect(()=>{
     if(!settling)return;
     const timer=window.setTimeout(()=>{setSettling(false);setRod(r=>({...r,energy:0}));},950);
@@ -271,12 +298,19 @@ export function Atelier(){
   }
   function decrease(id:string){setCounts(prev=>{const updated={...prev};if((updated[id]||0)<=1)delete updated[id];else updated[id]--;return updated;});setSaved(false);setCartAdded(false);}
   function remove(id:string){setCounts(prev=>{const updated={...prev};delete updated[id];return updated;});setSaved(false);setCartAdded(false);}
-  function recommend(id:string){
-    const family=scentFamilies.find(f=>f.id===id);
+  function openSelection(familyId?:string){
+    const family=scentFamilies.find(f=>f.id===familyId);
     setRecommended(family?[...family.notes]:[]);
-    setTab("top");setStep("select");
+    setTab("top");
+    setStep("select");
+    // Reset the document AND the scrolled ingredient panel after screen changes.
+    window.requestAnimationFrame(()=>{
+      window.scrollTo({top:0,behavior:"instant"});
+      document.querySelector(".a-ingredients")?.scrollTo({top:0,behavior:"instant"});
+    });
   }
-  function startBlend(){if(total===0)return;setProgress(0);setBlendMode("ready");setGestureActive(false);setSettling(false);setRod({x:50,y:50,energy:0});setShakeUiCount(0);shakeCount.current=0;setMotionAccess("idle");setOverlay("blend");}
+  function recommend(id:string){openSelection(id);}
+  function startBlend(){if(total===0)return;setProgress(0);setBlendMode("ready");setGestureActive(false);setSettling(false);setRod({x:50,y:50,energy:0});setShakePose({tilt:0,wave:0,energy:0});setShakeUiCount(0);shakeCount.current=0;setMotionAccess("idle");setOverlay("blend");}
   function closeOverlay(){setOverlay(null);gesture.current=null;setGestureActive(false);}
   function dropIngredient(event:DragEvent<HTMLElement>){
     event.preventDefault(); setDragActive(false);
@@ -286,11 +320,11 @@ export function Atelier(){
   // The glass rod follows deliberate clicks or free pointer motion *after* activation.
   // No compulsory mouse hold, exact circles, turns, vortex, or 'shake' gesture.
   function startGesture(event:PointerEvent<HTMLDivElement>){
-    if(blendComplete || blendMode==="auto") return;
+    if(blendComplete || blendMode==="auto" || blendMode==="shake") return;
     const rect=event.currentTarget.getBoundingClientRect();
     gesture.current={x:event.clientX,y:event.clientY,last:performance.now()};
     setBlendMode("manual");setSettling(false);setGestureActive(true);
-    setProgress(v=>Math.min(100,v+9));
+    // A click positions the rod, but does not magically mix the liquid.
     setRod({x:Math.max(12,Math.min(88,(event.clientX-rect.left)/rect.width*100)),y:Math.max(12,Math.min(88,(event.clientY-rect.top)/rect.height*100)),energy:.5});
     if(event.pointerType!=="mouse")event.currentTarget.setPointerCapture(event.pointerId);
   }
@@ -310,7 +344,7 @@ export function Atelier(){
     if(distance<3)return;
     const energy=Math.min(.85,Math.max(.1,distance/dt*1.3));
     // Small, bounded progress; fast cursor jumps cannot immediately finish blending.
-    setProgress(v=>Math.min(100,v+Math.min(1.8,distance*.028)));
+    setProgress(v=>Math.min(100,v+Math.min(1.4,distance*.023)));
     setRod({x:Math.max(12,Math.min(88,x)),y:Math.max(12,Math.min(88,y)),energy});
     setGestureActive(true);
     setSettling(false);
@@ -356,8 +390,8 @@ export function Atelier(){
     </header>
     {step==="entry"?<section className="atelier-entry page-width a-entry"><div className="entry-visual" aria-label="AURA 조향 안내 이미지"><img className="a-entry-photo" src="/assets/products/warm-eau-de-parfum.webp" alt="AURA의 향수병과 자연 소재" loading="eager"/><span className="a-entry-caption">A PERSONAL SCENT / AURA ATELIER</span></div><div><span className="eyebrow">A SCENT OF YOUR OWN</span><h2>어떤 향 계열을 좋아하시나요?</h2><p>익숙한 향의 계열에서 출발하거나, 원하는 향료를 자유롭게 골라 보세요.</p>
       {pendingDraft&&<div className="a-resume-card"><div><strong>만들던 향이 있어요</strong><p>{Object.keys(pendingDraft.counts).length}종의 향료를 다시 이어서 선택할 수 있어요.</p></div><button className="button" onClick={resumeDraft}>이어서 만들기 <UtilityIcon name="arrow"/></button></div>}
-      <div className="recommend-cards a-families">{scentFamilies.map(f=><button key={f.id} onClick={()=>recommend(f.id)}><Asset id={f.asset}/><strong>{f.name}</strong><span>{f.english} · {f.description}</span></button>)}</div>
-      <button className="button a-direct-start" onClick={()=>{setRecommended([]);setStep("select");}}>향료 직접 고르기 <UtilityIcon name="arrow"/></button></div></section>
+      <div className="recommend-cards a-families">{scentFamilies.map(f=><button key={f.id} type="button" data-aura-family={f.id} onClick={()=>recommend(f.id)}><Asset id={f.asset}/><strong>{f.name}</strong><span>{f.english} · {f.description}</span></button>)}</div>
+      <button className="button a-direct-start" onClick={()=>openSelection()}>향료 직접 고르기 <UtilityIcon name="arrow"/></button></div></section>
       :step==="select"?<><div className="atelier-workspace a-workspace" inert={overlay!==null}>
         <section className="ingredient-panel a-ingredients"><div className="panel-title"><h2>향료 고르기</h2><span>24 NOTES</span></div>
           {recommended.length>0&&<div className="recommendation"><span className="eyebrow">추천하는 첫 향료</span><div>{recommended.map(id=><button key={id} disabled={total>=20} onClick={()=>add(id)}><Asset id={id}/>{ingredients.find(i=>i.id===id)?.name}<span>+</span></button>)}</div></div>}
@@ -412,11 +446,11 @@ export function Atelier(){
         <div className="a-blend-stage">
           <span className="eyebrow">{blendComplete?"YOUR SCENT / COMPLETED":"THE ART OF BLENDING"}</span>
           
-          <div className={`a-blend-beaker a-interactive-vessel a-real-stir-target ${blendMode==="auto"?"automix":""} ${gestureActive?"dragging":settling?"settling":""}`} role="slider" tabIndex={blendComplete?-1:0} aria-label="비커를 클릭하거나 막대를 부드럽게 움직여 향 섞기" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}
-            style={{"--stir-progress":`${progress}%`,"--rod-x":`${rod.x}%`,"--rod-y":`${rod.y}%`,"--stir-energy":rod.energy} as CSSProperties}
+          <div className={`a-blend-beaker a-interactive-vessel a-real-stir-target ${blendMode==="auto"?"automix":""} ${blendMode==="shake"?"shake-mode":""} ${gestureActive?"dragging":settling?"settling":""}`} role="slider" tabIndex={blendComplete?-1:0} aria-label="비커를 클릭하거나 막대를 부드럽게 움직여 향 섞기" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}
+            style={{"--stir-progress":`${progress}%`,"--rod-x":`${rod.x}%`,"--rod-y":`${rod.y}%`,"--stir-energy":rod.energy,"--shake-tilt":`${shakePose.tilt}deg`} as CSSProperties}
             onKeyDown={e=>{if(blendComplete || blendMode==="auto") return; if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," ","Enter"].includes(e.key)){e.preventDefault();setBlendMode("manual");setProgress(v=>Math.min(100,v+8));setRod(r=>({...r,energy:.45,x:Math.max(35,Math.min(65,r.x+(e.key==="ArrowLeft"?-3:3)))}));}}}
             onPointerDown={startGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onPointerCancel={endGesture} onPointerLeave={()=>{gesture.current=null;setGestureActive(false);setSettling(true);}}>
-            <Beaker count={total} color={color} mixing={false} stir={rod}/>
+            <Beaker count={total} color={color} mixing={false} stir={blendMode==="shake"?{x:50,y:50,energy:shakePose.energy,tilt:shakePose.tilt,wave:shakePose.wave,mode:"shake"}:{...rod,mode:blendMode==="auto"?"auto":"manual"}}/>
             <svg className="a86-stir-layer" viewBox="0 0 360 360" aria-hidden="true" focusable="false"><defs><linearGradient id="a86-rod-glass" x1="0" x2="1"><stop offset="0" stopColor="#b2b8ac" stopOpacity=".3"/><stop offset=".28" stopColor="#fffdf6" stopOpacity=".94"/><stop offset=".64" stopColor="#d1ded8" stopOpacity=".55"/><stop offset="1" stopColor="#fffdfa" stopOpacity=".83"/></linearGradient></defs><g className="a86-stir-rod-group" style={{transform:`translate(${(rod.x-50)*.8}px,${(rod.y-50)*.28}px) rotate(${(rod.x-50)*.05}deg)`,transformOrigin:"180px 205px"}}><path d={`M180 25 L177 ${liquidY + 10} Q176 ${liquidY + 17} 181 ${liquidY + 17} Q186 ${liquidY + 17} 185 ${liquidY + 10} L183 25 Z`} fill="url(#a86-rod-glass)" stroke="#c4c0b4" strokeWidth="1.4"/><path d={`M180 33 L179 ${liquidY + 8}`} stroke="#fff" strokeOpacity=".72" strokeWidth="1.4"/></g><ellipse className="a86-rod-ripple" cx={180+(rod.x-50)*.8} cy={liquidY+(rod.y-50)*.28} rx={21+rod.energy*8} ry={3+rod.energy*2} fill="none" stroke="#fff5db" strokeWidth="1.6" style={{opacity:rod.energy*.52}}/></svg>
           </div>
           <div className="a-stir-soft-light" aria-hidden="true"/>
@@ -429,13 +463,13 @@ export function Atelier(){
               <span className="a-stir-instruction">GENTLE STIR</span>
               <span className="a-stir-percent">{Math.round(progress)}%</span>
             </div>
-            <div className="a-stir-actions"><strong>{blendMode==="ready"?"나만의 조향 방식":"당신의 조합을 만드는 중"}</strong><p>휴대폰을 가볍게 흔들거나 비커를 터치해 천천히 저어 보세요. PC에서는 클릭 후 마우스를 움직이면 돼요.</p><div className="a87-blend-controls">
-              {motionAvailable && <button type="button" className="a87-sensor-button" onClick={enableShake} disabled={motionAccess==="requesting" || (motionAccess==="active" && blendMode!=="auto")} aria-pressed={motionAccess==="active"}>
+            <div className="a-stir-actions"><strong>{blendMode==="ready"?"나만의 조향 방식":"당신의 조합을 만드는 중"}</strong><p>{isHandheld?"비커를 손가락으로 천천히 저어 보세요. 센서 사용이 가능한 휴대폰은 흔들어 섞을 수도 있어요.":"비커를 클릭한 뒤 마우스를 천천히 원형으로 움직여 보세요."}</p><div className="a87-blend-controls">
+              {motionAvailable && <button type="button" className="a87-sensor-button" onClick={enableShake} disabled={motionAccess==="requesting" || motionAccess==="active"} aria-pressed={motionAccess==="active"}>
                 {motionAccess==="active"?`휴대폰 흔들기 인식 중${shakeUiCount?` · ${shakeUiCount}회`:""}`:motionAccess==="requesting"?"센서 권한 확인 중…":motionAccess==="denied"?"흔들기 권한 다시 요청":motionAccess==="unavailable"?"센서 확인 후 다시 시도":"휴대폰 흔들기 켜기"}
               </button>}
               <button type="button" className="button a-stir-auto" onClick={()=>{setSettling(false);setMotionAccess("idle");setBlendMode("auto");}} disabled={blendMode==="auto"}>{blendMode==="auto"?"천천히 섞이는 중…":"자동으로 섞기 · 약 9초"}<UtilityIcon name="arrow"/></button>
             </div>
-            <small className="a87-sensor-status" role="status">{!motionAvailable?"센서가 없는 환경에서도 터치·자동 섞기를 사용할 수 있어요.":motionAccess==="active"?"흔들기 활성화됨 · 가볍게 좌우로 흔들어 주세요.":motionAccess==="denied"?"권한이 없어도 터치나 자동 섞기로 계속할 수 있어요.":motionAccess==="unavailable"?"센서 신호를 받지 못했어요. 터치나 자동 섞기를 이용해 주세요.":"첫 이용 시 센서 사용을 허용하면 이후 허용 상태를 기억해요."}</small><small className="a-turns-hint">{blendMode==="auto"?"향료가 부드럽게 어우러지는 중이에요":`${mixHint} · 방향키로도 조작 가능`}</small></div>
+            <small className="a87-sensor-status" role="status">{!isHandheld?"마우스로 직접 저어 보거나 자동 혼합을 선택하세요.":!motionAvailable?"센서가 없는 환경에서도 터치·자동 섞기를 사용할 수 있어요.":motionAccess==="active"?"흔들기 활성화됨 · 가볍게 좌우로 흔들어 주세요.":motionAccess==="denied"?"권한이 없어도 터치나 자동 섞기로 계속할 수 있어요.":motionAccess==="unavailable"?"센서 신호를 받지 못했어요. 터치나 자동 섞기를 이용해 주세요.":"첫 이용 시 센서 사용을 허용하면 이후 허용 상태를 기억해요."}</small><small className="a-turns-hint">{blendMode==="auto"?"향료가 부드럽게 어우러지는 중이에요":`${mixHint} · 방향키로도 조작 가능`}</small></div>
           </div>
           <div className="a-blend-progress"><div role="progressbar" aria-label="블렌딩 진행" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><span style={{width:`${progress}%`}}/></div><small>BLENDING / {Math.round(progress)}%</small></div>
         </>:<><div className="a-finished-badges">{ranked.slice(0,3).map(n=><span key={n.id}><Asset id={n.id}/>{n.name}</span>)}</div><button className="button a-finish-button" onClick={enterResult}>이 향에 이름 붙이기 <UtilityIcon name="arrow"/></button></>}

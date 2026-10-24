@@ -13,8 +13,8 @@ export type Product = (typeof products)[number];
 export const money = (v: number | null) =>
   v === null ? "가격 확인 중" : v.toLocaleString("ko-KR") + "원";
 
-// Production assets are genuine small, layered vectors. Pixel-traced references are archived only.
-// A single map prevents a page from accidentally mixing two illustration families.
+// Botanical illustrations use transparent WebP; tools use layered SVG.
+// Keep shared asset paths consistent across the selector, recipes, and account pages.
 const assetAliases:Record<string,string> = {"gold-droplet":"droplet"};
 const botanicalNames = new Set([
   "bergamot","lemon","mandarin","grapefruit","peppermint","rosemary","apple","peach",
@@ -128,7 +128,7 @@ export function Beaker({
   color: string;
   mixing?: boolean;
   drop?: number;
-  stir?: {x:number;y:number;energy:number};
+  stir?: {x:number;y:number;energy:number;tilt?:number;wave?:number;mode?:string};
 }) {
   return <div className={"beaker " + (mixing ? "mixing" : "") }>
     <Vessel total={count} color={color} mixing={mixing} stir={stir} />

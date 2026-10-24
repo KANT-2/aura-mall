@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuraMotionEnhancer } from "@/components/ui/AuraMotionEnhancer";
 import { AuraProvider, Shell } from "@/components/editorial/Aura";
 import "./editorial.css";
 import "./atelier-refinement.css";
@@ -13,6 +14,8 @@ import "./aura-v85-detail-assets.css";
 import "./aura-v85-motion.css";
 import "./aura-v86-qa-fixes.css";
 import "./aura-v87-mobile-shake.css";
+import "./aura-atelier-stability.css";
+import "./aura-motion-system.css";
 export const metadata: Metadata = {
   title: "AURA — From Scent to Identity",
   description: "향을 발견하고, 나만의 취향을 완성하는 프래그런스 셀렉트 스토어",
@@ -28,6 +31,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <AuraProvider>
+          <AuraMotionEnhancer/>
           <Shell>{children}</Shell>
         </AuraProvider>
       </body>

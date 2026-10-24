@@ -1,8 +1,6 @@
-> **AURA V3 2026-10-13:** 전체 소스 수정 버전. 적용 전 [`START_HERE_KO.md`](./START_HERE_KO.md) 를 먼저 확인하세요.
-
 # AURA — From Scent to Identity
 
-최신 UI/UX 업데이트: `docs/UIUX_UPDATE_20261013.md`. 조향 화면은 한 작업 화면과 혼합·시향 모달로 구성했습니다.
+Next.js 16.4.2 업그레이드와 AURA 팀 전달본의 인터랙션 개선을 반영했습니다. 조향 화면은 한 작업 화면과 혼합·시향 모달로 구성했습니다. 적용 내역과 검수 범위는 [QA 기록](docs/QA_RESULTS_KO.md), 화면별 동작은 [인터랙션 적용표](docs/REFERENCE_INTERACTION_MAPPING_KO.md)를 참고하세요.
 
 향을 발견하고, 나만의 취향을 기록하는 프래그런스 커머스와 퍼스널 아틀리에.
 
@@ -25,23 +23,11 @@ npx tsc --noEmit
 npm run build
 ```
 
-## 기존 프로젝트 전체 반영
+## 모바일 흔들기 확인
 
-ZIP을 **기존 `C:\dev\aura-mall` 바깥의 별도 폴더**에 압축 해제하세요. 실행 중인 개발 서버를 종료한 뒤, 압축 해제한 새 소스 폴더에서:
+iPhone Safari에서 HTTPS 주소로 `/atelier`에 접속한 뒤 향료 선택 → 섞기 → `휴대폰 흔들기 켜기` 버튼으로 센서 권한을 요청합니다. 로컬 개발에서는 `cloudflared tunnel --url http://localhost:3000`으로 HTTPS 주소를 만들 수 있습니다. 터널 도메인은 개발 설정에 허용되어 있습니다.
 
-```powershell
-python APPLY_TO_LOCAL.py --target "C:\dev\aura-mall"
-python APPLY_TO_LOCAL.py --target "C:\dev\aura-mall" --apply
-cd C:\dev\aura-mall
-npm ci
-npm run dev
-```
-
-첫 명령은 변경 예정 경로만 확인합니다. 두 번째 명령은 교체할 기존 소스를 옆 폴더에 자동 백업한 후 전체 반영합니다. `.git`, 루트 `.env*`, `node_modules`, 무관한 루트 파일은 보존합니다. 이전 `data`·`types`·UI 폴더는 백업 후 최신 소스로 대체되므로, 폴더만 겹쳐 복사해서 오래된 기능이 남는 문제를 피합니다. Git 커밋·push·merge는 실행하지 않습니다.
-
-사용자의 아직 push하지 않은 로컬 변경은 이 제작 환경에서 확인할 수 없었습니다. 자동 백업에는 대상 폴더의 현재 작업을 그대로 보존하며, 제공 소스는 GitHub `develop` 복제본에서 최신 기획을 반영한 전체 교체본입니다.
-
-캐시 문제가 있으면 개발 서버 종료 후 `.next`만 삭제하고 다시 실행하세요.
+실제 기기의 센서와 권한 동작은 별도 확인이 필요합니다. 센서가 없거나 권한을 거절하면 자동 섞기 또는 수동 젓기를 이용할 수 있습니다.
 
 ## 구현 범위
 
@@ -56,7 +42,7 @@ npm run dev
 - 디지털 시향, 이름·라벨 선택, 레시피 저장·다시 만들기·버전 관리
 - 마이페이지의 저장한 향·쿠폰·주문·계정 영역
 - 입점 문의 폼과 필수값 검증, 미연동 상태 안내
-- 투명 벡터 59개, 제품 목업 WebP 27장, 로컬 Pretendard
+- 향료 투명 WebP 24장, 투명 벡터 59개, 제품 목업 WebP 27장, Pretendard 웹폰트
 
 ## 구조
 
@@ -74,6 +60,7 @@ npm run dev
 | `components/editorial/catalog.json` | 30개 상품과 3개 컬렉션 |
 | `components/editorial/ingredients.json` | 향료 후보 24개 |
 | `public/assets/products/` | 27개 단품 목업 |
+| `public/assets/botanical/` | 1680×1680 투명 WebP 향료 24종 |
 | `public/assets/editorial/` | 그룹별로 분리한 투명 SVG |
 | `docs/` | 기준 PRD·에셋 목록·검수 기록·적용 제한 |
 
@@ -94,4 +81,6 @@ npm run dev
 - 목업의 인쇄된 향 노트·효능·전성분은 제조 검증 자료가 아닙니다. 컬렉션 노트·용량·재고 등 운영 데이터는 실제 판매 전 최종 대조가 필요합니다.
 - SVG는 레퍼런스 기반으로 새로 그린 편집 가능한 벡터이며, 레퍼런스 사진을 SVG로 감싼 파일이 아닙니다. 원본과 픽셀 단위로 동일한 질감은 아닙니다.
 
-최신 기준 원문은 `PRD.md`에, 검사 결과는 `docs/QA_REPORT.md`에 있습니다.
+향료 이미지는 기존 420px 원본을 1680px로 재출력한 WebP이며, 원본에 없던 세부 묘사가 복원된 것은 아닙니다. 이미지 목록과 해상도는 `public/assets/botanical-manifest.json`에서 관리합니다.
+
+기획 원문은 [PRD.md](PRD.md)에, 최근 적용·검수 기록은 [docs/QA_RESULTS_KO.md](docs/QA_RESULTS_KO.md)에 있습니다. `docs`의 날짜가 붙은 이전 문서는 당시 구현·검수 이력입니다.

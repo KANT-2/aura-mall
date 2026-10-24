@@ -170,7 +170,7 @@ export function Shop({
           <StyledSelect label="정렬" value={sort} onChange={setSort} options={[{value:"default",label:"추천순"},{value:"low",label:"가격 낮은 순"},{value:"high",label:"가격 높은 순"}]}/>
         </label>
       </div>
-      <div className="result-line">{list.length}개의 향 제품</div>
+      <div className="result-line" role="status" aria-live="polite">{list.length}개의 향 제품</div>
       {list.length ? (
         <div className="product-grid grid">
           {list.map((p) => (
@@ -202,6 +202,7 @@ export function ProductDetail({ product: p }: { product: Product }) {
     [n, setN] = useState(1),
     [selection, setSelection] = useState<string[]>([]),
     [added, setAdded] = useState(false);
+  const preview = useRef<HTMLDialogElement>(null);
   const col = collections.find((c) => c.id === p.collection)!,
     gift = p.type === "gift-set";
   const eligible = products.filter(
@@ -222,6 +223,7 @@ export function ProductDetail({ product: p }: { product: Product }) {
       <section className="detail-top">
         <div className="detail-image">
           <ProductPhoto product={p} loading="eager" selection={selection} />
+          <button className="aura-photo-expand" type="button" onClick={()=>preview.current?.showModal()} aria-label={p.name+" 제품 사진 크게 보기"}>확대해서 보기 <span aria-hidden="true">↗</span></button>
         </div>
         <div className="detail-copy">
           <span className="eyebrow">{col.name} COLLECTION</span>
@@ -248,7 +250,7 @@ export function ProductDetail({ product: p }: { product: Product }) {
               <span>
                 선물에 담을 세 가지 향 <b>{selection.length} / 3</b>
               </span>
-              <div className="gift-slots">
+              <div className="gift-slots" aria-live="polite">
                 {[0, 1, 2].map((i) => {
                   const s = products.find((x) => x.id === selection[i]);
                   return (
@@ -329,6 +331,10 @@ export function ProductDetail({ product: p }: { product: Product }) {
           </div>
         </section>
       )}
+      <dialog ref={preview} className="aura-image-preview" aria-label={p.name+" 제품 이미지 미리보기"} onClick={event=>{if(event.target===event.currentTarget)preview.current?.close();}}>
+        <button type="button" className="aura-preview-close" aria-label="이미지 확대 닫기" onClick={()=>preview.current?.close()}>×</button>
+        <div className="aura-preview-content"><ProductPhoto product={p} selection={selection} /></div>
+      </dialog>
       <ProductDetailContentDock product={p} collectionTitle={col.title} collectionDescription={col.description} />
       <section className="related">
         <SectionHeading

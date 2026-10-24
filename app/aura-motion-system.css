@@ -1,0 +1,84 @@
+/* AURA motion system — reference-inspired patterns, fully native & reduced-motion safe.
+   InView / scroll reveal (Motion Primitives + React Bits)
+   Subtle magnetic calls-to-action (Motion Primitives)
+   Hover photo parallax / tabs / quantity / swipe states (60fps/design inspiration).
+*/
+:root{--aura-motion-ease:cubic-bezier(.22,.78,.25,1);}
+@media(prefers-reduced-motion:no-preference){
+ [data-aura-enter="pending"]{opacity:0!important;transform:translate3d(0,15px,0)!important;}
+ [data-aura-enter="visible"]{opacity:1!important;transform:translate3d(0,0,0)!important;transition:opacity .6s var(--aura-motion-ease) var(--aura-delay,0ms),transform .62s var(--aura-motion-ease) var(--aura-delay,0ms)!important;}
+ .home .hero-copy>.eyebrow[data-aura-enter="visible"],.home .hero-copy>h2[data-aura-enter="visible"],.home .hero-copy>p[data-aura-enter="visible"],.home .hero-copy>.actions[data-aura-enter="visible"]{transition-duration:.72s!important;}
+ .home .hero-image img{transition:transform 1.25s var(--aura-motion-ease),filter 1s ease;}
+ .home .hero:hover .hero-image img{transform:scale(1.018);}
+ .home .collection-card .collection-circle img,.home .collection-card .collection-circle svg{transition:transform .7s var(--aura-motion-ease),filter .5s ease;transform-origin:center;}
+ .home .collection-card:hover .collection-circle img,.home .collection-card:focus-visible .collection-circle img,
+ .home .collection-card:hover .collection-circle svg,.home .collection-card:focus-visible .collection-circle svg{transform:translateY(-7px) scale(1.045);}
+ .home .collection-card .collection-overlay{transition:opacity .25s ease,transform .48s var(--aura-motion-ease);}
+ .home .promotion .a86-promo-photo{transition:transform .7s var(--aura-motion-ease),opacity .45s ease;}
+ .home .promotion:hover .a86-promo-photo{transform:scale(1.035);}
+ .home .promotion .promo-copy{animation:aura-promo-copy-in .46s var(--aura-motion-ease) both;}
+ @keyframes aura-promo-copy-in{from{opacity:.4;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+ .home .product-rail{scroll-snap-type:x proximity;scroll-behavior:smooth;overscroll-behavior-inline:contain;}
+ .home .product-rail>.product-card{scroll-snap-align:start;}
+ .product-card .product-image img{transition:transform .66s var(--aura-motion-ease),filter .4s ease;will-change:auto;}
+ .product-card:hover .product-image img,.product-card:focus-visible .product-image img{transform:scale(1.045) translateY(-4px);}
+ .product-card .product-image>span{transition:opacity .22s ease,transform .35s var(--aura-motion-ease);}
+ .product-card:hover .product-image>span,.product-card:focus-visible .product-image>span{transform:translateY(-4px);}
+ .home .hero-copy .button,.home .a86-atelier-intro .button,.detail .purchase-row .button,.a-v3.a-atelier .a-blend-button{
+   transform:translate3d(var(--aura-mx,0px),var(--aura-my,0px),0)!important;
+   transition:transform .24s var(--aura-motion-ease),background-color .22s ease,color .22s ease,border-color .22s ease!important;}
+ .shop .tabs button,.shop .filter-row select,.shop .filter-row input{transition:color .2s ease,border-color .25s ease,background-color .25s ease,box-shadow .3s ease;}
+ .shop .tabs button.selected{box-shadow:inset 0 -2px 0 currentColor;}
+ .detail .purchase-row .button:active,.a-v3.a-atelier .a-blend-button:active{filter:brightness(.91);}
+ .detail .gift-option{transition:border-color .25s ease,background-color .26s ease,transform .33s var(--aura-motion-ease),box-shadow .34s ease;}
+ .detail .gift-option:hover{transform:translateY(-3px);}
+ .detail .gift-option.selected{box-shadow:0 6px 24px rgba(95,74,45,.08);transform:translateY(-2px);}
+ .detail .gift-slots>div img{animation:aura-slot-enter .33s var(--aura-motion-ease) both;}
+ @keyframes aura-slot-enter{from{opacity:.3;transform:translateY(9px) scale(.93)}to{opacity:1;transform:translateY(0) scale(1)}}
+ .detail .added{animation:aura-slot-enter .35s var(--aura-motion-ease) both;}
+ .a86-cart .a86-cart-item{transition:background-color .2s ease;}
+ .mypage .saved-recipe{transition:transform .34s var(--aura-motion-ease),box-shadow .34s ease,border-color .25s ease;}
+ .mypage .saved-recipe:hover{transform:translateY(-3px);box-shadow:0 12px 24px rgba(25,28,24,.07);}
+ .mypage .tabs button,.mypage .chips button{transition:background-color .24s,border-color .24s,color .24s;}
+ .partner-page input,.partner-page textarea,.auth-page input,.checkout input,.checkout textarea{transition:box-shadow .24s ease,border-color .24s ease;}
+ .partner-page input:focus-visible,.partner-page textarea:focus-visible,.auth-page input:focus-visible,.checkout input:focus-visible,.checkout textarea:focus-visible{outline:2px solid #806c55;outline-offset:2px;}
+ .header .utility button,.header .utility a{transition:background-color .2s ease,color .2s ease;}
+ .header .utility button:active,.header .utility a:active{transform:scale(.97);}
+
+ .a86-cart .a86-cart-item:hover{background-color:rgba(128,108,85,.025);}
+ .a86-cart .a86-cart-remove{transition:color .2s,border-color .2s;}
+ .a86-cart .a86-cart-remove:hover{color:#8b503e;border-color:currentColor;}
+ .a-v3.a-atelier .a-sheet-card{transition:border-color .22s,background-color .25s,transform .32s var(--aura-motion-ease)!important;}
+ .a-v3.a-atelier .a-sheet-card:active:not(:disabled){transform:scale(.98)!important;}
+ .a-v3.a-atelier .a-recipe-chip{animation:aura-slot-enter .3s var(--aura-motion-ease) both;}
+}
+.detail .aura-photo-expand{position:absolute;right:16px;bottom:16px;z-index:3;min-height:40px;min-width:40px;padding:8px 12px;background:rgba(248,246,241,.91);color:#252522;border:1px solid rgba(85,76,65,.18);border-radius:2px;display:flex;gap:7px;align-items:center;justify-content:center;cursor:zoom-in;font-size:12px;letter-spacing:.01em;}
+.detail .aura-photo-expand:focus-visible{outline:2px solid #806c55;outline-offset:3px;}
+.detail .detail-image{position:relative;}
+.aura-image-preview{border:0;padding:0;background:transparent;max-height:min(94dvh,900px);max-width:min(92vw,900px);overflow:visible;}
+.aura-image-preview::backdrop{background:rgba(19,21,18,.77);backdrop-filter:blur(8px);}
+.aura-image-preview .aura-preview-content{background:#f7f6f3;padding:clamp(10px,2vw,24px);width:min(87vw,770px);height:min(87vw,770px);max-height:85dvh;display:grid;place-items:center;overflow:hidden;}
+.aura-image-preview .aura-preview-content img{height:100%;width:100%;object-fit:contain;}
+.aura-image-preview .aura-preview-close{position:absolute;top:12px;right:12px;z-index:2;width:44px;height:44px;border-radius:50%;border:1px solid #cfc7b9;background:#f7f6f3;color:#252522;cursor:pointer;font-size:24px;display:grid;place-items:center;}
+.aura-image-preview .aura-preview-close:focus-visible{outline:2px solid #806c55;outline-offset:2px;}
+@media(hover:none),(pointer:coarse){
+ .home .hero-image img,.home .promotion .a86-promo-photo,.product-card .product-image img{will-change:auto;}
+}
+@media(prefers-reduced-motion:reduce){
+ [data-aura-enter]{opacity:1!important;transform:none!important;transition:none!important;}
+ .home .collection-card img,.home .collection-card svg,.product-card .product-image img,.detail .gift-option{transition:none!important;transform:none!important;}
+ .home .hero-copy .button,.home .a86-atelier-intro .button,.detail .purchase-row .button,.a-v3.a-atelier .a-blend-button{transform:none!important;transition:none!important;}
+}
+/* Keep gallery action within the hero photo even in legacy tall-detail layouts. */
+.detail .aura-photo-expand{top:16px;bottom:auto;}
+/* Account and authentication: unobtrusive state feedback rather than decorative image badges. */
+@media(prefers-reduced-motion:no-preference){
+ .mypage .tabs button,.mypage .chips button{transition:background-color .22s ease,color .2s ease,border-color .2s ease,box-shadow .24s ease;}
+ .mypage .tabs button.selected,.mypage .chips button.selected{box-shadow:inset 0 -2px 0 currentColor;}
+ .mypage .saved-recipe{transition:transform .32s var(--aura-motion-ease),border-color .25s ease,box-shadow .3s ease;}
+ .mypage .saved-recipe:hover{transform:translateY(-3px);box-shadow:0 10px 27px rgba(36,30,22,.07);}
+ .auth-page .auth-form :is(input,textarea,select){transition:border-color .22s ease,box-shadow .22s ease;}
+ .auth-page .auth-form :is(input,textarea,select):focus-visible{outline:2px solid rgba(128,108,85,.35);outline-offset:2px;}
+ .auth-page .auth-form .button:active{transform:scale(.99);}
+ .checkout .order-summary .button:disabled{cursor:not-allowed;opacity:.65;}
+}
