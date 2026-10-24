@@ -1,4 +1,4 @@
-import { Checkout } from "@/components/editorial/Aura";
+import { Checkout } from "@/components/commerce/Checkout";
 export default function Page() {
   return <Checkout />;
 }

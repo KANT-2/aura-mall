@@ -1,0 +1,147 @@
+/* partner screen styles. :where keeps the original selector specificity. */
+
+:where(.root) :global(.partner-copy h1) {
+  font-size: 37px;
+  line-height: 1.5;
+  margin: 20px 0;
+}
+
+:where(.root) :global(.partner-copy > p) {
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+:where(.root) :global(.partner-copy img) {
+  width: 230px;
+  margin: 20px 0;
+}
+
+:where(.root):global(.partner-page form > .button) {
+  width: 100%;
+  margin-top: 12px;
+}
+
+@media (max-width: 800px) {
+  :where(.root):global(.partner-page) {
+    gap: 40px;
+  }
+
+  :where(.root) :global(.partner-copy h1) {
+    font-size: 29px;
+  }
+}
+
+@media (max-width: 560px) {
+  :where(.root):global(.partner-page) {
+    grid-template-columns: 1fr;
+    gap: 35px;
+  }
+
+  :where(.root) :global(.partner-copy h1) {
+    font-size: 30px;
+  }
+
+  :where(.root) :global(.partner-copy > p) {
+    font-size: 13px;
+  }
+
+  :where(.root) :global(.partner-copy img) {
+    width: 130px;
+    margin: 10px auto;
+  }
+
+  :where(.root) :global(.partner-copy .micro) {
+    font-size: 12px;
+  }
+}
+
+:where(.root):global(.partner-page) {
+  display: grid;
+  grid-template-columns: minmax(270px,.9fr) minmax(290px,1.1fr);
+  gap: clamp(30px,6vw,100px);
+  align-items: start;
+}
+
+:where(.root):global(.partner-page .partner-copy) {
+  background: linear-gradient(135deg,#3b3027,#242c26);
+  color: #f3e7d8;
+  min-height: 560px;
+  padding: clamp(26px,4vw,52px);
+  position: relative;
+  overflow: hidden;
+}
+
+:where(.root):global(.partner-page .partner-copy .eyebrow) {
+  color: #d8b783;
+}
+
+:where(.root):global(.partner-page .partner-copy h1) {
+  font-size: clamp(29px,3vw,42px);
+  margin: 22px 0;
+}
+
+:where(.root):global(.partner-page .partner-copy p) {
+  color: #d5c8b8;
+  line-height: 1.9;
+}
+
+:where(.root):global(.partner-page .partner-copy img) {
+  width: 180px;
+  max-height: 160px;
+  object-fit: contain;
+  margin: 36px auto;
+  filter: drop-shadow(0 16px 12px #080d0966);
+}
+
+:where(.root):global(.partner-page .partner-copy .micro) {
+  font-size: 12px;
+  color: #bba994;
+}
+
+:where(.root):global(.partner-page>form) {
+  background: #eee8dc;
+  border: 1px solid #ded0bf;
+  padding: clamp(22px,3vw,38px);
+}
+
+:where(.root):global(.partner-page>form label) {
+  color: #493b2d;
+}
+
+@media (max-width:700px) {
+  :where(.root):global(.partner-page) {
+    display: block;
+  }
+
+  :where(.root):global(.partner-page .partner-copy) {
+    min-height: 0;
+    margin: 0 0 22px;
+    padding: 28px;
+  }
+
+  :where(.root):global(.partner-page .partner-copy img) {
+    width: 125px;
+    margin: 15px auto;
+  }
+
+  :where(.root):global(.partner-page>form) {
+    padding: 22px 18px;
+  }
+}
+
+:where(.root):global(.partner-page h1) {
+  font-size: clamp(30px,3vw,44px);
+}
+
+@media (prefers-reduced-motion:no-preference) {
+  :where(.root):global(.partner-page input),
+  :where(.root):global(.partner-page textarea) {
+    transition: box-shadow .24s ease,border-color .24s ease;
+  }
+
+  :where(.root):global(.partner-page input:focus-visible),
+  :where(.root):global(.partner-page textarea:focus-visible) {
+    outline: 2px solid #806c55;
+    outline-offset: 2px;
+  }
+}

@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import { useState, useId, type CSSProperties } from "react";
-import type { Product } from "./Shared";
+import type { Product } from "@/lib/aura/catalog";
 
 /**
  * Figma integration boundary: bqmZeosTRQcTPixfHyheRp / node 4005:2.

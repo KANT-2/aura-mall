@@ -1,4 +1,4 @@
-import { Atelier } from "@/components/editorial/Aura";
+import { Atelier } from "@/components/editorial/Atelier";
 export default function Page() {
   return <Atelier />;
 }

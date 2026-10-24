@@ -1,17 +1,9 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
-import catalog from "./catalog.json";
+import { MAX_QUANTITY, products, type Product } from "../../lib/aura/catalog";
 import { Vessel } from "../ui/Vessel";
-import ingredients from "./ingredients.json";
 import { AuraWordmark } from "./AuraWordmark";
 import { AuraCollectionArtwork } from "./AuraCollectionArtwork";
-
-export const { products, collections, types } = catalog;
-
-export type Product = (typeof products)[number];
-
-export const money = (v: number | null) =>
-  v === null ? "가격 확인 중" : v.toLocaleString("ko-KR") + "원";
 
 // Botanical illustrations use transparent WebP; tools use layered SVG.
 // Keep shared asset paths consistent across the selector, recipes, and account pages.
@@ -107,7 +99,7 @@ export function Quantity({ n, set }: { n: number; set: (n: number) => void }) {
       </button>
       <output aria-live="polite">{n}</output>
       <button
-        disabled={n >= 15}
+        disabled={n >= MAX_QUANTITY}
         aria-label="수량 늘리기"
         onClick={() => set(n + 1)}
       >
@@ -134,28 +126,4 @@ export function Beaker({
     <Vessel total={count} color={color} mixing={mixing} stir={stir} />
     {drop > 0 && <span key={drop} className="vessel-drop a86-vessel-drop" aria-hidden="true"><img src="/assets/editorial/drop-amber-natural.svg" alt="" /></span>}
   </div>;
-}
-
-export const totalCount = (counts: Record<string, number>) =>
-  Object.values(counts).reduce((a, b) => a + b, 0);
-
-export function mixColor(counts: Record<string, number>) {
-  const total = totalCount(counts);
-  if (!total) return "#d5b575";
-  const sum = [0, 0, 0];
-  ingredients.forEach((i) => {
-    const n = counts[i.id] || 0;
-    for (let c = 0; c < 3; c++)
-      sum[c] += parseInt(i.color.slice(1 + c * 2, 3 + c * 2), 16) * n;
-  });
-  return (
-    "#" +
-    sum
-      .map((v) =>
-        Math.round(v / total)
-          .toString(16)
-          .padStart(2, "0"),
-      )
-      .join("")
-  );
 }

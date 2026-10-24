@@ -1,4 +1,4 @@
-import { Cart } from "@/components/editorial/Aura";
+import { Cart } from "@/components/commerce/Cart";
 export default function Page() {
   return <Cart />;
 }
