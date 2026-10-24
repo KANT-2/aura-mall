@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { Asset, Beaker } from "./Shared";
-import { useAura } from "./Provider";
+import { useSession } from "../providers/AuraContexts";
 
 const screens = [
   {title:"AURA에 오신 것을 환영해요", description:"향으로 취향을 발견하는 공간입니다.", note:"WELCOME BENEFIT"},
@@ -14,7 +14,7 @@ const screens = [
 const KEY="aura_welcome_pending_v8";
 export function WelcomeJourney(){
   const router=useRouter();
-  const {user}=useAura();
+  const {user}=useSession();
   const [open,setOpen]=useState(false);
   const [page,setPage]=useState(0);
   const [drops,setDrops]=useState(0);

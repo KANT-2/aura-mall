@@ -1,21 +1,21 @@
 "use client";
+import styles from "./Home.module.css";
 /* eslint-disable @next/next/no-img-element */
 // Synchronize browser storage or URL state after hydration.
  
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
-  products,
-  collections,
   Arrow,
   Asset,
   SectionHeading,
 } from "./Shared";
-import { useAura } from "./Provider";
-import { ProductCard } from "./Commerce";
+import { useSession } from "../providers/AuraContexts";
+import { ProductCard } from "../commerce/ProductCard";
+import { products, collections } from "@/lib/aura/catalog";
 
 export function Home() {
-  const { user } = useAura();
+  const { user } = useSession();
   const [promo, setPromo] = useState(0),
     [position, setPosition] = useState(0),
     [end, setEnd] = useState(false);
@@ -85,7 +85,7 @@ export function Home() {
     };
   }, []);
   return (
-    <main className="home">
+    <main className={styles.root + " home"}>
       <section className="hero">
         <div className="hero-copy">
           <span className="eyebrow">THE SCENT VEIL — AURA</span>

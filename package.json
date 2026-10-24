@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "lint:css": "node scripts/check-css.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/test.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:visual": "node scripts/test-visual.mjs",
+    "check": "npm run lint && npm run lint:css && npm run typecheck && npm test"
   },
   "dependencies": {
     "next": "16.4.2",
@@ -14,6 +20,7 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@tailwindcss/turbopack": "^4.3.3",
     "@types/node": "^22",

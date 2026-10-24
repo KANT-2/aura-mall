@@ -1,0 +1,47 @@
+/* Shared design tokens. */
+
+:root {
+  --atelier-night: #181b1a;
+  --atelier-panel: #222725;
+  --atelier-raised: #2c302b;
+  --atelier-line: #434740;
+  --atelier-gold: #d8b883;
+  --atelier-muted: #adafa6;
+  --atelier-ivory: #f2eee5;
+  --paper: #f6f2ea;
+  --ink: #29251f;
+  --muted: #71685d;
+  --line: #dcd3c5;
+  --accent: #876346;
+  --aura-linen: #ece5d9;
+  --aura-sand: #d7c9b6;
+  --aura-wood: #745640;
+  --aura-cocoa: #332b25;
+  --aura-night: #171b19;
+  --aura-gold: #d6b783;
+  --aura-rose: #d9c1b7;
+  --aura-sage: #bac3aa;
+  --font-aura-ko: var(--font-noto-serif-kr), "Noto Serif CJK KR", "Nanum Myeongjo", "AppleMyungjo", "Batang", serif;
+  --font-aura-en: var(--font-cormorant-garamond), "EB Garamond", "Baskerville", Georgia, serif;
+  --font-aura-ui: Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
+  --sans: var(--font-aura-ui);
+  --serif: var(--font-aura-en);
+  --a-v8-ink: #332b25;
+  --a-v8-paper: #f7f4ee;
+  --a-v8-accent: #997750;
+  --aura-motion-tap: 120ms;
+  --aura-motion-ui: 220ms;
+  --aura-motion-context: 340ms;
+  --aura-motion-ease-soft: cubic-bezier(.22,1,.36,1);
+  --aura-focus: #916d4a;
+  --a86-ease: cubic-bezier(.22,.72,.32,1);
+  --aura-motion-ease: cubic-bezier(.22,.78,.25,1);
+}
+
+@media (prefers-reduced-motion:reduce) {
+  :root {
+    --aura-motion-tap: 0ms;
+    --aura-motion-ui: 0ms;
+    --aura-motion-context: 0ms;
+  }
+}

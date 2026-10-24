@@ -1,22 +1,11 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Noto_Serif_KR } from "next/font/google";
 import { AuraMotionEnhancer } from "@/components/ui/AuraMotionEnhancer";
-import { AuraProvider, Shell } from "@/components/editorial/Aura";
-import "./editorial.css";
-import "./atelier-refinement.css";
-import "./atelier-dark.css";
-import "./aura-editorial-v3.css";
-import "./aura-sheet-ui-v4.css";
-import "./aura-atelier-v5.css";
-import "./aura-brand-v6.css";
-import "./aura-v7-flow.css";
-import "./aura-v8-integrated.css";
-import "./aura-v85-detail-assets.css";
-import "./aura-v85-motion.css";
-import "./aura-v86-qa-fixes.css";
-import "./aura-v87-mobile-shake.css";
-import "./aura-atelier-stability.css";
-import "./aura-motion-system.css";
+import { AuraProvider } from "@/components/providers/AuraProvider";
+import { Shell } from "@/components/editorial/Shell";
+import { Footer } from "@/components/editorial/Footer";
+import "./globals.css";
+
 const cormorant = Cormorant_Garamond({
   weight: ["400", "500", "600"],
   subsets: ["latin"],
@@ -42,7 +31,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <body>
         <AuraProvider>
           <AuraMotionEnhancer/>
-          <Shell>{children}</Shell>
+          <Shell footer={<Footer />}>{children}</Shell>
         </AuraProvider>
       </body>
     </html>

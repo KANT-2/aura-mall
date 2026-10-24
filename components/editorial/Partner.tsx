@@ -1,4 +1,5 @@
 "use client";
+import styles from "./Partner.module.css";
  
 import Link from "next/link";
 import { StyledSelect } from "../ui/StyledSelect";
@@ -34,7 +35,7 @@ export function Partner() {
     }
   }
   return (
-    <main className="partner-page page-width">
+    <main className={styles.root + " partner-page page-width"}>
       <div className="partner-copy">
         <span className="eyebrow">PARTNER WITH AURA</span>
         <h1>

@@ -1,4 +1,4 @@
-import { Home } from "@/components/editorial/Aura";
+import { Home } from "@/components/editorial/Home";
 export default function Page() {
   return <Home />;
 }

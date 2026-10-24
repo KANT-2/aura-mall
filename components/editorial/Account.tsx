@@ -1,14 +1,16 @@
 "use client";
+import styles from "./Account.module.css";
 /* eslint-disable @next/next/no-img-element */
 // Synchronize browser storage or URL state after hydration.
 /* eslint-disable react-hooks/set-state-in-effect */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import ingredients from "./ingredients.json";
-import * as accounts from "./accounts";
-import { Arrow, Asset, totalCount } from "./Shared";
-import { useAura } from "./Provider";
+import ingredients from "../../data/ingredients.json";
+import * as accounts from "../../lib/aura/accounts";
+import { Arrow, Asset } from "./Shared";
+import { totalCount } from "@/lib/aura/recipes";
+import { useNotify, useRecipes, useSession } from "../providers/AuraContexts";
 
 /** Same-origin path only; browsers normalize `/\host` and tab-split slashes to `//host`. */
 function safeReturnPath(next: string | null, fallback = "/mypage") {
@@ -24,7 +26,8 @@ function safeReturnPath(next: string | null, fallback = "/mypage") {
 }
 
 export function Auth({ mode }: { mode: "login" | "register" }) {
-  const { setUser, notify } = useAura(),
+  const { setUser } = useSession(),
+    notify = useNotify(),
     router = useRouter(),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -81,7 +84,7 @@ export function Auth({ mode }: { mode: "login" | "register" }) {
     }
   }
   return (
-    <main className="auth-page">
+    <main className={styles.root + " auth-page"}>
       <div className="auth-editorial">
         <img src="/assets/products/soft-eau-de-parfum.webp" alt="AURA 향수" />
         <div>
@@ -209,18 +212,20 @@ export function Auth({ mode }: { mode: "login" | "register" }) {
 }
 
 export function MyPage() {
-  const { user, setUser, recipes, ready, notify } = useAura(),
+  const { user, setUser, ready } = useSession(),
+    { recipes } = useRecipes(),
+    notify = useNotify(),
     [tab, setTab] = useState("scents"),
     [filter, setFilter] = useState("all");
   if (!ready)
     return (
-      <main className="page-width" aria-busy="true">
+      <main className={styles.root + " page-width"} aria-busy="true">
         <p>내 정보를 불러오고 있어요.</p>
       </main>
     );
   if (!user)
     return (
-      <main className="page-width">
+      <main className={styles.root + " page-width"}>
         <div className="empty">
           <Asset id="custom-bottle" />
           <h1>나의 향을 만나보세요.</h1>
@@ -232,7 +237,7 @@ export function MyPage() {
       </main>
     );
   return (
-    <main className="page-width mypage">
+    <main className={styles.root + " page-width mypage"}>
       <div className="heading-row">
         <div>
           <span className="eyebrow">MY AURA</span>

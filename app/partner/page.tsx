@@ -1,4 +1,4 @@
-import { Partner } from "@/components/editorial/Aura";
+import { Partner } from "@/components/editorial/Partner";
 export default function Page() {
   return <Partner />;
 }
