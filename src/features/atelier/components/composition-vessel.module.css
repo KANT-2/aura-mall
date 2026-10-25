@@ -1,0 +1,608 @@
+.vessel {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  padding-top: 40px;
+}
+
+.vessel > strong {
+  font: 36px var(--serif);
+  margin-top: 10px;
+}
+
+.vessel small {
+  font: 12px var(--sans);
+  color: var(--muted);
+}
+
+.vessel p {
+  text-align: center;
+  font-size: 12px;
+  margin: 12px 0 24px;
+}
+
+@media (max-width: 800px) {
+  .vessel {
+    padding-top: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .vessel {
+    grid-row: 2;
+    background: #efeadd;
+    border-radius: 4px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .vessel > :global(.eyebrow) {
+    grid-column: 1/-1;
+    text-align: center;
+  }
+
+  .vessel :global(.beaker) {
+    grid-row: 2/5;
+  }
+
+  .vessel strong {
+    text-align: center;
+    font-size: 30px;
+  }
+
+  .vessel p {
+    font-size: 12px;
+    margin: 0;
+  }
+}
+
+.vessel {
+  position: relative;
+  top: auto;
+  padding: 14px 0 0;
+  min-height: 0;
+  align-self: stretch;
+}
+
+.art {
+  position: relative;
+  width: 100%;
+  max-width: 280px;
+}
+
+.vessel :global(.beaker) {
+  width: 100%;
+  margin: 0;
+  max-width: 280px;
+}
+
+.impact {
+  position: absolute;
+  left: 30%;
+  bottom: 26%;
+  width: 40%;
+  height: 10%;
+  border: 2px solid;
+  border-radius: 50%;
+  animation: dropImpact 0.65s ease-out both;
+  pointer-events: none;
+}
+
+.counters {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin: 6px 0 22px;
+}
+
+.counters > div {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+}
+
+.counters strong {
+  font-size: 29px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.counters small {
+  font-size: 12px;
+}
+
+.total strong small {
+  font-size: 12px;
+  margin-left: 2px;
+}
+
+.meter {
+  width: 90%;
+  max-width: 270px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+.meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 20px;
+  transition:
+    width 0.35s,
+    background 0.35s;
+}
+
+.meter > i {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 2px;
+  background: #fffbf0;
+  opacity: 0.85;
+}
+
+.meterLabels {
+  display: flex;
+  justify-content: space-between;
+  width: 90%;
+  max-width: 270px;
+  font-size: 12px;
+  margin: 5px 0 18px;
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  border-radius: 30px;
+  padding: 7px 14px;
+  font-size: 12px;
+}
+
+.badge > span {
+  border-radius: 50%;
+}
+
+.tools {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+@media (min-width: 701px) and (max-width: 1050px) {
+  .vessel {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 0;
+  }
+
+  .art {
+    max-width: 180px;
+  }
+
+  .counters {
+    margin: 0 0 10px;
+  }
+
+  .counters > div {
+    width: 65px;
+    height: 65px;
+  }
+
+  .tools {
+    display: none;
+  }
+
+  .vessel .badge {
+    display: none;
+  }
+
+  .meterLabels {
+    display: none;
+  }
+
+  .counters strong {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 700px) {
+  .vessel {
+    order: 0;
+    flex: none;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0 10px;
+    background: #f0e9dc;
+    border-radius: 6px;
+    height: 106px;
+    margin: 0 0 12px;
+    gap: 4px;
+    position: relative;
+    top: auto;
+  }
+
+  .vessel > :global(.eyebrow) {
+    display: none;
+  }
+
+  .tools {
+    display: none;
+  }
+
+  .vessel > .meter {
+    display: none;
+  }
+
+  .vessel > .meterLabels {
+    display: none;
+  }
+
+  .vessel > .badge {
+    display: none;
+  }
+
+  .art {
+    width: 130px;
+    max-width: 130px;
+  }
+
+  .vessel :global(.beaker) {
+    width: 130px;
+    margin: 0;
+  }
+
+  .counters {
+    margin: 0;
+    gap: 8px;
+  }
+
+  .counters > div {
+    width: 64px;
+    height: 64px;
+  }
+
+  .counters strong {
+    font-size: 24px;
+  }
+
+  .counters small {
+    font-size: 12px;
+  }
+}
+
+@media (max-height: 700px) and (min-width: 701px) {
+  .art {
+    max-width: 210px;
+  }
+
+  .counters > div {
+    width: 65px;
+    height: 65px;
+  }
+
+  .counters {
+    margin-bottom: 12px;
+  }
+
+  .tools {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .impact {
+    animation: none !important;
+  }
+}
+
+:global([data-atelier]) .vessel {
+  isolation: isolate;
+  justify-content: center;
+}
+
+:global([data-atelier]) .vessel:before {
+  content: "";
+  z-index: -1;
+  position: absolute;
+  top: 7%;
+  left: 4%;
+  right: 4%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #6b6c5552 0%, #4c513524 50%, transparent 75%);
+  pointer-events: none;
+}
+
+:global([data-atelier]) .vessel > :global(.eyebrow) {
+  letter-spacing: 0.2em;
+}
+
+:global([data-atelier]) .counters > div {
+  border: 1px solid #615f4b;
+  background: #313630;
+}
+
+:global([data-atelier]) .counters strong {
+  color: #e6cc9d;
+}
+
+:global([data-atelier]) .counters small {
+  color: #c2b9a6;
+}
+
+:global([data-atelier]) .counters .total {
+  border-color: #cbb080;
+}
+
+:global([data-atelier]) .total strong {
+  color: #29271f;
+}
+
+:global([data-atelier]) .total small {
+  color: #29271f;
+}
+
+:global([data-atelier]) .total strong small {
+  color: #29271f;
+}
+
+:global([data-atelier]) .meter {
+  background: #41453b;
+  border: 1px solid #666752;
+  height: 13px;
+}
+
+:global([data-atelier]) .meterLabels {
+  color: #b1b0a5;
+}
+
+@media (min-width: 701px) and (max-width: 1050px) {
+  :global([data-atelier]) .vessel {
+    align-self: stretch;
+  }
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier]) .vessel {
+    background: #2d342f;
+    border: 1px solid #51564a;
+    border-radius: 5px;
+    margin: 0 0 10px;
+    height: 108px;
+    padding-inline: 12px;
+  }
+
+  :global([data-atelier]) .vessel:before {
+    inset: 0;
+    width: 130px;
+    height: 100%;
+    aspect-ratio: auto;
+  }
+
+  :global([data-atelier]) .art {
+    width: 120px;
+    max-width: 120px;
+    flex-shrink: 1;
+  }
+
+  :global([data-atelier]) .vessel :global(.beaker) {
+    width: 120px;
+    max-width: 120px;
+  }
+
+  :global([data-atelier]) .counters {
+    gap: 7px;
+  }
+
+  :global([data-atelier]) .counters > div {
+    width: 61px;
+    height: 61px;
+  }
+
+  :global([data-atelier]) .counters strong {
+    font-size: 23px;
+  }
+}
+
+@media (max-height: 690px) and (min-width: 701px) {
+  :global([data-atelier]) .art {
+    max-width: 190px;
+  }
+
+  :global([data-atelier]) .counters {
+    margin-block: 2px 10px;
+  }
+
+  :global([data-atelier]) .tools {
+    display: none;
+  }
+}
+
+:global([data-atelier]) .art {
+  filter: drop-shadow(0 16px 18px #090f0bab);
+}
+
+:global([data-atelier]) .vessel .hint {
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
+  color: #b7b8a9;
+  margin: 5px auto 0;
+  max-width: 240px;
+  transition: color 0.2s;
+}
+
+:global([data-atelier]) .vessel.dropTarget {
+  outline: 2px dashed #d2b783;
+  outline-offset: -2px;
+  border-radius: 10px;
+  background: #d0b87b0c;
+}
+
+:global([data-atelier]) .vessel.dropTarget .hint {
+  color: #f1d69f;
+}
+
+:global([data-atelier]) .vessel .ratios {
+  width: 92%;
+  max-width: 275px;
+  display: grid;
+  gap: 6px;
+  margin: 11px 0 0;
+}
+
+:global([data-atelier]) .ratioRow {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 35px;
+  align-items: center;
+  gap: 7px;
+  color: #b1b4a8;
+}
+
+:global([data-atelier]) .ratioRow small {
+  font-size: 10px;
+  letter-spacing: 0.07em;
+}
+
+:global([data-atelier]) .ratioRow strong {
+  text-align: right;
+  font-size: 11px;
+  font-weight: 500;
+  color: #d2c8b6;
+}
+
+:global([data-atelier]) .ratioTrack {
+  background: #40463d;
+  border-radius: 20px;
+  height: 6px;
+  overflow: hidden;
+}
+
+:global([data-atelier]) .ratioTrack span {
+  display: block;
+  height: 100%;
+  border-radius: 20px;
+  transition: width 0.35s;
+}
+
+:global([data-atelier]) .ratioTrack span[data-stage="top"] {
+  background: #c4cda3;
+}
+
+:global([data-atelier]) .ratioTrack span[data-stage="middle"] {
+  background: #d6a09e;
+}
+
+:global([data-atelier]) .ratioTrack span[data-stage="base"] {
+  background: #bb916b;
+}
+
+:global([data-atelier]) .badge {
+  max-width: 270px;
+  min-height: 30px;
+  flex-wrap: wrap;
+  justify-content: center;
+  background: #404838;
+  color: #efe2c7;
+  border: 1px solid #67624a;
+  gap: 6px;
+}
+
+:global([data-atelier]) .badge > span {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+}
+
+:global([data-atelier]) .badge > small {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: #cabb9c;
+}
+
+:global([data-atelier]) .counters > div {
+  box-shadow: inset 0 0 0 1px #bfb08f60;
+}
+
+:global([data-atelier]) .counters .total {
+  background: linear-gradient(140deg, #c7a16e, #946440);
+}
+
+:global([data-atelier]) .tools :global([data-atelier-part="icon-button"]) {
+  border-color: #665e4b;
+  background: #343b33;
+  color: #d9c6a6;
+}
+
+:global([data-atelier]) .tools :global([data-atelier-part="icon-button"]):hover:not(:disabled) {
+  background: #554d3b;
+  color: #fff4da;
+}
+
+@media (min-width: 701px) and (max-width: 1050px) {
+  :global([data-atelier]) .vessel .ratios {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier]) .hint {
+    display: none;
+  }
+
+  :global([data-atelier]) .vessel .ratios {
+    display: none;
+  }
+}
+
+:global([data-atelier]) .ratioToggle {
+  border: 1px solid #af9b795c;
+  border-radius: 5px;
+  padding: 9px 12px;
+  background: transparent;
+  color: #d7c9b5;
+  font-size: 12px;
+  display: block;
+  width: 100%;
+  margin: 7px 0;
+  text-align: left;
+}
+
+:global([data-atelier]) .ratioToggle:hover {
+  background: #ceb0841a;
+}
+
+:global([data-atelier]) .ratios {
+  margin: 9px 0;
+}
+
+@media (max-width: 790px) {
+  :global([data-atelier]) .vessel .ratioToggle {
+    display: none !important;
+  }
+
+  :global([data-atelier]) .vessel .ratios {
+    display: none !important;
+  }
+}
+
+@keyframes dropImpact {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.3);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}

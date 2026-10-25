@@ -1,0 +1,218 @@
+.iconButton svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.iconButton {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e4dacb;
+  padding: 0;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  user-select: none;
+}
+
+.dialog {
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  border: 1px solid #e1d5c2;
+  outline: none;
+  animation: dialogEnter 0.2s ease-out;
+}
+
+.dialog > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e2d8c8;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+}
+
+.dialog > header h2 {
+  font-size: 19px;
+}
+
+.content {
+  padding: 24px;
+}
+
+.content p {
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+
+.content > :global(.button) {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.dialog img {
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+@media (max-width: 700px) {
+  .backdrop {
+    padding: 12px;
+  }
+
+  .dialog {
+    max-height: calc(100dvh - 24px);
+  }
+
+  .dialog > header h2 {
+    font-size: 17px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog {
+    animation: none !important;
+  }
+}
+
+.dialog input {
+  user-select: auto;
+}
+
+:global([data-atelier]) .iconButton {
+  background: #313731;
+  color: #dfd3be;
+  border-color: #57594d;
+  border-radius: 50%;
+}
+
+:global([data-atelier]) .iconButton:hover:not(:disabled) {
+  background: #454a40;
+  border-color: #c6a577;
+}
+
+:global([data-atelier]) .backdrop {
+  background: #090d0acb;
+  backdrop-filter: blur(7px);
+}
+
+:global([data-atelier]) .dialog {
+  border-color: #5b5b4c;
+  border-radius: 7px;
+  color: #f2eade;
+  box-shadow: 0 25px 100px #030605b0;
+}
+
+:global([data-atelier]) .dialog > header {
+  background: #292f2b;
+  border-color: #4f564a;
+}
+
+:global([data-atelier]) .dialog > header h2 {
+  color: #f4e7d4;
+}
+
+:global([data-atelier]) .content p {
+  color: #d0ccbb;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier]) .dialog {
+    border-radius: 7px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global([data-atelier]) .dialog {
+    transition: none !important;
+  }
+}
+
+:global([data-atelier]) .dialog {
+  max-width: min(100%, 650px);
+  width: 650px;
+  background: #222825;
+}
+
+:global([data-atelier][data-atelier-step]) .dialog > header {
+  min-height: 70px;
+  padding: 17px 26px !important;
+}
+
+@media (max-width: 680px) {
+  :global([data-atelier][data-atelier-step]) .backdrop {
+    padding: 10px !important;
+    align-items: center;
+  }
+
+  :global([data-atelier][data-atelier-step]) .dialog {
+    max-height: calc(100dvh - 20px) !important;
+  }
+
+  :global([data-atelier][data-atelier-step]) .dialog > header {
+    min-height: 64px;
+    padding: 14px 18px !important;
+  }
+}
+
+:global([data-atelier][data-atelier-step]) .iconButton {
+  touch-action: manipulation;
+}
+
+:global([data-atelier][data-atelier-step]) .dialog {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+:global([data-atelier][data-atelier-step]) .backdrop {
+  pointer-events: auto;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier][data-atelier-step]) .backdrop {
+    z-index: 2000;
+  }
+}
+
+:global([data-atelier][data-atelier-step]) .backdrop .dialog {
+  box-sizing: border-box !important;
+  max-width: min(650px, calc(100vw - 20px)) !important;
+  max-height: calc(100dvh - 20px) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+:global([data-atelier][data-atelier-step]) .dialog > header {
+  z-index: 16 !important;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier][data-atelier-step]) .backdrop .dialog {
+    max-height: calc(100dvh - 20px) !important;
+  }
+}
+
+@keyframes dialogEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

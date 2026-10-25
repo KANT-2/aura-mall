@@ -2,63 +2,142 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
-const eslintConfig = defineConfig([
+const ui = [
+  "react",
+  "react/*",
+  "react-dom",
+  "react-dom/*",
+  "next",
+  "next/*",
+  "@/components/**",
+  "@/app/**",
+  "@/hooks/**",
+];
+export default defineConfig([
   ...nextVitals,
   ...nextTs,
   {
-    files: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}"],
+    files: ["mock-server/**/*.ts"],
+    rules: { "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }] },
+  },
+  {
+    files: ["src/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-syntax": ["error", {
-        selector: "ExportAllDeclaration",
-        message: "Use explicit screen exports; avoid aggregate entries that couple unrelated client features.",
-      }],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/mock-server/**", "**/fixtures/**"],
+              message:
+                "Frontend code must get persisted data through the API; never import mock fixtures.",
+            },
+          ],
+        },
+      ],
     },
   },
   {
-    files: ["components/{editorial,commerce,atelier}/**/*.{ts,tsx}"],
+    files: ["src/components/**/*.{ts,tsx}", "src/hooks/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": ["error", {
-        patterns: [{
-          group: ["**/AuraProvider", "@/components/providers/AuraProvider"],
-          message: "Screens subscribe through AuraContexts; only the composition root mounts AuraProvider.",
-        }],
-      }],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/app/**", "@/features/**", "**/mock-server/**"],
+              message:
+                "Shared UI and browser hooks must not depend on application features or mock data.",
+            },
+          ],
+        },
+      ],
     },
   },
   {
-    files: ["lib/**/*.ts"],
+    files: ["src/features/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": ["error", {
-        patterns: [{
-          group: ["react", "react/*", "react-dom", "react-dom/*", "next", "next/*", "@/components/**", "**/components/**", "@/app/**", "**/app/**"],
-          message: "lib must remain independent of React, Next.js and UI modules.",
-        }],
-      }],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/app/**", "**/mock-server/**", "**/fixtures/**"],
+              message: "Features must not import the app composition layer or mock database.",
+            },
+          ],
+        },
+      ],
     },
   },
   {
-    files: ["lib/aura/{catalog,cart,recipes,pricing,format,validation,atelier,blending,motion}.ts"],
+    files: [
+      "src/features/**/model/**/*.ts",
+      "src/lib/{format,validation,assets,navigation,test-ids}.ts",
+    ],
     rules: {
-      "no-restricted-globals": ["error", ...["window", "document", "localStorage", "sessionStorage", "navigator"].map(name => ({
-        name,
-        message: "Keep domain rules pure; browser access belongs in a persistence adapter or client component.",
-      }))],
-      "no-restricted-imports": ["error", {
-        patterns: [{
-          group: ["react", "react/*", "react-dom", "react-dom/*", "next", "next/*", "@/components/**", "**/components/**", "@/app/**", "**/app/**", "./browser-store", "./atelier-store", "./accounts", "@/lib/aura/browser-store", "@/lib/aura/atelier-store", "@/lib/aura/accounts"],
-          message: "Domain rules must not depend on UI or browser persistence.",
-        }],
-      }],
+      "no-restricted-globals": [
+        "error",
+        ...["window", "document", "localStorage", "sessionStorage", "navigator"].map((name) => ({
+          name,
+          message: "Domain models must remain independent of browser resources.",
+        })),
+      ],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                ...ui,
+                "@/features/*/api/**",
+                "@/features/*/hooks/**",
+                "@/features/*/components/**",
+                "**/mock-server/**",
+              ],
+              message: "Pure models cannot depend on React, routing, transport or mock fixtures.",
+            },
+          ],
+        },
+      ],
     },
   },
-  // Override default ignores of eslint-config-next.
+  {
+    files: ["src/features/**/hooks/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/app/**", "@/features/*/components/**", "**/mock-server/**"],
+              message:
+                "Feature hooks may compose models and API calls, but must not import their views.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/app/**/page.tsx", "src/app/**/layout.tsx"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "ExpressionStatement[expression.value='use client']",
+          message: "Keep route entries on the server; compose client features below them.",
+        },
+      ],
+    },
+  },
   globalIgnores([
-    // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "test-results/**",
+    "playwright-report/**",
+    "mock-server/.data/**",
   ]),
 ]);
-
-export default eslintConfig;

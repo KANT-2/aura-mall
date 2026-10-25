@@ -1,52 +1,75 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/test";
+import { routes } from "./fixtures/data";
 
 test.use({ reducedMotion: "no-preference" });
 
-test("navigation, search and custom selects remain styled after client navigation", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "컬렉션", exact: true }).click();
-  await expect(page.locator(".mega")).toBeVisible();
-  await page.getByRole("link", { name: "모든 컬렉션", exact: true }).click();
-  await expect(page).toHaveURL(/\/shop$/);
-  await expect(page.locator(".product-card").first()).toHaveCSS("opacity", "1");
-  await page.getByRole("combobox", { name: "정렬", exact: true }).click();
-  await expect(page.getByRole("listbox", { name: "정렬", exact: true })).toBeVisible();
-  await page.getByRole("option", { name: "가격 낮은 순", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "정렬", exact: true })).toHaveAttribute("aria-expanded", "false");
-  await page.getByRole("button", { name: "상품 검색", exact: true }).click();
-  await page.getByRole("textbox", { name: "어떤 향을 찾고 있나요?" }).fill("candle");
-  await page.getByRole("button", { name: "검색", exact: true }).click();
-  await expect(page).toHaveURL(/q=candle/);
-  await expect(page.getByRole("heading", { name: /캔들/ }).first()).toBeVisible();
+test("navigation, search and custom selects remain styled after client navigation", async ({
+  page,
+  storefront,
+}) => {
+  await storefront.openCatalogFromMenu();
+  await expect(page).toHaveURL((url) => url.pathname === routes.shop);
+  await expect(storefront.products.first()).toHaveCSS("opacity", "1");
+  await storefront.sortBy("low");
+  await expect(storefront.sort).toHaveAttribute("aria-expanded", "false");
+  const query = "candle";
+  await storefront.search(query);
+  await expect(page).toHaveURL((url) => url.searchParams.get("q") === query);
+  await expect(storefront.products).toHaveCount(3);
 });
 
-test("screen animations still refer to defined keyframes after CSS Module scoping", async ({ page }) => {
-  for (const route of ["/", "/atelier"]) {
-    await page.goto(route);
-    if (route === "/atelier") {
-      await page.getByRole("button", { name: "향료 직접 고르기" }).click();
-      await page.getByRole("button", { name: "베르가못 한 방울 추가", exact: true }).click();
-      await page.locator(".a-blend-button:visible,.a-mobile-dock .button:visible").click();
-      await expect(page.getByRole("dialog")).toBeVisible();
+test("screen animations still refer to defined keyframes after CSS Module scoping", async ({
+  page,
+  atelier,
+}) => {
+  for (const route of [routes.home, routes.atelier]) {
+    if (route === routes.atelier) {
+      await atelier.openWorkspace();
+      await atelier.openBlend();
+    } else {
+      await page.goto(route);
     }
     const result = await page.evaluate(() => {
       const defined = new Set<string>();
       function visit(rules: CSSRuleList) {
         for (const rule of rules) {
           if (rule instanceof CSSKeyframesRule) defined.add(rule.name);
-          else if (rule instanceof CSSImportRule && rule.styleSheet) visit(rule.styleSheet.cssRules);
+          else if (rule instanceof CSSImportRule && rule.styleSheet)
+            visit(rule.styleSheet.cssRules);
           else if ("cssRules" in rule) visit((rule as CSSGroupingRule).cssRules);
         }
       }
       for (const sheet of document.styleSheets) {
-        try { visit(sheet.cssRules); } catch { /* External font stylesheets cannot be inspected. */ }
+        try {
+          visit(sheet.cssRules);
+        } catch {
+          /* External font stylesheets cannot be inspected. */
+        }
       }
-      const used = new Set([...document.body.querySelectorAll("*")]
-        .flatMap(element => getComputedStyle(element).animationName.split(",").map(name => name.trim()))
-        .filter(name => name !== "none"));
-      return { count: used.size, missing: [...used].filter(name => !defined.has(name)) };
+      const used = new Set(
+        [...document.body.querySelectorAll("*")]
+          .flatMap((element) =>
+            getComputedStyle(element)
+              .animationName.split(",")
+              .map((name) => name.trim()),
+          )
+          .filter((name) => name !== "none"),
+      );
+      return { count: used.size, missing: [...used].filter((name) => !defined.has(name)) };
     });
     expect(result.count).toBeGreaterThan(0);
     expect(result.missing).toEqual([]);
   }
+});
+
+test("query drafts preserve whitespace and accept external search navigation", async ({
+  page,
+  storefront,
+}) => {
+  await storefront.openCatalogFromMenu();
+  await storefront.query.fill("white ");
+  await expect(page).toHaveURL((url) => url.searchParams.get("q") === "white");
+  await expect(storefront.query).toHaveValue("white ");
+  await storefront.search("candle");
+  await expect(storefront.query).toHaveValue("candle");
 });

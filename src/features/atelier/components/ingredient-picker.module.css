@@ -1,0 +1,712 @@
+.recommendation {
+  padding: 15px;
+  margin: 20px 0;
+}
+
+.recommendation > :global(.eyebrow) {
+  font-size: 12px;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.recommendation > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.recommendation button {
+  border: 1px solid #d8ceb9;
+  border-radius: 20px;
+  background: #f8f4eb;
+  font-size: 12px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+}
+
+.recommendation img {
+  width: 24px;
+  height: 24px;
+}
+
+.tabs {
+  margin: 18px 0;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+@media (max-width: 560px) {
+  .tabs {
+    gap: 20px;
+  }
+}
+
+.tabs button {
+  padding: 10px 12px;
+  font-size: 13px;
+  flex: 1;
+}
+
+.tabs small {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.grid {
+  display: grid;
+}
+
+.card:nth-child(2n) {
+  background: #eee7db;
+}
+
+.card[aria-pressed="true"] {
+  background: #eee1c9;
+}
+
+.card img {
+  aspect-ratio: 1;
+}
+
+.card > span {
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+@media (max-width: 800px) {
+  .ingredients {
+    grid-column: 1/-1;
+  }
+}
+
+@media (max-width: 560px) {
+  .ingredients {
+    grid-column: auto;
+  }
+
+  .card > span {
+    font-size: 12px;
+  }
+}
+
+.note {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: #776654;
+  align-self: flex-start;
+  margin: 0 4px 8px;
+}
+
+.card > span {
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  min-height: 30px;
+  border-radius: 50%;
+  background: #91633d;
+  color: #fffaf1;
+}
+
+.ingredients {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 8px;
+  scrollbar-width: thin;
+}
+
+.ingredients .tabs {
+  margin: 12px 0;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.ingredients .recommendation {
+  margin: 10px 0;
+  padding: 12px;
+}
+
+.grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.card {
+  border: 1px solid #e9dfcf;
+  transition:
+    transform 0.18s,
+    box-shadow 0.18s,
+    border-color 0.18s;
+}
+
+.card img {
+  flex-shrink: 0;
+  user-select: none;
+  pointer-events: none;
+}
+
+.card .note {
+  align-self: flex-start;
+}
+
+.card > .count {
+  min-width: 30px;
+  min-height: 30px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+  padding: 3px 8px;
+}
+
+.card > .check {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 12px;
+  color: white;
+}
+
+@media (min-width: 701px) and (max-width: 1050px) {
+  .ingredients {
+    grid-column: 1;
+    grid-row: 1/3;
+  }
+}
+
+@media (max-width: 700px) {
+  .ingredients {
+    order: 1;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .ingredients :global([data-atelier-part="panel-title"]) {
+    display: none;
+  }
+
+  .ingredients .tabs {
+    margin: 0 0 8px;
+    padding-top: 2px;
+  }
+
+  .ingredients .tabs button {
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.ingredients {
+  height: 100%;
+  align-self: stretch;
+}
+
+@media (max-width: 700px) {
+  .ingredients {
+    height: auto;
+    align-self: auto;
+  }
+}
+
+.ingredients {
+  width: 100%;
+}
+
+:global([data-atelier-step="select"]) .ingredients :global(.micro) {
+  margin-bottom: 4px;
+}
+
+:global([data-atelier]) .ingredients {
+  scrollbar-color: #666758 #252a27;
+}
+
+:global([data-atelier]) .ingredients {
+  border: 1px solid #3a413b;
+  border-radius: 6px;
+  padding: 18px;
+}
+
+:global([data-atelier]) .ingredients .tabs {
+  background: #242927;
+  border-bottom: 1px solid #464940;
+  padding-block: 7px 10px;
+  margin-block: 5px 8px;
+}
+
+:global([data-atelier]) .tabs button {
+  border-radius: 4px;
+  color: #c3c6ba;
+  border: 1px solid #4a5149;
+  background: #303631;
+  min-height: 51px;
+  transition:
+    background 0.18s,
+    border-color 0.18s,
+    color 0.18s;
+}
+
+:global([data-atelier]) .tabs button small {
+  color: #9ea79e;
+  letter-spacing: 0.075em;
+}
+
+:global([data-atelier]) .tabs button[aria-selected="true"] {
+  background: #d6b783;
+  color: #21231f;
+  border-color: #d6b783;
+}
+
+:global([data-atelier]) .tabs button[aria-selected="true"] {
+  background: #d6b783;
+  color: #21231f;
+  border-color: #d6b783;
+}
+
+:global([data-atelier]) .tabs button[aria-selected="true"] small {
+  color: #4e402d;
+}
+
+:global([data-atelier]) .ingredients > :global(.micro) {
+  padding: 0 2px;
+  margin: 8px 0 9px;
+}
+
+:global([data-atelier]) .recommendation {
+  background: #33372f;
+  border: 1px solid #565343;
+  border-radius: 5px;
+}
+
+:global([data-atelier]) .recommendation button {
+  color: #34291f;
+  border-color: #d3bf9c;
+}
+
+:global([data-atelier]) .grid {
+  gap: 10px;
+  margin-top: 8px;
+  padding-bottom: 6px;
+}
+
+:global([data-atelier]) .card {
+  color: #342e27;
+  min-width: 0;
+}
+
+:global([data-atelier]) .card img {
+  width: 100%;
+  height: 84px;
+  object-fit: contain;
+}
+
+:global([data-atelier]) .card strong {
+  color: #2c2823;
+  font-weight: 600;
+}
+
+:global([data-atelier]) .card > .count {
+  background: #4e5044;
+  color: #fff8e9;
+  border-radius: 100px;
+}
+
+:global([data-atelier]) .card[aria-pressed="true"] > .count {
+  background: #876138;
+}
+
+:global([data-atelier]) .card > .check {
+  background: #876138;
+}
+
+:global([data-atelier]) .card:hover:not(:disabled) {
+  box-shadow: 0 5px 18px #12161342;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier]) .ingredients {
+    border: 0;
+    padding: 0 3px 9px;
+    border-radius: 0;
+  }
+
+  :global([data-atelier]) .ingredients .tabs {
+    top: 0;
+    margin: 0 0 7px;
+    padding: 5px 0 7px;
+  }
+
+  :global([data-atelier]) .tabs button {
+    min-height: 45px;
+    padding: 5px 6px;
+  }
+
+  :global([data-atelier]) .grid {
+    gap: 8px;
+    margin: 4px 0 0;
+  }
+
+  :global([data-atelier]) .card img {
+    height: 70px;
+  }
+}
+
+@media (max-width: 360px) {
+  :global([data-atelier]) .grid {
+    gap: 6px;
+  }
+
+  :global([data-atelier]) .card {
+    padding-inline: 4px;
+  }
+}
+
+@media (max-height: 690px) and (min-width: 701px) {
+  :global([data-atelier]) .ingredients {
+    padding: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global([data-atelier]) .card {
+    transition: none !important;
+  }
+
+  :global([data-atelier]) .card:hover {
+    transform: none !important;
+  }
+}
+
+:global([data-atelier]) .ingredients {
+  background: #252b27;
+  border-color: #42483e;
+}
+
+:global([data-atelier]) .card {
+  background: #e9e3d7 !important;
+  border-color: #cfc4b1;
+  box-shadow: inset 0 1px #fff7e9a8;
+}
+
+:global([data-atelier]) .card[data-note="top"] {
+  background: linear-gradient(145deg, #edf0e6, #e4e7d9) !important;
+}
+
+:global([data-atelier]) .card[data-note="middle"] {
+  background: linear-gradient(145deg, #f2e7e2, #eadbd5) !important;
+}
+
+:global([data-atelier]) .card[data-note="base"] {
+  background: linear-gradient(145deg, #ece1d2, #e4d7c4) !important;
+}
+
+:global([data-atelier]) .card img {
+  filter: drop-shadow(0 10px 7px #1d221a1c);
+}
+
+:global([data-atelier]) .card[aria-pressed="true"] {
+  border-color: #d2a45c;
+}
+
+:global([data-atelier]) .card:focus-visible {
+  outline-color: #d5ad72;
+}
+
+:global([data-atelier]) .card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 198px;
+  gap: 0;
+  border-radius: 5px;
+  overflow: hidden;
+  background-image: none !important;
+  padding: 11px 8px 10px;
+}
+
+:global([data-atelier]) .card[data-note="top"] {
+  background: linear-gradient(160deg, #f3f1e7, #ece9d9) !important;
+}
+
+:global([data-atelier]) .card[data-note="middle"] {
+  background: linear-gradient(155deg, #f5ebe4, #eedad5) !important;
+}
+
+:global([data-atelier]) .card[data-note="base"] {
+  background: linear-gradient(155deg, #f1e6d7, #e6d0b4) !important;
+}
+
+:global([data-atelier]) .card .note {
+  width: 100%;
+  margin: 0;
+  text-align: left;
+  font-size: 10px;
+  color: #7b6857;
+  letter-spacing: 0.14em;
+}
+
+:global([data-atelier]) .art {
+  width: 100%;
+  height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin: 0 0 4px;
+}
+
+:global([data-atelier]) .art img {
+  width: 100%;
+  height: 100%;
+  max-width: 135px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 5px #59442c25);
+  transition: transform 0.25s ease;
+  pointer-events: none;
+}
+
+:global([data-atelier]) .card strong {
+  margin: 0;
+  line-height: 1.35;
+  font-size: 13px;
+  min-height: 18px;
+  word-break: keep-all;
+}
+
+:global([data-atelier]) .description {
+  display: block;
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
+  color: #776758;
+  min-height: 30px;
+  margin: 3px 0 5px;
+  word-break: keep-all;
+}
+
+:global([data-atelier]) .card .count {
+  padding: 0;
+  background: #8d5635;
+  color: #fffbf3;
+  font-size: 17px;
+  box-shadow: 0 2px 6px #48312230;
+  margin: auto 0 0;
+  border: 1px solid #a97951;
+}
+
+:global([data-atelier]) .card[aria-pressed="true"] {
+  border: 1px solid #ae724b;
+  box-shadow:
+    inset 0 0 0 1px #b37b51,
+    0 0 0 1px #e2b785;
+}
+
+:global([data-atelier]) .card[aria-pressed="true"] .count {
+  background: #8d5635;
+  font-size: 12px;
+}
+
+:global([data-atelier]) .card .check {
+  right: 9px;
+  top: 9px;
+  box-shadow: 0 0 0 2px #f4eee1;
+  font-weight: 600;
+}
+
+:global([data-atelier]) .card:hover:not(:disabled) {
+  border-color: #b67b51;
+  transform: translateY(-2px);
+}
+
+:global([data-atelier]) .card:hover:not(:disabled) .art img {
+  transform: translateY(-3px) scale(1.04);
+}
+
+:global([data-atelier]) .card:disabled {
+  opacity: 0.46;
+  filter: grayscale(0.75);
+}
+
+:global([data-atelier]) .card[aria-pressed="true"]:disabled {
+  opacity: 0.7;
+}
+
+:global([data-atelier]) .card:focus-visible {
+  outline: 2px solid #dbbd83;
+  outline-offset: 3px;
+}
+
+:global([data-atelier]) .ingredients .tabs button {
+  transition:
+    background 0.2s,
+    color 0.2s,
+    transform 0.2s;
+}
+
+:global([data-atelier]) .ingredients .tabs button:hover:not([aria-selected="true"]) {
+  background: #474c41;
+}
+
+@media (min-width: 701px) and (max-width: 1050px) {
+  :global([data-atelier]) .art {
+    height: 82px;
+  }
+
+  :global([data-atelier]) .card {
+    min-height: 188px;
+  }
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier]) .card {
+    padding: 7px 4px 8px;
+  }
+
+  :global([data-atelier]) .art {
+    height: 66px;
+    margin: 1px 0 3px;
+  }
+
+  :global([data-atelier]) .card strong {
+    font-size: 12px;
+    min-height: auto;
+  }
+
+  :global([data-atelier]) .description {
+    font-size: 10px;
+    line-height: 1.3;
+    min-height: 25px;
+    margin: 2px 0 4px;
+  }
+
+  :global([data-atelier]) .card .count {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 360px) {
+  :global([data-atelier]) .description {
+    font-size: 9px;
+  }
+
+  :global([data-atelier]) .card {
+    min-height: 158px;
+  }
+
+  :global([data-atelier]) .art {
+    height: 58px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global([data-atelier]) .card {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  :global([data-atelier]) .art img {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+:global([data-atelier][data-atelier-step]) .card .count {
+  display: grid;
+  place-items: center;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
+  border-radius: 50% !important;
+  line-height: 1 !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :global([data-atelier][data-atelier-step]) .card {
+    transition:
+      border-color 0.22s,
+      background-color 0.25s,
+      transform 0.32s var(--aura-motion-ease) !important;
+  }
+
+  :global([data-atelier][data-atelier-step]) .card:active:not(:disabled) {
+    transform: scale(0.98) !important;
+  }
+}
+
+:global([data-atelier][data-atelier-step]) .card {
+  position: relative;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+  cursor: pointer;
+  isolation: isolate;
+}
+
+:global([data-atelier][data-atelier-step]) .card:disabled {
+  cursor: not-allowed;
+}
+
+:global([data-atelier][data-atelier-step]) .card .art {
+  pointer-events: none !important;
+}
+
+:global([data-atelier][data-atelier-step]) .card .art img {
+  pointer-events: none !important;
+}
+
+:global([data-atelier][data-atelier-step]) .card img {
+  image-rendering: auto;
+  max-width: 100%;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier][data-atelier-step]) .card {
+    min-height: 160px;
+  }
+}
+
+:global([data-atelier][data-atelier-step]) .card .art {
+  display: grid !important;
+  place-items: center !important;
+  overflow: visible !important;
+  max-width: 100% !important;
+  isolation: isolate;
+}
+
+:global([data-atelier][data-atelier-step]) .card .art img {
+  width: auto !important;
+  height: auto !important;
+  max-width: 79% !important;
+  max-height: 79% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  object-fit: contain !important;
+  image-rendering: auto !important;
+  transform: none !important;
+  backface-visibility: visible !important;
+  filter: none !important;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier][data-atelier-step]) .card .art img {
+    max-width: 77% !important;
+    max-height: 77% !important;
+  }
+}
