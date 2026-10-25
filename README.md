@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-개발 명령은 Next.js(`http://localhost:3000`)와 독립 HTTP Mock API(`http://127.0.0.1:4000`)를 함께 실행합니다. API 주소는 `.env.example`의 `API_URL`을 참고하세요. Next 서버의 데이터 조회와 `/api/*` 프록시가 같은 주소를 사용합니다. 주소를 바꾸면 개발 서버를 재시작하고 프로덕션용으로는 다시 빌드합니다.
+개발 명령은 Next.js(`http://localhost:3000`)와 독립 HTTP Mock API(`http://127.0.0.1:4000`)를 함께 실행합니다. API 주소는 `.env.example`의 `API_URL`을 참고하세요. Next 서버의 데이터 조회와 `/api` BFF가 같은 서버 전용 연결을 사용합니다. `API_URL`·`API_PREFIX`·세션 쿠키 이름은 서버 실행 환경에서 설정하며, 주소를 바꾸면 Next 서버를 재시작합니다. 같은 빌드를 Mock 또는 FastAPI에 연결할 수 있습니다.
 
 ```sh
 npm run build
@@ -34,6 +34,7 @@ src/
     atelier/_components/       # 계정·장바구니·레시피·초안을 조향 편집기에 연결
     shop/, cart/, checkout/    # 얇은 서버 라우트 진입점
     mypage/, partner/
+    api/                       # 명시적인 BFF Route Handlers
     loading.tsx, error.tsx, global-error.tsx
   features/
     catalog/                   # 상품 조회·검색·필터·상품 표현
@@ -46,7 +47,10 @@ src/
   components/
     ui/, brand/, illustrations/, layout/, feedback/
   hooks/                       # 화면 폭·공유 API·기기 센서 등 브라우저 기능
-  lib/api/                     # HTTP 클라이언트·오류·서버 전용 연결
+  server/
+    bff/                       # 출처·본문·세션 쿠키·브라우저 응답 경계
+    backend/                   # FastAPI/Mock 설정·서버 전용 HTTP 연결
+  lib/api/                     # 브라우저 클라이언트·공용 오류·RSC 조회 연결
   lib/                         # 형식·입력 검증·내부 경로·테스트 식별자
   styles/                      # 토큰·기본값·공유 요소·사이트 셸·모션·공유 커머스 모듈
 mock-server/
@@ -70,6 +74,14 @@ e2e/
 `page.tsx`·`layout.tsx`는 서버 컴포넌트로 유지하고, 상태·이벤트·브라우저 API가 필요한 하위 구현에 클라이언트 경계를 둡니다. 홈과 상품 상세는 서버에서 API를 조회합니다. 공용 카탈로그만 요청별 QueryClient에 담아 클라이언트에 전달하고, 세션·회원 데이터는 브라우저의 동일 출처 API에서 조회합니다. 사용자 간 서버 캐시를 공유하지 않습니다. `/products`, `/custom`, `/signup`, `/cards`의 기존 URL도 유지합니다.
 
 의존 방향은 `app → features → components/hooks/lib`입니다. 기능은 다른 기능의 모델·API·훅을 필요한 범위에서 조합할 수 있으며, 기능 간 화면 조합은 `app`에서 담당합니다. 공용 UI·브라우저 훅은 기능이나 라우트를 가져올 수 없습니다. 순수 모델은 React·브라우저·전송 계층에 의존하지 않습니다. 프런트엔드의 Mock fixture 직접 참조, 역방향 의존, 라우트 진입점의 클라이언트 전환은 ESLint로 검사합니다.
+
+## BFF와 FastAPI 연결
+
+브라우저는 동일 출처 `/api`만 호출합니다. Next의 명시적인 Route Handler가 허용한 리소스를 FastAPI 또는 Mock으로 연결합니다. 외부 rewrite와 catch-all 프록시는 제거했습니다. Server Components는 BFF를 HTTP로 재호출하지 않고 같은 서버 전용 통신 모듈로 데이터 원본을 직접 조회합니다.
+
+BFF는 요청 출처·JSON 크기·허용 쿠키·제한시간을 처리하고, FastAPI의 `detail` 및 422 오류를 공통 오류 형식으로 변환합니다. 가격·소유권·인증·트랜잭션은 백엔드에서 검증합니다. 실제 FastAPI 서버는 아직 구현하지 않았으며 현재 Mock으로 동작을 검증합니다.
+
+설정 예제, 리소스별 입력·응답 DTO, 세션·오류 계약, OpenAPI 인계 기준은 [FastAPI BFF 연결 문서](docs/FASTAPI_BFF.md)에 정리했습니다.
 
 ## 데이터 소유권과 Mock API
 
@@ -115,7 +127,7 @@ npm run test:e2e
 
 `check`는 Prettier → ESLint → CSS 구조 검사 → Next 라우트 타입 생성·TypeScript → Vitest를 실행합니다. 단위 테스트는 조향·수량·복원·내부 리다이렉트 규칙을, 통합 테스트는 실제 HTTP 요청으로 회원 간 데이터 분리·가격 변조 거절·레시피 버전·초안·모의 주문·문의·파일 영속성을 검증합니다.
 
-Playwright는 포트 4000의 메모리 Mock API와 포트 3100의 프로덕션 Next 서버를 자동 시작·종료합니다. 기본 검증은 데스크톱·모바일 조작, 로그인·로그아웃에 따른 장바구니 전환, 검색 URL 동기화, 조향 초안 복원·초기화, 혼합·센서 권한 정리를 포함합니다. 실제 iPhone Safari의 센서·권한 동작은 기기 검증이 필요합니다.
+Playwright는 포트 4000의 메모리 Mock API와 포트 3100의 프로덕션 Next BFF 서버를 자동 시작·종료합니다. 기본 검증은 데스크톱·모바일 조작, 로그인·로그아웃에 따른 장바구니 전환, 검색 URL 동기화, 조향 초안 복원·초기화, 혼합·센서 권한 정리를 포함합니다. 실제 iPhone Safari의 센서·권한 동작은 기기 검증이 필요합니다.
 
 테스트 선택자는 화면 문구·CSS 클래스와 분리합니다. 역할은 `getByRole`, 특정 조작은 `src/lib/test-ids.ts`의 식별자를 사용합니다. 선택자와 반복 조작은 `e2e/pages`, 데이터와 API 시드는 `e2e/fixtures`, 명세는 사용자 시나리오와 독립적인 기대 결과를 담당합니다. [Playwright Best Practices](https://playwright.dev/docs/best-practices)와 [Page Object Models](https://playwright.dev/docs/pom)를 기준으로 합니다.
 

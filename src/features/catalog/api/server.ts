@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { ApiError } from "@/lib/api/client";
+import { ApiError } from "@/lib/api/errors";
 import { serverRequest } from "@/lib/api/server";
 import type { Catalog, Product } from "../model/catalog";
 

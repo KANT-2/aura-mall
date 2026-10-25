@@ -35,13 +35,20 @@ export default defineConfig({
       url: "http://127.0.0.1:4000/health",
       reuseExistingServer: false,
       timeout: 30_000,
-      env: { MOCK_TEST_MODE: "1", MOCK_PERSIST: "0" },
+      env: { MOCK_TEST_MODE: "1", MOCK_PERSIST: "0", MOCK_PORT: "4000" },
     },
     {
       command: "npm run start -- --hostname 127.0.0.1 --port 3100",
       url: "http://127.0.0.1:3100",
       reuseExistingServer: false,
       timeout: 30_000,
+      env: {
+        API_URL: "http://127.0.0.1:4000",
+        API_PREFIX: "/api",
+        API_SESSION_COOKIE: "aura_mock_session",
+        API_TIMEOUT_MS: "10000",
+        APP_ORIGIN: "http://127.0.0.1:3100",
+      },
     },
   ],
 });

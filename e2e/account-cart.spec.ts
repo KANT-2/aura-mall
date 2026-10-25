@@ -3,7 +3,6 @@ import { seedApi } from "./fixtures/api";
 import { randomUUID } from "node:crypto";
 import { routes } from "./fixtures/data";
 
-const mock = "http://127.0.0.1:4000";
 test("client authentication switches cart ownership and restores the guest cart", async ({
   page,
   account,
@@ -14,17 +13,15 @@ test("client authentication switches cart ownership and restores the guest cart"
     password: "password123",
   };
   await seedApi(page, { cart: [{ product: { id: "fresh-hand-cream" }, quantity: 2 }] });
-  expect(
-    (await page.request.post(`${mock}/api/auth/register`, { data: credentials })).status(),
-  ).toBe(201);
+  expect((await page.request.post("/api/auth/register", { data: credentials })).status()).toBe(201);
   expect(
     (
-      await page.request.post(`${mock}/api/cart/items`, {
+      await page.request.post("/api/cart/items", {
         data: { productId: "soft-candle", quantity: 1 },
       })
     ).status(),
   ).toBe(201);
-  await page.request.post(`${mock}/api/auth/logout`);
+  await page.request.post("/api/auth/logout");
   await account.signIn(credentials, routes.cart);
   await expect(account.cartItems).toHaveCount(1);
   await expect(account.firstProductLink).toHaveAttribute("href", `${routes.shop}/soft-candle`);
