@@ -22,6 +22,11 @@ export function mutateCart(command: CartCommand, owner?: string) {
     : request<CartItem[]>("/cart/items", {
         method: "POST",
         headers: owner ? { "X-Session-Owner": owner } : undefined,
-        body: JSON.stringify(command),
+        body: JSON.stringify({
+          productId: command.productId,
+          quantity: command.quantity,
+          selection: command.selection,
+          custom: command.custom,
+        }),
       });
 }

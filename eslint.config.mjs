@@ -12,6 +12,7 @@ const ui = [
   "@/components/**",
   "@/app/**",
   "@/hooks/**",
+  "@/server/**",
 ];
 export default defineConfig([
   ...nextVitals,
@@ -45,7 +46,7 @@ export default defineConfig([
         {
           patterns: [
             {
-              group: ["@/app/**", "@/features/**", "**/mock-server/**"],
+              group: ["@/app/**", "@/features/**", "@/server/**", "**/mock-server/**"],
               message:
                 "Shared UI and browser hooks must not depend on application features or mock data.",
             },
@@ -110,7 +111,7 @@ export default defineConfig([
         {
           patterns: [
             {
-              group: ["@/app/**", "@/features/*/components/**", "**/mock-server/**"],
+              group: ["@/app/**", "@/features/*/components/**", "@/server/**", "**/mock-server/**"],
               message:
                 "Feature hooks may compose models and API calls, but must not import their views.",
             },
