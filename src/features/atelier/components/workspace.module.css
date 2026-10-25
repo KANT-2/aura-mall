@@ -1,0 +1,358 @@
+.workspace {
+  display: grid;
+  margin: auto;
+  align-items: start;
+}
+
+.panelTitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.panelTitle > span {
+  letter-spacing: 1px;
+}
+
+.panelTitle :global(.text-link) {
+  font-size: 12px;
+}
+
+:where(.page) :global(.ratio) {
+  height: 3px;
+  background: #ece4d5;
+  margin-top: 5px;
+  border-radius: 3px;
+}
+
+:where(.page) :global(.ratio) > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+
+.editing {
+  height: calc(100dvh - 64px);
+  display: flex;
+  flex-direction: column;
+  min-height: 590px;
+}
+
+.workspace {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(300px, 1.25fr) minmax(230px, 0.85fr) minmax(260px, 1fr);
+  padding: 24px 4%;
+  max-width: 1480px;
+  height: auto;
+}
+
+.dock {
+  display: none;
+}
+
+@media (min-width: 701px) and (max-width: 1050px) {
+  .workspace {
+    grid-template-columns: minmax(280px, 1.2fr) minmax(220px, 1fr);
+    padding: 20px 4%;
+  }
+}
+
+@media (max-width: 700px) {
+  .editing {
+    height: calc(100dvh - 56px);
+    min-height: 480px;
+  }
+
+  .workspace {
+    display: flex;
+    flex-direction: column;
+    padding: 0 20px 12px;
+    height: auto;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .dock {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 20px calc(10px + env(safe-area-inset-bottom));
+    flex: none;
+  }
+
+  .dock > :global(.button) {
+    flex: 1;
+    min-height: 48px;
+    padding: 10px 16px;
+    gap: 12px;
+    font-size: 14px;
+  }
+
+  .dockSummary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    min-height: 44px;
+    text-align: left;
+    padding: 0;
+    border: 0;
+    background: none;
+    max-width: 52%;
+  }
+
+  .dockSummary small {
+    display: block;
+    font-size: 12px;
+  }
+
+  .dockSummary svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .colorDot {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+}
+
+.workspace {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+@media (min-width: 701px) and (max-width: 1050px) {
+  .workspace {
+    grid-template-rows: minmax(0, 1fr) minmax(180px, 0.75fr);
+  }
+
+  .workspace {
+    row-gap: 14px;
+  }
+}
+
+.page {
+  color: var(--atelier-ivory);
+  background: radial-gradient(ellipse 72% 47% at 52% 45%, #2a302a 0%, #1b201e 64%, #181b1a 100%);
+  color-scheme: dark;
+  --muted: var(--atelier-muted);
+  --line: var(--atelier-line);
+  --accent: var(--atelier-gold);
+  min-width: 0;
+  position: relative;
+}
+
+.page p {
+  color: var(--atelier-muted);
+}
+
+.page :global(.micro) {
+  color: var(--atelier-muted);
+}
+
+.page :global(.eyebrow) {
+  color: var(--atelier-gold);
+}
+
+.page .workspace {
+  gap: clamp(14px, 2vw, 28px);
+  padding-top: 22px;
+  padding-bottom: 22px;
+}
+
+.page .panelTitle {
+  border-bottom: 1px solid #414840;
+  padding-bottom: 13px;
+  margin-bottom: 13px;
+}
+
+.page .panelTitle h2 {
+  font-size: 17px;
+  letter-spacing: -0.03em;
+}
+
+.page .panelTitle > span {
+  color: #b4b5a9;
+  font-size: 12px;
+}
+
+.page :global(.button) {
+  background: #cfb080;
+  color: #27251f;
+  border: 1px solid #cfb080;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.page :global(.button):hover:not(:disabled) {
+  background: #e0c69c;
+  border-color: #e0c69c;
+  color: #181b17;
+}
+
+.page :global(.button):disabled {
+  background: #5a5c52;
+  border-color: #68685b;
+  color: #dfd7c8;
+}
+
+.page :is(button, a, input, summary, [role="slider"]):focus-visible {
+  outline: 2px solid #eacb92;
+  outline-offset: 3px;
+}
+
+.page .dock {
+  background: #252b27;
+  border-top: 1px solid #53584a;
+}
+
+.page .dockSummary {
+  color: #f3e9d6;
+}
+
+.page .dockSummary small {
+  color: #b8b9aa;
+}
+
+.page .dockSummary svg {
+  color: #d2b17a;
+}
+
+@media (min-width: 701px) and (max-width: 1050px) {
+  .page .workspace {
+    gap: 14px 20px;
+  }
+}
+
+@media (max-width: 700px) {
+  .page .workspace {
+    padding: 0 14px 0;
+  }
+
+  .page .dock {
+    padding: 9px 16px calc(9px + env(safe-area-inset-bottom));
+    gap: 10px;
+  }
+
+  .page .dockSummary {
+    min-width: 0;
+    max-width: 50%;
+    white-space: nowrap;
+  }
+
+  .page .dockSummary svg {
+    flex: none;
+  }
+}
+
+@media (max-width: 360px) {
+  .page .dockSummary {
+    font-size: 12px;
+  }
+}
+
+@media (max-height: 690px) and (min-width: 701px) {
+  .page .workspace {
+    padding-block: 10px;
+  }
+}
+
+.page :global(.live-vessel) [data-layer="glass-body"] > path {
+  stroke: #d8c9ae;
+}
+
+.page :global(.live-vessel) [data-layer="rim"] > path {
+  stroke: #e5d4b7;
+}
+
+.page :global(.live-vessel) [data-layer="reflections"] > path {
+  opacity: 0.72;
+}
+
+.page :global(.live-vessel) [data-layer="liquid"] path {
+  transition: all 0.4s cubic-bezier(0.25, 0.7, 0.25, 1);
+}
+
+.page :global(.live-vessel) [data-layer="liquid"] ellipse {
+  transition: all 0.4s cubic-bezier(0.25, 0.7, 0.25, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page :global(.live-vessel) [data-layer="liquid"] > * {
+    transition: none !important;
+  }
+}
+
+.page[data-atelier] {
+  --sheet-cream: #f5efe3;
+  --sheet-gold: #d6b783;
+  --sheet-copper: #96613d;
+  --sheet-ink: #302a23;
+}
+
+.page :global(.liquid-ripple) {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: stirFluid 2.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page :global(.liquid-ripple) {
+    transition: none !important;
+  }
+
+  .page :global(.liquid-ripple) {
+    animation: none !important;
+  }
+
+  .page :global(.vessel-drop) {
+    animation: none !important;
+  }
+}
+
+.page p:not(:global(.eyebrow)) {
+  line-height: 1.65;
+}
+
+.page[data-atelier] button:not(:disabled) {
+  -webkit-tap-highlight-color: rgba(199, 180, 152, 0.19);
+}
+
+.page[data-atelier] .dock button {
+  touch-action: manipulation;
+}
+
+.page[data-atelier] .workspace[inert] {
+  pointer-events: none !important;
+}
+
+.page[data-atelier] .dock[inert] {
+  pointer-events: none !important;
+}
+
+@media (max-width: 700px) {
+  .page[data-atelier] .dock {
+    z-index: 12;
+    position: relative;
+    flex-shrink: 0;
+  }
+}
+
+@keyframes stirFluid {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  50% {
+    transform: rotate(175deg) scale(0.87);
+  }
+
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}

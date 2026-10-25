@@ -1,0 +1,570 @@
+:global([data-atelier]) .experience {
+  text-align: center;
+}
+
+:global([data-atelier]) .stage {
+  position: relative;
+  height: 350px;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+:global([data-atelier]) .stage:before {
+  content: "";
+  position: absolute;
+  inset: 18% 0 5%;
+  background: radial-gradient(ellipse, #9e896248, transparent 64%);
+  z-index: -1;
+}
+
+:global([data-atelier]) .stage > :global(.eyebrow) {
+  position: absolute;
+  top: 12px;
+  z-index: 1;
+}
+
+:global([data-atelier]) .copy h3 {
+  font-size: clamp(18px, 2.5vw, 23px);
+  color: #f1e5d3;
+  font-weight: 500;
+}
+
+:global([data-atelier]) .copy p {
+  font-size: 13px;
+  color: #c3bbad;
+  margin: 8px auto 18px;
+}
+
+:global([data-atelier]) .progress {
+  max-width: 330px;
+  margin: 18px auto 0;
+}
+
+:global([data-atelier]) .progress > div {
+  height: 3px;
+  background: #55574b;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+:global([data-atelier]) .progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #a97c48, #dfc08c);
+  transition: width 0.12s linear;
+}
+
+:global([data-atelier]) .progress small {
+  display: block;
+  color: #d0b78d;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  margin-top: 10px;
+}
+
+:global([data-atelier]) .finish {
+  width: 100%;
+  max-width: 400px;
+  margin: 24px auto 0;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier]) .stage {
+    height: 315px;
+  }
+
+  :global([data-atelier]) .copy h3 {
+    font-size: 18px;
+    line-height: 1.5;
+  }
+
+  :global([data-atelier]) .copy p {
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global([data-atelier]) .progress span {
+    transition: none !important;
+  }
+}
+
+:global([data-atelier]) .experience {
+  padding: 6px 20px 22px;
+}
+
+:global([data-atelier]) .experience .copy h3 {
+  margin: 10px 0 4px;
+}
+
+:global([data-atelier]) .experience .copy p {
+  margin: 0 auto 12px;
+  max-width: 430px;
+}
+
+:global([data-atelier]) .layout {
+  display: grid;
+  grid-template-columns: 155px 1fr;
+  align-items: center;
+  gap: 23px;
+  max-width: 475px;
+  margin: 8px auto 0;
+  padding: 15px 16px;
+  background: #2b322d;
+  border: 1px solid #505443;
+  border-radius: 7px;
+  text-align: left;
+}
+
+:global([data-atelier]) .surface {
+  width: 142px;
+  height: 142px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  position: relative;
+  flex-shrink: 0;
+  border-radius: 50%;
+  touch-action: none;
+  user-select: none;
+  background: radial-gradient(circle, #4d4d3c, #30382f);
+  color: #f4e6ce;
+}
+
+:global([data-atelier]) .outline {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(#d7ad72 var(--stir-progress), #5e655a 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  pointer-events: none;
+}
+
+:global([data-atelier]) .outline img {
+  width: 0;
+  height: 0;
+}
+
+:global([data-atelier]) .instruction {
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 1;
+  pointer-events: none;
+}
+
+:global([data-atelier]) .percent {
+  font-size: 20px;
+  font-family: var(--serif);
+  color: #e6bc7c;
+  margin-top: 3px;
+  pointer-events: none;
+}
+
+:global([data-atelier]) .surface:focus-visible {
+  outline: 2px solid #d9b47a;
+  outline-offset: 4px;
+}
+
+:global([data-atelier]) .actions strong {
+  display: block;
+  color: #f4e7d3;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  font-weight: 500;
+}
+
+:global([data-atelier]) .actions p {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #bfb7a8;
+  margin: 5px 0 9px;
+}
+
+:global([data-atelier]) .actions .auto {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  background: #dac097;
+  color: #2e2b26;
+}
+
+:global([data-atelier]) .actions .auto:disabled {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+:global([data-atelier]) .experience .progress {
+  margin: 12px auto 0;
+}
+
+:global([data-atelier]) .finished {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 13px auto;
+}
+
+:global([data-atelier]) .finished > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #f3e7d2;
+  background: #3e483b;
+  border: 1px solid #5a624d;
+  border-radius: 24px;
+  padding: 4px 9px 4px 4px;
+}
+
+:global([data-atelier]) .finished img {
+  width: 27px;
+  height: 27px;
+  object-fit: contain;
+  background: #eee5d7;
+  border-radius: 50%;
+}
+
+:global([data-atelier]) .experience .finish {
+  margin: 10px auto 0;
+  max-width: 390px;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier]) .experience {
+    padding: 4px 12px 14px;
+  }
+
+  :global([data-atelier]) .experience .copy h3 {
+    margin: 2px 0;
+  }
+
+  :global([data-atelier]) .experience .copy p {
+    margin: 0 auto 6px;
+  }
+
+  :global([data-atelier]) .layout {
+    grid-template-columns: 114px minmax(0, 1fr);
+    padding: 10px;
+    gap: 12px;
+    max-width: 100%;
+    margin: 4px 0 0;
+  }
+
+  :global([data-atelier]) .surface {
+    width: 108px;
+    height: 108px;
+  }
+
+  :global([data-atelier]) .instruction {
+    font-size: 12px;
+  }
+
+  :global([data-atelier]) .percent {
+    font-size: 16px;
+  }
+
+  :global([data-atelier]) .actions strong {
+    font-size: 12px;
+  }
+
+  :global([data-atelier]) .actions p {
+    font-size: 10px;
+    line-height: 1.55;
+    margin: 3px 0 7px;
+  }
+
+  :global([data-atelier]) .actions .auto {
+    font-size: 11px;
+    min-height: 38px;
+    padding: 7px 10px;
+  }
+
+  :global([data-atelier]) .actions .auto svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  :global([data-atelier]) .experience .progress small {
+    font-size: 10px;
+    margin-top: 5px;
+  }
+
+  :global([data-atelier]) .finished {
+    margin: 4px auto;
+  }
+}
+
+@media (max-width: 360px) {
+  :global([data-atelier]) .layout {
+    grid-template-columns: 95px 1fr;
+    gap: 8px;
+  }
+
+  :global([data-atelier]) .surface {
+    width: 92px;
+    height: 92px;
+  }
+}
+
+:global([data-atelier]) .surface {
+  cursor: default;
+  pointer-events: none;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .hint {
+  display: block;
+  text-align: left;
+  color: #d2c3a7;
+  font-size: 11px;
+  line-height: 1.65;
+  margin-top: 10px;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier][data-atelier-step]) .experience .hint {
+    text-align: center;
+    font-size: 11px;
+  }
+}
+
+:global([data-atelier]) .experience .stage :global(.beaker) {
+  pointer-events: none;
+}
+
+:global([data-atelier]) .experience .surface {
+  pointer-events: none;
+}
+
+:global([data-atelier]) .experience .hint {
+  display: block;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .actions :global(.button) {
+  border-radius: 4px;
+}
+
+:global([data-atelier][data-atelier-step]) .experience.experience {
+  padding: clamp(25px, 4.5vw, 42px) clamp(18px, 4vw, 38px) 30px !important;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .stage {
+  padding-top: 12px !important;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .copy {
+  margin: 16px auto 22px !important;
+  max-width: 550px;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .copy h3 {
+  line-height: 1.45 !important;
+  font-size: clamp(20px, 2.3vw, 27px) !important;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .copy p {
+  line-height: 1.65 !important;
+  font-size: clamp(13px, 1.5vw, 15px) !important;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .layout {
+  max-width: 600px !important;
+  grid-template-columns: minmax(130px, 190px) minmax(0, 1fr) !important;
+  gap: 22px !important;
+  padding: 20px 22px !important;
+  margin: 20px auto 16px !important;
+  align-items: center;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .actions p {
+  font-size: 13px !important;
+  line-height: 1.65 !important;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .actions strong {
+  font-size: 16px !important;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .controls {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .sensor {
+  border-radius: 4px;
+  border: 1px solid #bda47d;
+  background: transparent;
+  color: #eadac1;
+  padding: 10px 13px;
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .sensor:hover:not(:disabled) {
+  background: rgba(221, 195, 157, 0.12);
+}
+
+:global([data-atelier][data-atelier-step]) .experience .sensor[aria-pressed="true"] {
+  border-color: #9cb48c;
+  background: rgba(111, 135, 95, 0.2);
+  color: #e2eddc;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .sensor:disabled {
+  opacity: 0.78 !important;
+  cursor: default !important;
+  filter: none !important;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .auto:disabled {
+  opacity: 0.78 !important;
+  cursor: default !important;
+  filter: none !important;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .sensorStatus {
+  display: block;
+  margin: 9px 0 0;
+  color: #cbbda8;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .actions .auto {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 44px;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .progress {
+  margin-top: 15px !important;
+}
+
+@media (max-width: 680px) {
+  :global([data-atelier][data-atelier-step]) .experience.experience {
+    padding: 22px 16px calc(20px + env(safe-area-inset-bottom)) !important;
+  }
+
+  :global([data-atelier][data-atelier-step]) .experience .copy {
+    margin: 9px auto 14px !important;
+  }
+
+  :global([data-atelier][data-atelier-step]) .experience .layout {
+    grid-template-columns: 100px minmax(0, 1fr) !important;
+    gap: 12px !important;
+    padding: 13px 14px !important;
+    margin: 12px 0 !important;
+  }
+
+  :global([data-atelier][data-atelier-step]) .experience .actions p {
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+  }
+
+  :global([data-atelier][data-atelier-step]) .experience .actions strong {
+    font-size: 14px !important;
+  }
+
+  :global([data-atelier][data-atelier-step]) .experience .sensor {
+    font-size: 12px !important;
+    padding: 9px 10px !important;
+  }
+
+  :global([data-atelier][data-atelier-step]) .experience .auto {
+    font-size: 12px !important;
+    padding: 9px 10px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global([data-atelier][data-atelier-step]) .experience .sensor {
+    transition: none !important;
+  }
+}
+
+:global([data-atelier][data-atelier-step]) .sensor {
+  touch-action: manipulation;
+}
+
+:global([data-atelier][data-atelier-step]) .controls button {
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .sensor {
+  min-height: 48px !important;
+  touch-action: manipulation;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .auto {
+  min-height: 48px !important;
+  touch-action: manipulation;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .stage {
+  pointer-events: auto;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .copy {
+  pointer-events: none;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier][data-atelier-step]) .experience .controls {
+    gap: 8px;
+  }
+}
+
+:global([data-atelier][data-atelier-step]) .experience .stage {
+  height: auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 14px !important;
+  padding: 20px 0 18px !important;
+  overflow: visible !important;
+  max-width: 100% !important;
+}
+
+:global([data-atelier][data-atelier-step]) .experience .stage > :global(.eyebrow) {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  display: block !important;
+  margin: 0 0 5px !important;
+  order: 0 !important;
+  z-index: 2 !important;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.5;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier][data-atelier-step]) .experience .stage {
+    padding: 15px 0 14px !important;
+    gap: 7px !important;
+  }
+}

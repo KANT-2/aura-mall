@@ -3,32 +3,48 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently -k -n api,web \"npm:mock:dev\" \"npm:dev:web\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "lint:css": "node scripts/check-css.mjs",
-    "typecheck": "tsc --noEmit",
-    "test": "node scripts/test.mjs",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:visual": "node scripts/test-visual.mjs",
-    "check": "npm run lint && npm run lint:css && npm run typecheck && npm test"
+    "check": "npm run format:check && npm run lint && npm run lint:css && npm run typecheck && npm test",
+    "test:watch": "vitest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "dev:web": "next dev",
+    "mock": "tsx mock-server/index.ts",
+    "start:mock": "concurrently -k -n api,web \"npm:mock\" \"npm:start\"",
+    "mock:dev": "tsx watch mock-server/index.ts"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.104.5",
     "next": "16.4.2",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@tailwindcss/turbopack": "^4.3.3",
+    "@types/express": "^5.0.6",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^10.0.6",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
+    "express": "^5.3.0",
+    "postcss": "^8.5.31",
+    "prettier": "^3.9.10",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^5.0.5"
   }
 }

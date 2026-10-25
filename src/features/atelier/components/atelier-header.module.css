@@ -1,0 +1,146 @@
+.heading p {
+  font-size: 13px;
+}
+
+@media (max-width: 560px) {
+  .heading p {
+    font-size: 12px;
+  }
+}
+
+:global([data-atelier]) .heading {
+  padding: 22px 4%;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  border-bottom: 1px solid var(--line);
+  min-height: 104px;
+}
+
+.heading h1 {
+  margin: 6px 0 0;
+  letter-spacing: -0.6px;
+}
+
+.heading :global(.eyebrow) {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+.steps {
+  display: flex;
+  font-size: 12px;
+  color: #998d7d;
+}
+
+.steps [aria-current="step"] {
+  color: #7e4f2b;
+  font-weight: 600;
+}
+
+:global([data-atelier-step="select"]) .heading {
+  flex-shrink: 0;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier]) .heading {
+    gap: 10px;
+  }
+
+  .heading h1 {
+    margin-top: 4px;
+  }
+
+  .heading :global(.eyebrow) {
+    font-size: 12px;
+  }
+
+  .steps [aria-current="step"] {
+    display: block;
+    font-size: 12px;
+  }
+}
+
+@media (max-height: 700px) and (min-width: 701px) {
+  :global([data-atelier-step="select"]) .heading {
+    min-height: 80px;
+    padding: 14px 4%;
+  }
+}
+
+:global([data-atelier-step="select"]) .heading .steps {
+  align-items: center;
+}
+
+:global([data-atelier]) .heading {
+  background: #1c201e;
+  border-color: #393d37;
+  padding-inline: clamp(22px, 4vw, 72px);
+}
+
+:global([data-atelier]) .heading h1 {
+  font-weight: 500;
+}
+
+:global([data-atelier]) .heading :global(.eyebrow) {
+  color: var(--atelier-gold);
+}
+
+:global([data-atelier]) .steps {
+  gap: 8px;
+}
+
+:global([data-atelier]) .steps span {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #aaa99e;
+}
+
+:global([data-atelier]) .steps span[aria-current="step"] {
+  color: #f6e7ca;
+  border-color: #6e614b;
+  background: #393729;
+  font-weight: 600;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier]) .heading {
+    padding: 12px 18px;
+    min-height: 69px;
+  }
+
+  :global([data-atelier]) .steps span {
+    display: none;
+  }
+
+  :global([data-atelier]) .steps span[aria-current="step"] {
+    display: inline-flex;
+    padding: 5px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 360px) {
+  :global([data-atelier]) .steps span[aria-current="step"] {
+    font-size: 12px;
+    padding-inline: 6px;
+  }
+}
+
+:global([data-atelier]) .heading h1 {
+  font-size: clamp(27px, 2.4vw, 39px);
+}
+
+@media (max-width: 600px) {
+  :global([data-atelier]) .heading h1 {
+    font-size: 27px;
+  }
+}
