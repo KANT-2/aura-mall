@@ -1,6 +1,8 @@
 # V3 주의: 아래 목록은 과거 제작 기록입니다.
 
-현재 향료 24종은 `/assets/botanical/*.webp`의 1680×1680 투명 이미지로, SVG 도구는 `/assets/editorial/*.svg`로 사용합니다. `/assets/reference`는 이전 원본 보관용이며 실사용하지 않습니다. [README](../README.md) 및 `public/assets/botanical-manifest.json`을 참고하세요.
+> 보관 기록입니다. 구현·경로·명령·검증 결과는 작성 당시 기준입니다. 현재 개발 방법은 [문서 목록](../README.md)에서 확인하세요.
+
+현재 향료 24종은 `/assets/botanical/*.webp`의 1680×1680 투명 이미지로, SVG 도구는 `/assets/editorial/*.svg`로 사용합니다. `/assets/reference`는 이전 원본 보관용이며 실사용하지 않습니다. [README](../../README.md) 및 `public/assets/botanical-manifest.json`을 참고하세요.
 
 ---
 
