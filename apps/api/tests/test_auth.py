@@ -397,6 +397,7 @@ def test_production_app_has_no_test_or_issuance_routes():
             "/api/v1/health",
             "/api/v1/catalog",
             "/api/v1/catalog/products/{product_id}",
+            "/api/v1/partner",
         }
         assert client.get("/test/me").status_code == 404
 

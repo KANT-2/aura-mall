@@ -143,7 +143,10 @@ def test_unknown_product_is_404_in_common_error_shape(client):
     response = client.get("/api/v1/catalog/products/no-such-product")
 
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "HTTP_404"
+    assert response.json()["error"] == {
+        "code": "PRODUCT_NOT_FOUND",
+        "message": "상품을 찾을 수 없어요.",
+    }
     assert "x-request-id" in response.headers
 
 
