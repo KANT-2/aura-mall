@@ -20,7 +20,7 @@ def check_password(stored_hash: str | None, password: str) -> bool:
     try:
         valid = PASSWORD_HASHER.verify(stored_hash if supported else DUMMY_HASH, password)
         return supported and valid
-    except (VerificationError, InvalidHashError):
+    except (VerificationError, InvalidHashError, UnicodeEncodeError):
         return False
 
 

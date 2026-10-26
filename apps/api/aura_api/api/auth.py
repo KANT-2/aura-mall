@@ -17,6 +17,15 @@ class LoginInput(BaseModel):
     email: str = Field(min_length=1, max_length=254)
     password: SecretStr = Field(min_length=1, max_length=256)
 
+    @field_validator("password")
+    @classmethod
+    def validate_password_encoding(cls, value: SecretStr) -> SecretStr:
+        try:
+            value.get_secret_value().encode("utf-8")
+        except UnicodeEncodeError:
+            raise ValueError("Invalid login input") from None
+        return value
+
     @field_validator("email")
     @classmethod
     def normalize_email(cls, value):

@@ -1,6 +1,8 @@
 """Lifecycle API tests. Memory storage is a TEST substitute, never an app fallback."""
 
 import asyncio
+import json
+import logging
 import os
 import threading
 import time
@@ -22,7 +24,12 @@ from aura_api.config import Settings
 from aura_api.core.auth import CurrentUser
 from aura_api.identity.postgres import PostgresAuthRepository
 from aura_api.identity.repository import AuthStorageUnavailable
-from aura_api.identity.service import PASSWORD_HASHER, AuthLifecycleService
+from aura_api.identity.service import (
+    PASSWORD_HASHER,
+    AuthenticationRejected,
+    AuthLifecycleService,
+    check_password,
+)
 from aura_api.identity.tokens import UserRecord, hash_refresh_token
 from aura_api.main import create_app
 
@@ -303,12 +310,21 @@ def test_expired_or_forged_access_is_rejected(client):
     "operation", ["find_user", "create_session", "rotate", "logout", "is_revoked"]
 )
 def test_storage_errors_never_report_success_or_leak_secrets(
-    client, repository, monkeypatch, operation
+    client, repository, monkeypatch, operation, caplog
 ):
+    caplog.set_level(logging.DEBUG)
     pair = login(client).json()
+    other_secret = "qa-bff-secret-0123456789abcdef0123456789"
 
     async def broken(*args, **kwargs):
-        raise AuthStorageUnavailable(KEY + PASSWORD + pair["refreshToken"] + "postgres://private")
+        raise AuthStorageUnavailable(
+            KEY
+            + PASSWORD
+            + pair["accessToken"]
+            + pair["refreshToken"]
+            + other_secret
+            + "postgres://private"
+        )
 
     monkeypatch.setattr(repository, operation, broken)
     if operation in {"find_user", "create_session"}:
@@ -320,9 +336,81 @@ def test_storage_errors_never_report_success_or_leak_secrets(
     else:
         response = protected(client, pair["accessToken"])
     assert response.status_code == (401 if operation == "is_revoked" else 503)
-    for secret in (KEY, PASSWORD, pair["refreshToken"], pair["accessToken"], "postgres://private"):
+    for secret in (
+        KEY,
+        PASSWORD,
+        pair["refreshToken"],
+        pair["accessToken"],
+        other_secret,
+        "postgres://private",
+    ):
         assert secret not in response.text
+        assert secret not in caplog.text
     assert response.headers["x-request-id"]
+
+
+@pytest.mark.parametrize("repository", ["memory"], indirect=True)
+@pytest.mark.parametrize("email", ["alice@example.com", "missing@example.com"])
+@pytest.mark.parametrize("password", ["private-\ud800", "private-\udfff", "x\ud800y\udfff"])
+def test_unencodable_password_is_safe_validation_error(client, repository, email, password, caplog):
+    caplog.set_level(logging.DEBUG)
+    response = client.post(
+        "/api/v1/auth/login",
+        content=json.dumps({"email": email, "password": password}),
+        headers={"Origin": ORIGIN, "Content-Type": "application/json"},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert response.headers["x-request-id"]
+    assert password not in response.text + caplog.text
+    assert json.dumps(password)[1:-1] not in response.text + caplog.text
+    assert not repository.families
+
+
+@pytest.mark.parametrize("stored_hash", [None, PASSWORD_HASH])
+@pytest.mark.parametrize("password", ["private-\ud800", "private-\udfff"])
+def test_password_verifier_rejects_unencodable_input(stored_hash, password):
+    assert check_password(stored_hash, password) is False
+
+
+@pytest.mark.parametrize("repository", ["memory"], indirect=True)
+@pytest.mark.parametrize("email", ["alice@example.com", "missing@example.com"])
+def test_service_login_rejects_unencodable_password_without_http_validation(
+    client, repository, email, caplog
+):
+    caplog.set_level(logging.DEBUG)
+    password = "private-\ud800"
+
+    async def run():
+        with pytest.raises(AuthenticationRejected) as failure:
+            await client.app.state.auth_service.login(email, password)
+        assert password not in str(failure.value)
+
+    anyio.run(run)
+    assert password not in caplog.text
+    assert not repository.families
+
+
+@pytest.mark.parametrize("repository", ["memory"], indirect=True)
+@pytest.mark.parametrize(
+    "password", ["한국어-비밀번호123!", "emoji-🔐🌸123!", "special-!@#$%^&*()"]
+)
+def test_unicode_and_special_passwords_keep_argon2_login_contract(
+    client, repository, password, caplog
+):
+    caplog.set_level(logging.DEBUG)
+    repository.users["alice@example.com"] = replace(
+        repository.users["alice@example.com"], password_hash=PASSWORD_HASHER.hash(password)
+    )
+    response = login(client, password=password)
+    assert response.status_code == 200
+    pair = response.json()
+    assert protected(client, pair["accessToken"]).status_code == 200
+    failure = login(client, password=password + "wrong")
+    missing = login(client, email="missing@example.com", password=password)
+    assert failure.status_code == missing.status_code == 401
+    assert failure.json() == missing.json()
+    assert password not in response.text + failure.text + missing.text + caplog.text
 
 
 def test_refresh_expiry_revocation_and_account_disable(client, repository):
