@@ -1,5 +1,5 @@
 import { request } from "@/lib/api/client";
-import type { AtelierDraft } from "../model/recipes";
+import type { AtelierDraft } from "@/features/atelier/model/recipes";
 export const draftKey = (guestId?: string) => ["atelier-draft", guestId] as const;
 export const getDraft = (signal?: AbortSignal) =>
   request<AtelierDraft | null>("/atelier/draft", { signal });

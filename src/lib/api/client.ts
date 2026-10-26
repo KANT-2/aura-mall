@@ -1,4 +1,4 @@
-import { ApiError } from "./errors";
+import { ApiError } from "@/lib/api/errors";
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
   if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");

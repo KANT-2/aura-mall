@@ -1,6 +1,6 @@
 "use client";
 import { useSubmitInquiry } from "@/features/partner/hooks/use-submit-inquiry";
-import styles from "./partner-form.module.css";
+import styles from "@/features/partner/components/partner-form.module.css";
 
 import Link from "next/link";
 import { StyledSelect } from "@/components/ui/select";

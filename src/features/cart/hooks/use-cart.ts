@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "@/features/account/hooks/use-session";
 import { useNotify } from "@/components/feedback/notification-provider";
 import type { Product } from "@/features/catalog/model/catalog";
-import type { CustomRecipeItem } from "../model/cart";
-import { cartKey, getCart, mutateCart, type CartCommand } from "../api/cart";
+import type { CustomRecipeItem } from "@/features/cart/model/cart";
+import { cartKey, getCart, mutateCart, type CartCommand } from "@/features/cart/api/cart";
 
 export function useCart() {
   const { owner, ready: sessionReady } = useSession();

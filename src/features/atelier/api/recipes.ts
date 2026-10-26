@@ -1,5 +1,5 @@
 import { request } from "@/lib/api/client";
-import type { Recipe } from "../model/recipes";
+import type { Recipe } from "@/features/atelier/model/recipes";
 export type RecipeInput = Pick<Recipe, "name" | "label" | "counts" | "parent">;
 export const recipesKey = (owner?: string) => ["recipes", owner] as const;
 export const getRecipes = (signal?: AbortSignal) => request<Recipe[]>("/recipes", { signal });

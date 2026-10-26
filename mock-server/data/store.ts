@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import catalogFixture from "../fixtures/catalog.json";
-import type { Catalog } from "../../src/features/catalog/model/catalog";
-import type { Member } from "../../src/features/account/model/account";
-import type { CartItem } from "../../src/features/cart/model/cart";
-import type { AtelierDraft, Recipe } from "../../src/features/atelier/model/recipes";
+import type { Catalog } from "@/features/catalog/model/catalog";
+import type { Member } from "@/features/account/model/account";
+import type { CartItem } from "@/features/cart/model/cart";
+import type { AtelierDraft, Recipe } from "@/features/atelier/model/recipes";
 
 export const catalog: Catalog = catalogFixture as Catalog;
 export type Account = Member & { passwordHash: string; salt: string };

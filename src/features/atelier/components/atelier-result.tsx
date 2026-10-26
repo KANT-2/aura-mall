@@ -8,8 +8,8 @@ import { testIds } from "@/lib/test-ids";
 import { UtilityIcon } from "@/components/ui/utility-icon";
 import { stageLabels } from "@/features/atelier/lib/content";
 import { BottlePreview } from "@/features/atelier/components/bottle-preview";
-import personalizationStyles from "./personalization.module.css";
-import resultStyles from "./atelier-result.module.css";
+import personalizationStyles from "@/features/atelier/components/personalization.module.css";
+import resultStyles from "@/features/atelier/components/atelier-result.module.css";
 
 type AtelierResultProps = {
   state: AtelierState;

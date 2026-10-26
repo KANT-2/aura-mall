@@ -2,7 +2,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDeviceMotion } from "@/hooks/use-device-motion";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { detectShake, initialShakeTracker, motionSample, shakePose } from "../model/motion";
+import {
+  detectShake,
+  initialShakeTracker,
+  motionSample,
+  shakePose,
+} from "@/features/atelier/model/motion";
 
 const restingPose = { tilt: 0, wave: 0, energy: 0 };
 export function useShakeBlending({

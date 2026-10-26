@@ -1,9 +1,13 @@
 "use client";
 import { useCallback, useReducer } from "react";
-import { blendReducer, initialBlendState, type BlendSnapshot } from "../model/blending";
-import { useAutomaticBlending } from "./use-automatic-blending";
-import { useStirGesture } from "./use-stir-gesture";
-import { useShakeBlending } from "./use-shake-blending";
+import {
+  blendReducer,
+  initialBlendState,
+  type BlendSnapshot,
+} from "@/features/atelier/model/blending";
+import { useAutomaticBlending } from "@/features/atelier/hooks/use-automatic-blending";
+import { useStirGesture } from "@/features/atelier/hooks/use-stir-gesture";
+import { useShakeBlending } from "@/features/atelier/hooks/use-shake-blending";
 
 /** Coordinates mutually exclusive mixing modes; each input owns its own lifecycle. */
 export function useBlend(open: boolean) {

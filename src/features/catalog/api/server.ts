@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { ApiError } from "@/lib/api/errors";
 import { serverRequest } from "@/lib/api/server";
-import type { Catalog, Product } from "../model/catalog";
+import type { Catalog, Product } from "@/features/catalog/model/catalog";
 
 export const getServerCatalog = cache(() => serverRequest<Catalog>("/catalog"));
 export const getServerProduct = cache(async (id: string) => {

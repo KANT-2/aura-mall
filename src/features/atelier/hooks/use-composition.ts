@@ -6,8 +6,8 @@ import {
   initialAtelierState,
   type AtelierState,
   type AtelierAction,
-} from "../model/composition";
-import type { AtelierDraft, Recipe } from "../model/recipes";
+} from "@/features/atelier/model/composition";
+import type { AtelierDraft, Recipe } from "@/features/atelier/model/recipes";
 
 type InitialComposition = {
   ingredients: Ingredient[];

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
-import { mixColor, restoreDraft, restoreRecipes } from "../../src/features/atelier/model/recipes";
+import { mixColor, restoreDraft, restoreRecipes } from "@/features/atelier/model/recipes";
 import { catalog, type MockDatabase } from "../data/store";
 import { resolveSession } from "../session";
 import { HttpError } from "../http";

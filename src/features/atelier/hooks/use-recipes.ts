@@ -2,7 +2,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "@/features/account/hooks/use-session";
 import { useNotify } from "@/components/feedback/notification-provider";
-import { getRecipes, recipesKey, saveRecipe, type RecipeInput } from "../api/recipes";
+import {
+  getRecipes,
+  recipesKey,
+  saveRecipe,
+  type RecipeInput,
+} from "@/features/atelier/api/recipes";
 export function useRecipes() {
   const { owner, ready } = useSession();
   const client = useQueryClient();

@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { request } from "@/lib/api/client";
-import type { Session, Credentials, Registration } from "../model/account";
+import type { Session, Credentials, Registration } from "@/features/account/model/account";
 
 export const sessionKey = ["session"] as const;
 export const sessionQueryOptions = queryOptions({

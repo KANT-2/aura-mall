@@ -5,8 +5,8 @@ import { stageOrder, type Stage } from "@/features/atelier/model/composition";
 import { MAX_DROPS } from "@/features/atelier/model/recipes";
 import { Asset } from "@/components/ui/asset";
 import { noteEnglish, stageDescriptions } from "@/features/atelier/lib/content";
-import styles from "./ingredient-picker.module.css";
-import layout from "./workspace.module.css";
+import styles from "@/features/atelier/components/ingredient-picker.module.css";
+import layout from "@/features/atelier/components/workspace.module.css";
 
 export function IngredientPicker({
   panelRef,

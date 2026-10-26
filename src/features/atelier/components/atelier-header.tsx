@@ -1,5 +1,5 @@
 import type { AtelierState } from "@/features/atelier/model/composition";
-import headerStyles from "./atelier-header.module.css";
+import headerStyles from "@/features/atelier/components/atelier-header.module.css";
 
 export function AtelierHeader({
   step,

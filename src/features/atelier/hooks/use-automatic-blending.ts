@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import type { StirPose } from "../model/blending";
+import type { StirPose } from "@/features/atelier/model/blending";
 
 export function useAutomaticBlending(
   enabled: boolean,

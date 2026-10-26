@@ -3,7 +3,7 @@ import Image from "next/image";
 import { Asset } from "@/components/ui/asset";
 import { UtilityIcon } from "@/components/ui/utility-icon";
 import { useCatalog } from "@/features/catalog/hooks/use-catalog";
-import styles from "./atelier-entry.module.css";
+import styles from "@/features/atelier/components/atelier-entry.module.css";
 
 export function AtelierEntry({
   draftCount,

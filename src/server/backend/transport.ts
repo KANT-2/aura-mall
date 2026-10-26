@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { ApiError } from "@/lib/api/errors";
 import { isRecord } from "@/lib/validation";
-import { backendConfig } from "./config";
+import { backendConfig } from "@/server/backend/config";
 
 export type BackendResult = { status: number; data: unknown; cookies: string[]; requestId: string };
 type BackendOptions = {

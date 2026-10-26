@@ -1,7 +1,13 @@
 "use client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { login, logout, register, sessionKey, sessionQueryOptions } from "../api/session";
-import type { Credentials, Registration, Session } from "../model/account";
+import {
+  login,
+  logout,
+  register,
+  sessionKey,
+  sessionQueryOptions,
+} from "@/features/account/api/session";
+import type { Credentials, Registration, Session } from "@/features/account/model/account";
 
 type AuthCommand =
   | { type: "login"; input: Credentials }

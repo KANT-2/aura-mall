@@ -4,7 +4,7 @@ import type { Stage } from "@/features/atelier/model/composition";
 import { MAX_DROPS } from "@/features/atelier/model/recipes";
 import { Asset } from "@/components/ui/asset";
 import { noteEnglish } from "@/features/atelier/lib/content";
-import styles from "./recipe-list.module.css";
+import styles from "@/features/atelier/components/recipe-list.module.css";
 
 export function RecipeList({
   selected,

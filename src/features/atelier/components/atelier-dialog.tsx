@@ -1,5 +1,5 @@
 "use client";
-import modalStyles from "./atelier-dialog.module.css";
+import modalStyles from "@/features/atelier/components/atelier-dialog.module.css";
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { UtilityIcon } from "@/components/ui/utility-icon";
 export function AtelierModal({

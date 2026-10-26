@@ -1,7 +1,7 @@
 import type { Ingredient } from "@/features/catalog/model/catalog";
 import { AuraWordmark } from "@/components/brand/wordmark";
 import { Asset } from "@/components/ui/asset";
-import styles from "./bottle-preview.module.css";
+import styles from "@/features/atelier/components/bottle-preview.module.css";
 
 export function BottlePreview({
   label,

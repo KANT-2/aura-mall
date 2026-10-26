@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { MAX_QUANTITY, restoreCart, type CartItem } from "../../src/features/cart/model/cart";
-import { itemPrice, isGiftSelectionValid } from "../../src/features/cart/model/pricing";
+import { MAX_QUANTITY, restoreCart, type CartItem } from "@/features/cart/model/cart";
+import { itemPrice, isGiftSelectionValid } from "@/features/cart/model/pricing";
 import { catalog, type MockDatabase } from "../data/store";
 import { resolveSession } from "../session";
 import { HttpError } from "../http";

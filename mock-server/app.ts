@@ -7,8 +7,8 @@ import { atelierRoutes } from "./routes/atelier";
 import { checkoutRoutes } from "./routes/checkout";
 import { resolveSession, ownerOf } from "./session";
 import { HttpError } from "./http";
-import { restoreCart } from "../src/features/cart/model/cart";
-import { restoreDraft, restoreRecipes } from "../src/features/atelier/model/recipes";
+import { restoreCart } from "@/features/cart/model/cart";
+import { restoreDraft, restoreRecipes } from "@/features/atelier/model/recipes";
 
 export function createMockApp({
   database = createDatabase(),

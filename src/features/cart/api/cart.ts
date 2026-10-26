@@ -1,5 +1,5 @@
 import { request } from "@/lib/api/client";
-import type { CartItem, CustomRecipeItem } from "../model/cart";
+import type { CartItem, CustomRecipeItem } from "@/features/cart/model/cart";
 
 export type CartCommand =
   | {
