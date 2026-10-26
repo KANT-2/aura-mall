@@ -2,7 +2,7 @@
 
 > **상태:** 초안 · 팀 검토 전 · Linear CRA-11 (상위 CRA-5)
 > **기준:** [백엔드 ERD](ERD.md), [FastAPI BFF 계약](../FASTAPI_BFF.md)(#24 로컬 장바구니 반영), Mock API(`apps/web/mock-server`)
-> **코드:** `apps/api/aura_api/modules/<영역>/domain.py` · **테스트:** `apps/api/tests/domain/`
+> **코드:** `apps/api/aura_api/domain/<영역>.py` · **테스트:** `apps/api/tests/domain/`
 
 ## 1. 이 문서의 역할
 
@@ -18,7 +18,7 @@ ERD는 **무엇을 저장하는가**를, 도메인 규칙은 **그 데이터로 
 
 ## 2. 오류 형식
 
-`aura_api/modules/errors.py`
+`aura_api/domain/errors.py`
 
 | 클래스         | `kind`         | 표현 계층에서 매핑할 HTTP 상태 |
 | -------------- | -------------- | ------------------------------ |
@@ -107,17 +107,17 @@ ERD는 **무엇을 저장하는가**를, 도메인 규칙은 **그 데이터로 
 ## 7. 코드 구조
 
 ```text
-apps/api/aura_api/modules/
+apps/api/aura_api/domain/
   errors.py              # DomainError와 kind
-  catalog/domain.py      # Product, Ingredient, Catalog (규칙이 참고하는 상품·향료 사실)
-  identity/domain.py     # 가입·로그인 입력, RequestOwner, Coupon
-  atelier/domain.py      # 향료 구성, 블렌딩 색, 레시피·초안
-  ordering/domain.py     # 주문 항목 재구성, Gift Set, 재고 수요, 금액·배송비
-  partner/domain.py      # 입점 문의 입력
+  catalog.py             # Product, Ingredient, Catalog (규칙이 참고하는 상품·향료 사실)
+  identity.py            # 가입·로그인 입력, RequestOwner, Coupon
+  atelier.py             # 향료 구성, 블렌딩 색, 레시피·초안
+  ordering.py            # 주문 항목 재구성, Gift Set, 재고 수요, 금액·배송비
+  partner.py             # 입점 문의 입력
 apps/api/tests/domain/   # 규칙별 단위 테스트 (DB 없음)
 ```
 
-모듈마다 이후 계층을 같은 폴더에 추가한다(예: 표현 `api.py`, 애플리케이션 `service.py`, 인프라 `repository.py`). 폴더 구성은 공통 모듈(CRA-8)과 합의해 조정한다.
+다른 계층은 계층별 폴더에 영역 이름으로 둔다: 표현 `aura_api/api/`, 서비스 `aura_api/services/`, 인프라 `aura_api/infra/`(DB·ORM 모델·저장소). 도메인 계층만 다른 계층을 import하지 않는다.
 
 ## 8. 결정 · 확인 필요
 

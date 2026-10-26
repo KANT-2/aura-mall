@@ -1,6 +1,6 @@
 import pytest
 
-from aura_api.modules.atelier.domain import (
+from aura_api.domain.atelier import (
     mix_color,
     new_recipe,
     normalize_label,
@@ -8,7 +8,7 @@ from aura_api.modules.atelier.domain import (
     validate_counts,
     validate_draft,
 )
-from aura_api.modules.errors import InvalidInput
+from aura_api.domain.errors import InvalidInput
 
 
 def test_counts_drop_zero_entries(catalog):
