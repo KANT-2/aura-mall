@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { useSession } from "@/features/account/hooks/use-session";
 import { useCart } from "@/features/cart/hooks/use-cart";
 import { useRecipes } from "@/features/atelier/hooks/use-recipes";
@@ -24,7 +25,7 @@ export function AtelierScreen({
   if (!recipes.ready || !draft.ready) {
     return (
       <main className="page-width" aria-busy="true">
-        <p role="status">조향 정보를 불러오고 있어요.</p>
+        <LoadingSkeleton variant="atelier" label="조향 정보를 불러오고 있어요." />
       </main>
     );
   }
