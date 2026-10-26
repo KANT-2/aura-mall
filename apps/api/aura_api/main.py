@@ -1,3 +1,6 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from aura_api.api.health import router as health_router
@@ -7,11 +10,25 @@ from aura_api.core.auth import JWTVerifier
 from aura_api.core.csrf import CSRFMiddleware
 from aura_api.core.exception_handlers import register_exception_handlers
 from aura_api.core.middleware import RequestIDMiddleware
+from aura_api.infra.database import create_engine, create_sessionmaker
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
-    app = FastAPI(title=settings.app_name, version="0.1.0", redirect_slashes=False)
+    engine = (
+        create_engine(settings.database_url.get_secret_value()) if settings.database_url else None
+    )
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        yield
+        if engine is not None:
+            await engine.dispose()
+
+    app = FastAPI(
+        title=settings.app_name, version="0.1.0", redirect_slashes=False, lifespan=lifespan
+    )
+    app.state.sessionmaker = create_sessionmaker(engine) if engine is not None else None
     app.state.jwt_verifier = JWTVerifier(settings)
     app.add_middleware(
         CSRFMiddleware,
