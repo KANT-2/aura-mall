@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { Router } from "express";
-import { HttpError, requireString } from "../http";
+import { HttpError, requireJsonBody, requireString } from "../http";
 import { publicMember, resolveSession } from "../session";
 import type { MockDatabase } from "../data/store";
 
@@ -10,7 +10,7 @@ export function accountRoutes(database: MockDatabase) {
     const { session, user } = resolveSession(req, res, database);
     res.json({ user, guestId: session.guestId });
   });
-  router.post("/auth/register", (req, res) => {
+  router.post("/auth/register", requireJsonBody, (req, res) => {
     const name = requireString(req.body.name, "이름을 입력해 주세요.", 100);
     const email = requireString(req.body.email, "이메일을 확인해 주세요.", 254).toLowerCase();
     const password = req.body.password;
@@ -26,6 +26,7 @@ export function accountRoutes(database: MockDatabase) {
       throw new HttpError(409, "이미 가입된 이메일입니다.");
     }
 
+    const { session } = resolveSession(req, res, database);
     const salt = randomBytes(16).toString("hex");
     const account = {
       id: randomUUID(),
@@ -37,12 +38,11 @@ export function accountRoutes(database: MockDatabase) {
       passwordHash: scryptSync(password, salt, 32).toString("hex"),
     };
     database.state.accounts[account.id] = account;
-    const { session } = resolveSession(req, res, database);
     session.userId = account.id;
     database.persist();
     res.status(201).json({ user: publicMember(account), guestId: session.guestId });
   });
-  router.post("/auth/login", (req, res) => {
+  router.post("/auth/login", requireJsonBody, (req, res) => {
     const email = requireString(req.body.email, "이메일을 확인해 주세요.").toLowerCase();
     const password = req.body.password;
     if (typeof password !== "string" || !password || password.length > 256) {

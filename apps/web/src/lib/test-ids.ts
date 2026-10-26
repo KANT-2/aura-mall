@@ -36,6 +36,7 @@ export const testIds = {
     card: "product-card",
     sort: "catalog-sort",
     giftOption: "gift-option",
+    addToCart: "product-add-to-cart",
   },
   account: {
     submit: "auth-submit",

@@ -3,7 +3,7 @@ import { Router } from "express";
 import { mixColor, restoreDraft, restoreRecipes } from "@/features/atelier/model/recipes";
 import { catalog, type MockDatabase } from "../data/store";
 import { resolveSession } from "../session";
-import { HttpError } from "../http";
+import { HttpError, requireJsonBody } from "../http";
 
 export function atelierRoutes(database: MockDatabase) {
   const router = Router();
@@ -11,7 +11,7 @@ export function atelierRoutes(database: MockDatabase) {
     const { owner } = resolveSession(req, res, database);
     res.json(database.state.recipes[owner] ?? []);
   });
-  router.post("/recipes", (req, res) => {
+  router.post("/recipes", requireJsonBody, (req, res) => {
     const { owner, user } = resolveSession(req, res, database);
     if (!user) {
       throw new HttpError(401, "로그인 후 향을 저장할 수 있어요.");
@@ -64,7 +64,7 @@ export function atelierRoutes(database: MockDatabase) {
     const { session } = resolveSession(req, res, database);
     res.json(database.state.drafts[session.guestId] ?? null);
   });
-  router.put("/atelier/draft", (req, res) => {
+  router.put("/atelier/draft", requireJsonBody, (req, res) => {
     const { session } = resolveSession(req, res, database);
     const draft = restoreDraft(req.body, catalog.ingredients);
     if (!draft) {
