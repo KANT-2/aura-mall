@@ -6,8 +6,8 @@ import type { Account, MockDatabase, MockSession } from "./data/store";
 
 export const SESSION_COOKIE = "aura_mock_session";
 export function publicMember(account: Account): Member {
-  const { id, name, email, coupon, marketing } = account;
-  return { id, name, email, coupon, marketing };
+  const { id, name, email, coupon, marketing, role = "member" } = account;
+  return { id, name, email, coupon, marketing, role };
 }
 export function resolveSession(request: Request, response: Response, database: MockDatabase) {
   const cookies = Object.fromEntries(
@@ -44,3 +44,16 @@ export function resolveSession(request: Request, response: Response, database: M
 }
 export const ownerOf = (session: MockSession) =>
   session.userId ? `member:${session.userId}` : `guest:${session.guestId}`;
+/** Checks the stored account on every request, so logout or role removal applies immediately. */
+export function requireAdmin(request: Request, response: Response, database: MockDatabase) {
+  const { user } = resolveSession(request, response, database);
+  if (!user) {
+    throw new HttpError(401, "로그인이 필요해요.");
+  }
+
+  if (database.state.accounts[user.id].role !== "admin") {
+    throw new HttpError(403, "관리자 권한이 필요해요.");
+  }
+
+  return user;
+}
