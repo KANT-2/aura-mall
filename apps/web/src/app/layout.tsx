@@ -32,7 +32,11 @@ export default async function Layout({ children }: { children: React.ReactNode }
   const queryClient = new QueryClient();
   await queryClient.fetchQuery({ queryKey: catalogKey, queryFn: getServerCatalog });
   return (
-    <html lang="ko" className={`${cormorant.variable} ${notoSerif.variable}`}>
+    <html
+      lang="ko"
+      data-scroll-behavior="smooth"
+      className={`${cormorant.variable} ${notoSerif.variable}`}
+    >
       <head>
         <link
           rel="stylesheet"

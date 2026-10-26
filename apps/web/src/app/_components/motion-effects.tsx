@@ -20,6 +20,7 @@ export function AuraMotionEnhancer() {
     }
 
     let observer: IntersectionObserver | undefined;
+    const entrances = new Set<Animation>();
     const raf = window.requestAnimationFrame(() => {
       const targets = document.querySelectorAll<HTMLElement>(
         [
@@ -53,35 +54,49 @@ export function AuraMotionEnhancer() {
               continue;
             }
 
+            // Animation effects do not mutate attributes owned by a hydrating React tree.
             const target = entry.target as HTMLElement;
-            target.dataset.auraEnter = "visible";
+            const animation = target.animate(
+              [
+                { opacity: 0, transform: "translateY(15px)" },
+                { opacity: 1, transform: "none" },
+              ],
+              { duration: 620, easing: "cubic-bezier(0.22, 0.78, 0.25, 1)" },
+            );
+            entrances.add(animation);
+            animation.finished.then(
+              () => entrances.delete(animation),
+              () => entrances.delete(animation),
+            );
             observer?.unobserve(target);
           }
         },
         { rootMargin: "0px 0px -35px 0px", threshold: 0.06 },
       );
-      targets.forEach((el, index) => {
-        el.dataset.auraEnter = "pending";
-        el.style.setProperty("--aura-delay", Math.min(index % 4, 3) * 56 + "ms");
-        observer?.observe(el);
-      });
+      targets.forEach((el) => observer?.observe(el));
     });
+    const stopEntrances = () => {
+      window.cancelAnimationFrame(raf);
+      observer?.disconnect();
+      for (const animation of entrances) {
+        animation.cancel();
+      }
+
+      entrances.clear();
+    };
     const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
     if (!finePointer) {
-      return () => {
-        window.cancelAnimationFrame(raf);
-        observer?.disconnect();
-      };
+      return stopEntrances;
     }
 
     const magnets =
       ".home .hero-copy .button,.home .a86-atelier-intro .button,.detail .purchase-row .button,[data-atelier-blend]";
     let current: HTMLElement | null = null;
+    let magnet: Animation | undefined;
     const move = (event: PointerEvent) => {
       const el = (event.target as HTMLElement)?.closest<HTMLElement>(magnets);
       if (current && current !== el) {
-        current.style.removeProperty("--aura-mx");
-        current.style.removeProperty("--aura-my");
+        magnet?.cancel();
       }
 
       current = el;
@@ -92,28 +107,25 @@ export function AuraMotionEnhancer() {
       const box = el.getBoundingClientRect();
       const dx = (event.clientX - (box.left + box.width / 2)) / Math.max(1, box.width);
       const dy = (event.clientY - (box.top + box.height / 2)) / Math.max(1, box.height);
-      el.style.setProperty("--aura-mx", Math.max(-5, Math.min(5, dx * 8)).toFixed(2) + "px");
-      el.style.setProperty("--aura-my", Math.max(-4, Math.min(4, dy * 6)).toFixed(2) + "px");
+      const x = Math.max(-5, Math.min(5, dx * 8)).toFixed(2);
+      const y = Math.max(-4, Math.min(4, dy * 6)).toFixed(2);
+      magnet?.cancel();
+      magnet = el.animate([{ translate: `${x}px ${y}px` }], { duration: 0, fill: "forwards" });
     };
     const out = (event: PointerEvent) => {
       const to = event.relatedTarget as Node | null;
       if (current && (!to || !current.contains(to))) {
-        current.style.removeProperty("--aura-mx");
-        current.style.removeProperty("--aura-my");
+        magnet?.cancel();
         current = null;
       }
     };
     document.addEventListener("pointermove", move, { passive: true });
     document.addEventListener("pointerout", out, { passive: true });
     return () => {
-      window.cancelAnimationFrame(raf);
-      observer?.disconnect();
+      stopEntrances();
       document.removeEventListener("pointermove", move);
       document.removeEventListener("pointerout", out);
-      if (current) {
-        current.style.removeProperty("--aura-mx");
-        current.style.removeProperty("--aura-my");
-      }
+      magnet?.cancel();
     };
   }, [pathname]);
   return null;
