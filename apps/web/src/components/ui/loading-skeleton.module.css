@@ -1,0 +1,233 @@
+.root {
+  width: 100%;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.preview {
+  display: grid;
+  gap: 32px;
+  pointer-events: none;
+  animation: enter 320ms var(--aura-motion-ease-soft) both;
+}
+
+.heading,
+.lines,
+.fields {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.heading {
+  max-width: 520px;
+  padding-block: 12px;
+}
+
+.eyebrow,
+.title,
+.line,
+.image,
+.visual,
+.thumbnail,
+.control {
+  border-radius: 4px;
+  background: linear-gradient(100deg, var(--aura-linen) 35%, #f7f3ec 50%, var(--aura-linen) 65%);
+  background-size: 300% 100%;
+  animation: shimmer 2.4s ease-in-out infinite;
+}
+
+.eyebrow {
+  width: 96px;
+  height: 12px;
+}
+
+.title {
+  width: 70%;
+  height: 36px;
+}
+
+.line {
+  width: 100%;
+  height: 14px;
+}
+
+.lines > .line:nth-child(2) {
+  width: 78%;
+}
+
+.lines > .line:last-child {
+  width: 52%;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.card {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.image {
+  aspect-ratio: 1 / 1;
+}
+
+.commerce {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
+  gap: clamp(26px, 4vw, 54px);
+  align-items: start;
+}
+
+.row {
+  display: flex;
+  gap: 22px;
+  padding-block: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.thumbnail {
+  width: 112px;
+  height: 132px;
+  flex-shrink: 0;
+}
+
+.fields {
+  flex: 1;
+  align-content: start;
+}
+
+.control {
+  width: 100%;
+  height: 48px;
+}
+
+.summary {
+  display: grid;
+  gap: 28px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.atelier {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: clamp(25px, 4vw, 52px);
+  align-items: center;
+}
+
+.visual {
+  min-height: 360px;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 140px));
+  gap: 12px;
+  padding-block: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.root[data-variant="checkout"] .row {
+  padding-block: 0;
+  border: 0;
+}
+
+.root[data-variant="checkout"] .fields > .lines > .line:not(:first-child) {
+  display: none;
+}
+
+.root[data-variant="checkout"] .fields > .lines > .line:first-child {
+  width: 80px;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: 0% 0;
+  }
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 790px) {
+  .commerce,
+  .atelier {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .visual {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .tabs {
+    gap: 8px;
+  }
+
+  .title {
+    height: 30px;
+  }
+
+  .thumbnail {
+    width: 80px;
+    height: 100px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preview,
+  .eyebrow,
+  .title,
+  .line,
+  .image,
+  .visual,
+  .thumbnail,
+  .control {
+    animation: none;
+  }
+
+  .eyebrow,
+  .title,
+  .line,
+  .image,
+  .visual,
+  .thumbnail,
+  .control {
+    background: var(--aura-linen);
+  }
+}
