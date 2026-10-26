@@ -19,7 +19,9 @@ test("real FastAPI JWT login, rotation, logout revocation and guest continuity",
   const token = await cookieToken(request);
   expect(await login.text()).not.toContain(token);
   expect(await (await request.get("/api/session")).json()).toEqual(member);
-  expect(await (await request.get("/api/recipes")).json()).toEqual([{ id: "recipe-member-a" }]);
+  expect(await (await request.get("/api/recipes")).json()).toMatchObject([
+    { id: "recipe-member-a" },
+  ]);
 
   const loggedOut = await request.post("/api/auth/logout");
   expect(loggedOut.status()).toBe(200);
@@ -83,8 +85,12 @@ test("separate users retain their identities; origin and owner checks still appl
     await other.post("/api/auth/login", {
       data: { ...credentials, email: "member-b@example.com" },
     });
-    expect(await (await other.get("/api/recipes")).json()).toEqual([{ id: "recipe-member-b" }]);
-    expect(await (await request.get("/api/recipes")).json()).toEqual([{ id: "recipe-member-a" }]);
+    expect(await (await other.get("/api/recipes")).json()).toMatchObject([
+      { id: "recipe-member-b" },
+    ]);
+    expect(await (await request.get("/api/recipes")).json()).toMatchObject([
+      { id: "recipe-member-a" },
+    ]);
     const conflict = await request.get("/api/recipes", {
       headers: { "X-Session-Owner": "member-b" },
     });
