@@ -1,6 +1,24 @@
 # AURA JWT 로그인·갱신·회전·로그아웃
 
-## 1. 구현 상태와 확인한 팀 작업
+## 현재 저장소 구조 — Access 기록 통합
+
+JWT 저장소와 격리 테스트는 `users`, `revoked_tokens`, `auth_token_families`,
+`refresh_tokens`의 네 테이블 계약을 사용합니다. `refresh_tokens`에
+`access_jti UUID NOT NULL UNIQUE`, `access_expires_at TIMESTAMPTZ NOT NULL`을 저장하며
+별도 `auth_access_tokens` 테이블은 조회하거나 생성하지 않습니다.
+
+로그인과 회전은 Access·Refresh를 한 쌍으로 발급하고, 해시와 Access 메타데이터를 같은 행에
+저장합니다. 정상 회전 후 이전 Access는 자체 만료까지 유효합니다. 따라서 Access 검증·로그아웃은
+Refresh의 만료·소비 상태로 거절하지 않으며 Access 만료·계열 폐기·회원 활성·jti 차단을 확인합니다.
+재사용 감지·로그아웃 시에는 계열의 모든 미만료 Access를 기존 `revoked_tokens`에 기록합니다.
+회원의 다른 로그인 계열은 유지합니다. 사용자 → 계열 → 토큰 잠금과 커밋 후 응답 원칙도 유지합니다.
+
+이는 예진 담당 저장소 코드와 테스트의 계약입니다. 우섭님 담당 SQL·ORM·Alembic 0002에는
+아직 반영하지 않았고 운영 DB에도 적용하지 않았습니다. 기본 스키마나 옛 다섯 테이블 구조만으로는
+새 구조 검사를 통과하지 못하며, 저장소 불일치 시 로그인 503·보호 요청 401로 안전하게 거절합니다.
+실제 PostgreSQL 연결·동시성·제약·롤백 검증은 승인된 전용 테스트 DB가 준비된 뒤 수행합니다.
+
+## 1. 구현 상태와 확인한 팀 작업 (최초 구현 이력)
 
 이 문서는 전예진 담당 JWT 생명주기 코드를 설명합니다. 인증은 신원 확인, 인가는
 해당 작업을 해도 되는지 확인하는 과정입니다. 이번에 실제 API·서비스와 PostgreSQL
@@ -139,21 +157,27 @@ DB에는 `SHA-256("aura-refresh-v1:" + 원문)`만 저장합니다. 난수는 38
 아래 이름은 저장소 코드·테스트를 작성하기 위한 **잠정 계약**이며 CRA-14 확인 후 조정해야 합니다.
 ERD·팀원 SQL을 덮어쓰거나 실행 가능한 운영 마이그레이션으로 확정하지 않았습니다.
 
-| 테이블              | 필요한 항목                                                                                 | 현재 확인·차이                                                          |
-| ------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| users               | id UUID, email, password_hash, is_active BOOLEAN NOT NULL                                   | ERD에 앞 세 항목만 있음. is_active 또는 동등한 활성 상태 계약 필요      |
-| revoked_tokens      | jti UUID PK, expires_at TIMESTAMPTZ NOT NULL                                                | ERD에 있음. 실제 테이블은 아직 미확인                                   |
-| refresh_tokens      | id UUID PK, user_id, family_id, token_hash, created_at, expires_at, consumed_at, revoked_at | ERD·원격 SQL에 없음                                                     |
-| auth_token_families | id UUID PK, user_id, created_at, revoked_at                                                 | 계열 잠금·재사용 폐기에 필요한 잠정 보조 테이블                         |
-| auth_access_tokens  | jti UUID PK, family_id, expires_at                                                          | 계열 로그아웃·재사용 시 모든 미만료 JWT를 차단하기 위한 잠정 메타데이터 |
+| 테이블              | 필요한 항목                                                                                                                | 현재 확인·차이                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| users               | id UUID, email, password_hash, is_active BOOLEAN NOT NULL                                                                  | ERD에 앞 세 항목만 있음. is_active 또는 동등한 활성 상태 계약 필요 |
+| revoked_tokens      | jti UUID PK, expires_at TIMESTAMPTZ NOT NULL                                                                               | SQL·ORM·0001 기준 UUID 일치. 실제 DB는 미검증                      |
+| refresh_tokens      | id UUID PK, user_id, family_id, token_hash, created_at, expires_at, consumed_at, revoked_at, access_jti, access_expires_at | Access 발급 기록을 통합한 신규 계약. SQL·ORM·0002 반영 대기        |
+| auth_token_families | id UUID PK, user_id, created_at, revoked_at                                                                                | 계열 잠금·재사용 폐기에 필요한 잠정 보조 테이블                    |
 
 필요 제약·인덱스:
 
 - `lower(users.email)` 유일 인덱스, Argon2id 해시를 담는 password_hash.
 - 사용자·계열 외래키, `(family_id, user_id)` 일치 제약으로 사용자 혼동 방지.
 - Refresh `token_hash` UNIQUE(64자리 16진수), 독립 토큰 식별자 PK, `expires_at > created_at`.
+- Refresh `access_jti` UUID NOT NULL UNIQUE, `access_expires_at` TIMESTAMPTZ NOT NULL,
+  `access_expires_at > created_at`. API 발급 시 두 토큰을 한 쌍으로 저장합니다.
+- 격리 테스트 SQL에는 미소비·미폐기 행의 family_id 부분 UNIQUE도 둡니다.
+  `consumed_at IS NULL AND revoked_at IS NULL`이며 기존 행 소비 처리 후 새 행을 삽입합니다.
+  구조 가드는 주요 컬럼·PK·FK·비부분 UNIQUE를 검사하며 CHECK·부분 인덱스까지 보장하지 않습니다.
 - family_id 조회 인덱스, 만료 정리용 expires_at 인덱스, jti PK 충돌 방지.
 - 소비·폐기된 Refresh 기록을 즉시 지우면 재사용을 탐지하지 못합니다. 보존·정리 정책 필요.
+- 같은 계열이 살아 있는 동안 소비된 Refresh 행도 보존해야 합니다. 정리는 계열 전체의
+  Refresh·Access가 모두 만료된 후 계열 잠금 아래 재확인하는 방식을 추천합니다. 정리 작업은 미구현입니다.
 - `revoked_tokens`는 원래 JWT exp까지 반드시 유지합니다. 정리 작업은 이번에 구현하지 않았습니다.
 - 현재 단일 issuer·UUID jti 계약입니다. 다중 발급자, users.role의 권한 매핑은 후속 합의입니다.
 
@@ -202,6 +226,17 @@ npm run check:api
 git diff --check
 git status -sb
 ```
+
+Access 기록 통합 후 Python 3.14.6·uv 기준 `npm run check:api`: **443개 통과, 44개 건너뜀,
+0개 실패**이며 린트·포맷도 통과했습니다. 기존 428개 통과를 유지하고 신규 오프라인 검사
+15개가 통과했습니다. 집중 검사(생명주기·구조·SQL 계약)는 68개 통과, 29개 건너뜀입니다.
+같은 회원의 계열 분리, 소비·만료된 Refresh에 연결된 Access 유지와 로그아웃, 미등록 jti 거절을
+검사했습니다. PostgreSQL 어댑터의 SQL 계약 검사는 연결 대역으로 바인딩·조회 조건을 확인하며,
+실제 SQL 실행·행 잠금·DB 롤백을 검증한 것이 아닙니다. 승인된 전용 DB가 없어 실제 DB 검사는
+실행하지 않았습니다. 빌드는 통과했고 전체 check는 수정하지 않은 파일 247개의 포맷 경고로
+중단됐습니다. SQL·ORM·0002와 실제 DB 호환 여부는 우섭님 반영 후 재검증해야 합니다.
+
+이하 내용은 최초 구현 당시의 과거 검증 기록입니다.
 
 2026-10-26 Python 3.14.6·기존 uv 환경에서 `npm run check:api`의 린트·포맷 검사를 통과했고
 **297개 통과, 24개 건너뜀, 0개 실패**를 확인했습니다. 기존 271개 회귀와 새 단위 검사

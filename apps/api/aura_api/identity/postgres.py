@@ -61,8 +61,9 @@ class PostgresAuthRepository:
     async def _insert_tokens(self, connection, tokens: IssuedTokens):
         await connection.execute(
             """INSERT INTO refresh_tokens
-               (id, user_id, family_id, token_hash, expires_at, created_at)
-               VALUES (%s, %s, %s, %s, %s, %s)""",
+               (id, user_id, family_id, token_hash, expires_at, created_at,
+                access_jti, access_expires_at)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
             (
                 tokens.refresh_id,
                 tokens.user_id,
@@ -70,12 +71,9 @@ class PostgresAuthRepository:
                 tokens.refresh_hash,
                 tokens.refresh_expires_at,
                 tokens.issued_at,
+                tokens.jti,
+                tokens.access_expires_at,
             ),
-        )
-        await connection.execute(
-            """INSERT INTO auth_access_tokens (jti, family_id, expires_at)
-               VALUES (%s, %s, %s)""",
-            (tokens.jti, tokens.family_id, tokens.access_expires_at),
         )
 
     async def create_session(self, tokens: IssuedTokens) -> bool:
@@ -104,8 +102,8 @@ class PostgresAuthRepository:
         )
         await connection.execute(
             """INSERT INTO revoked_tokens (jti, expires_at)
-               SELECT jti, expires_at FROM auth_access_tokens
-               WHERE family_id = %s AND expires_at > clock_timestamp()
+               SELECT access_jti, access_expires_at FROM refresh_tokens
+               WHERE family_id = %s AND access_expires_at > clock_timestamp()
                ON CONFLICT (jti) DO UPDATE
                SET expires_at = GREATEST(revoked_tokens.expires_at, EXCLUDED.expires_at)""",
             (family_id,),
@@ -153,8 +151,9 @@ class PostgresAuthRepository:
             await connection.execute("SELECT id FROM users WHERE id = %s FOR SHARE", (user_id,))
             cursor = await connection.execute(
                 """SELECT f.id, f.revoked_at FROM auth_token_families f
-                   JOIN auth_access_tokens a ON a.family_id = f.id
-                   WHERE a.jti = %s AND f.user_id = %s AND a.expires_at > clock_timestamp()
+                   JOIN refresh_tokens t ON t.family_id = f.id
+                   WHERE t.access_jti = %s AND f.user_id = %s
+                     AND t.access_expires_at > clock_timestamp()
                    FOR UPDATE OF f""",
                 (jti, user_id),
             )
@@ -172,14 +171,15 @@ class PostgresAuthRepository:
         except ValueError:
             return True
         async with self._connection() as connection:
+            # A consumed/expired Refresh row still tracks its independently valid Access.
             cursor = await connection.execute(
                 """SELECT NOT EXISTS (
-                     SELECT 1 FROM auth_access_tokens a
-                     JOIN auth_token_families f ON f.id = a.family_id
+                     SELECT 1 FROM refresh_tokens t
+                     JOIN auth_token_families f ON f.id = t.family_id
                      JOIN users u ON u.id = f.user_id
-                     WHERE a.jti = %s AND a.expires_at > clock_timestamp()
+                     WHERE t.access_jti = %s AND t.access_expires_at > clock_timestamp()
                        AND f.revoked_at IS NULL AND u.is_active
-                       AND NOT EXISTS (SELECT 1 FROM revoked_tokens r WHERE r.jti = a.jti)
+                       AND NOT EXISTS (SELECT 1 FROM revoked_tokens r WHERE r.jti = t.access_jti)
                    ) AS revoked""",
                 (token_id,),
             )

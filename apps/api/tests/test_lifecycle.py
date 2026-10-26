@@ -47,7 +47,7 @@ class MemoryRepository:
             "bob@example.com": UserRecord(BOB, PASSWORD_HASH, True),
             "inactive@example.com": UserRecord(INACTIVE, PASSWORD_HASH, False),
         }
-        self.families, self.refreshes, self.accesses, self.revoked = {}, {}, {}, {}
+        self.families, self.refreshes, self.revoked = {}, {}, {}
         self.lock = threading.RLock()
 
     async def find_user(self, email):
@@ -64,11 +64,8 @@ class MemoryRepository:
             "expires": pair.refresh_expires_at,
             "consumed": False,
             "revoked": False,
-        }
-        self.accesses[pair.jti] = {
-            "user": pair.user_id,
-            "family": pair.family_id,
-            "expires": pair.access_expires_at,
+            "access_jti": pair.jti,
+            "access_expires_at": pair.access_expires_at,
         }
 
     async def create_session(self, pair):
@@ -84,9 +81,8 @@ class MemoryRepository:
         for row in self.refreshes.values():
             if row["family"] == family:
                 row["revoked"] = True
-        for jti, row in self.accesses.items():
-            if row["family"] == family:
-                self.revoked[jti] = row["expires"]
+                if row["access_expires_at"] > datetime.now(UTC):
+                    self.revoked[row["access_jti"]] = row["access_expires_at"]
 
     async def rotate(self, token_hash, issue):
         with self.lock:
@@ -105,16 +101,30 @@ class MemoryRepository:
 
     async def logout(self, user_id, jti):
         with self.lock:
-            row = self.accesses.get(jti)
-            if not row or row["user"] != user_id or self.families[row["family"]]:
+            row = next((row for row in self.refreshes.values() if row["access_jti"] == jti), None)
+            if (
+                not row
+                or row["user"] != user_id
+                or self.families[row["family"]]
+                or row["access_expires_at"] <= datetime.now(UTC)
+            ):
                 return False
             self.revoke(row["family"])
             return True
 
     async def is_revoked(self, *, issuer, jti):
         with self.lock:
-            row = self.accesses.get(UUID(jti))
-            return not row or self.families[row["family"]] or not self.active(row["user"])
+            row = next(
+                (row for row in self.refreshes.values() if row["access_jti"] == UUID(jti)), None
+            )
+            return (
+                issuer != "aura-test-issuer"
+                or not row
+                or self.families[row["family"]]
+                or not self.active(row["user"])
+                or row["access_expires_at"] <= datetime.now(UTC)
+                or row["access_jti"] in self.revoked
+            )
 
 
 @pytest.fixture(params=["memory", "postgres"])
@@ -226,6 +236,19 @@ def test_login_issues_minimal_jwt_and_hashed_refresh(client, repository):
     if isinstance(repository, MemoryRepository):
         assert hash_refresh_token(pair["refreshToken"]) in repository.refreshes
         assert pair["refreshToken"] not in str(repository.refreshes)
+        row = repository.refreshes[hash_refresh_token(pair["refreshToken"])]
+        assert row["access_jti"] == UUID(claims["jti"])
+        assert row["access_expires_at"] == datetime.fromtimestamp(claims["exp"], UTC)
+    else:
+        with psycopg.connect(repository._dsn) as connection:
+            connection.execute(
+                sql.SQL("SET LOCAL search_path TO {}").format(sql.Identifier(repository._schema))
+            )
+            row = connection.execute(
+                "SELECT access_jti, access_expires_at FROM refresh_tokens WHERE token_hash=%s",
+                (hash_refresh_token(pair["refreshToken"]),),
+            ).fetchone()
+        assert row == (UUID(claims["jti"]), datetime.fromtimestamp(claims["exp"], UTC))
 
 
 @pytest.mark.parametrize(
@@ -252,6 +275,7 @@ def test_rotation_and_replay_revoke_entire_family(client):
     assert second["refreshToken"] != first["refreshToken"]
     assert second["accessToken"] != first["accessToken"]
     assert protected(client, second["accessToken"]).status_code == 200
+    assert protected(client, first["accessToken"]).status_code == 200
     assert refresh(client, first["refreshToken"]).status_code == 401
     assert protected(client, first["accessToken"]).status_code == 401
     assert protected(client, second["accessToken"]).status_code == 401
@@ -278,6 +302,54 @@ def test_logout_persists_revocation_and_isolates_other_login(client, repository)
     assert refresh(client, other["refreshToken"]).status_code == 200
     if isinstance(repository, MemoryRepository):
         assert repository.revoked
+
+
+def test_logout_only_revokes_current_family_for_same_member(client):
+    first = login(client).json()
+    other = login(client).json()
+    assert logout(client, first["accessToken"]).status_code == 204
+    assert protected(client, first["accessToken"]).status_code == 401
+    assert refresh(client, first["refreshToken"]).status_code == 401
+    assert protected(client, other["accessToken"]).status_code == 200
+    assert refresh(client, other["refreshToken"]).status_code == 200
+
+
+def test_signed_but_untracked_access_jti_cannot_authenticate(client):
+    pair = login(client).json()
+    claims = jwt.decode(
+        pair["accessToken"],
+        KEY,
+        algorithms=["HS256"],
+        issuer="aura-test-issuer",
+        audience="aura-test-api",
+    )
+    token = jwt.encode({**claims, "jti": str(uuid4())}, KEY, algorithm="HS256")
+    assert protected(client, token).status_code == 401
+
+
+def test_consumed_expired_refresh_still_tracks_live_access_and_family_logout(client, repository):
+    first = login(client).json()
+    second = refresh(client, first["refreshToken"]).json()
+    token_hash = hash_refresh_token(first["refreshToken"])
+    if isinstance(repository, MemoryRepository):
+        row = repository.refreshes[token_hash]
+        assert row["consumed"]
+        row["expires"] = datetime.now(UTC) - timedelta(seconds=1)
+    else:
+        with psycopg.connect(repository._dsn) as connection:
+            connection.execute(
+                sql.SQL("SET LOCAL search_path TO {}").format(sql.Identifier(repository._schema))
+            )
+            connection.execute(
+                "UPDATE refresh_tokens SET created_at=now()-interval '2 days', "
+                "expires_at=now()-interval '1 day' WHERE token_hash=%s",
+                (token_hash,),
+            )
+    assert protected(client, first["accessToken"]).status_code == 200
+    assert logout(client, first["accessToken"]).status_code == 204
+    assert protected(client, first["accessToken"]).status_code == 401
+    assert protected(client, second["accessToken"]).status_code == 401
+    assert refresh(client, second["refreshToken"]).status_code == 401
 
 
 @pytest.mark.parametrize("token", ["invalid", "r1_" + "a" * 64])
