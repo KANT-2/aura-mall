@@ -27,21 +27,54 @@ uv run --directory apps/api --locked uvicorn aura_api.main:app --reload --host 1
 
 ```text
 aura_api/
-  main.py             # 앱 팩토리·라우터 연결
+  main.py             # 앱 팩토리·라우터 연결·DB 엔진 수명
   config.py           # 환경 변수와 .env 읽기
   api/                # 표현 계층: 라우터·요청/응답 모델
     router.py         # 업무 라우터 등록
     health.py         # 헬스 체크와 응답 모델
   services/           # 서비스 계층: 유스케이스·트랜잭션
   domain/             # 도메인 계층: 순수 Python 업무 규칙 (영역별 파일)
-  infra/              # 인프라 계층: DB·ORM 모델·저장소
+  infra/              # 인프라 계층
+    database.py       # SQLAlchemy Base·비동기 엔진·요청별 세션
+    models/           # 영역별 ORM 모델 (__init__.py가 전체 등록)
+    seed.py           # db/seed.sql 적재 명령
   core/               # 공통 모듈: 요청 ID·오류·인증·CSRF
+db/
+  schema.sql          # 테이블 21개 DDL (마이그레이션 0001이 그대로 실행)
+  seed.sql            # 상품·향료 초기 데이터 (generate_seed.py로 생성)
+migrations/           # Alembic 환경과 리비전
+alembic.ini           # Alembic 설정 (DB 주소는 AURA_DATABASE_URL)
 tests/
   test_health.py      # 헬스 체크·OpenAPI·접두사·리다이렉트 검사
   domain/             # 도메인 규칙 단위 테스트 (DB 없음)
+  db/                 # 실제 PostgreSQL 통합 테스트 (AURA_TEST_DATABASE_URL)
 pyproject.toml        # Python 의존성·Ruff·pytest 설정
 uv.lock               # 의존성 버전 고정
 .env.example          # 설정 예제
+```
+
+## 데이터베이스
+
+PostgreSQL 13 이상(개발은 16)을 사용합니다. 테이블 설계는 [ERD](../../docs/backend/ERD.md), DDL은 [db/schema.sql](db/schema.sql)입니다. `AURA_DATABASE_URL`이 없으면 DB를 쓰는 API는 요청을 거절합니다.
+
+```sh
+# 로컬 PostgreSQL 예시 (Docker)
+docker run -d --name aura-db -e POSTGRES_PASSWORD=aura -e POSTGRES_DB=aura -p 127.0.0.1:5432:5432 postgres:16-alpine
+
+# apps/api/.env
+AURA_DATABASE_URL=postgresql+asyncpg://postgres:aura@127.0.0.1:5432/aura
+
+# 저장소 루트에서: 테이블 생성 → 초기 데이터
+uv run --directory apps/api --locked alembic upgrade head
+uv run --directory apps/api --locked python -m aura_api.infra.seed
+```
+
+- 마이그레이션 `0001`은 `db/schema.sql`을 그대로 실행합니다. 팀이 검토하는 SQL과 실제 적용되는 DDL이 같습니다.
+- 스키마를 바꿀 때는 `schema.sql`·ORM 모델(`aura_api/infra/models/<영역>.py`)·새 Alembic 리비전을 함께 수정합니다. `tests/db`가 모델과 실제 스키마의 차이를 검사합니다.
+- DB 통합 테스트는 **지워도 되는 테스트 DB**에서만 실행합니다(모든 테이블을 삭제 후 다시 만듭니다). 설정하지 않으면 건너뜁니다.
+
+```sh
+AURA_TEST_DATABASE_URL=postgresql+asyncpg://postgres:aura@127.0.0.1:5432/aura_test npm run test:api
 ```
 
 ## 설정과 제공 경로
