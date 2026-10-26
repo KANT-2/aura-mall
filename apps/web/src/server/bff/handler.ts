@@ -10,9 +10,28 @@ import { requestOrigin } from "@/server/bff/request-origin";
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type Params = Record<string, string>;
 type BackendPath = string | ((params: Params) => string);
+type HandlerOptions = { session?: boolean; query?: readonly string[] };
+
+/** Forward only allow-listed, single-valued query parameters. */
+export function allowedQuery(url: string, names: readonly string[] = []) {
+  const source = new URL(url).searchParams;
+  const query = new URLSearchParams();
+  for (const name of names) {
+    const value = source.get(name)?.trim();
+    if (value && value.length <= 100 && !/[\u0000-\u001f\u007f]/.test(value)) {
+      query.set(name, value);
+    }
+  }
+
+  return query;
+}
 
 /** Explicit route files select the upstream path; browser input cannot select a host. */
-export function createBffHandler(method: Method, path: BackendPath, { session = true } = {}) {
+export function createBffHandler(
+  method: Method,
+  path: BackendPath,
+  { session = true, query }: HandlerOptions = {},
+) {
   return async function handle(request: Request, context?: { params: Promise<Params> }) {
     const requestId = randomUUID();
     const headers = new Headers({
@@ -42,6 +61,7 @@ export function createBffHandler(method: Method, path: BackendPath, { session = 
       const response = await backendRequest(backendPath, {
         method,
         body,
+        query: allowedQuery(request.url, query),
         signal: request.signal,
         requestId,
         cookie: session

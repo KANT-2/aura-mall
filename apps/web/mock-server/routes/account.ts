@@ -34,6 +34,8 @@ export function accountRoutes(database: MockDatabase) {
       email,
       coupon: true,
       marketing: Boolean(req.body.marketing),
+      // Registration never grants admin access, even when the body contains a role.
+      role: "member" as const,
       salt,
       passwordHash: scryptSync(password, salt, 32).toString("hex"),
     };

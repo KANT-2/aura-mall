@@ -1,9 +1,10 @@
 import express, { type ErrorRequestHandler } from "express";
 import { randomBytes, randomUUID, scryptSync } from "node:crypto";
-import { createDatabase, catalog, type MockDatabase } from "./data/store";
+import { createDatabase, catalog, catalogOf, type MockDatabase } from "./data/store";
 import { accountRoutes } from "./routes/account";
 import { atelierRoutes } from "./routes/atelier";
 import { checkoutRoutes } from "./routes/checkout";
+import { adminRoutes } from "./routes/admin";
 import { resolveSession, ownerOf } from "./session";
 import { HttpError, requireJsonBody } from "./http";
 import { isRecord } from "@/lib/validation";
@@ -17,7 +18,7 @@ export function createMockApp({
   app.disable("x-powered-by");
   app.use(express.json({ limit: "32kb" }));
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
-  app.get("/api/catalog", (_req, res) => res.json(catalog));
+  app.get("/api/catalog", (_req, res) => res.json(catalogOf(database)));
   const aliases = new Map([
     ["bergamot-veil", "fresh-eau-de-parfum"],
     ["petal-haze", "soft-eau-de-parfum"],
@@ -28,14 +29,20 @@ export function createMockApp({
   ]);
   app.get("/api/catalog/products/:id", (req, res) => {
     const id = aliases.get(String(req.params.id)) ?? req.params.id;
-    const product = catalog.products.find((product) => product.id === id);
+    const product = database.state.products.find((product) => product.id === id);
     if (!product) {
       throw new HttpError(404, "상품을 찾을 수 없어요.");
     }
 
     res.json(product);
   });
-  app.use("/api", accountRoutes(database), atelierRoutes(database), checkoutRoutes(database));
+  app.use(
+    "/api",
+    accountRoutes(database),
+    atelierRoutes(database),
+    checkoutRoutes(database),
+    adminRoutes(database),
+  );
   if (testMode) {
     app.post("/__test__/seed", requireJsonBody, (req, res) => {
       const { session } = resolveSession(req, res, database);
