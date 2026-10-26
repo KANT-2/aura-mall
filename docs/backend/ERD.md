@@ -73,7 +73,7 @@ erDiagram
         timestamptz last_login_at
     }
     revoked_tokens {
-        varchar jti PK
+        uuid jti PK
         timestamptz expires_at
     }
     collections {
@@ -167,7 +167,7 @@ erDiagram
         smallint count
     }
     atelier_drafts {
-        varchar guest_id PK
+        uuid guest_id PK
         jsonb counts
         varchar name
         varchar label
@@ -283,10 +283,10 @@ erDiagram
 
 **revoked_tokens** — 로그아웃한 세션 토큰(JWT) 차단 목록
 
-| 컬럼       | 타입        | 제약            | 설명                                                         |
-| ---------- | ----------- | --------------- | ------------------------------------------------------------ |
-| jti        | VARCHAR(64) | PK              | 토큰 고유 번호 (UUID로 제한하지 않음, 공통 인증 모듈과 동일) |
-| expires_at | TIMESTAMPTZ | NOT NULL, INDEX | 원래 만료 시각. 지난 행은 주기적으로 삭제                    |
+| 컬럼       | 타입        | 제약            | 설명                                                                                     |
+| ---------- | ----------- | --------------- | ---------------------------------------------------------------------------------------- |
+| jti        | UUID        | PK              | 토큰 고유 번호. API가 발급하는 모든 토큰의 jti는 UUID. UUID가 아니면 조회 전에 거절(401) |
+| expires_at | TIMESTAMPTZ | NOT NULL, INDEX | 원래 만료 시각. 지난 행은 주기적으로 삭제                                                |
 
 > 인증은 JWT로 결정했다(쿠키 값 = 서명된 JWT). 서버 세션 테이블은 두지 않는다. 비회원 식별값 `guestId`는 JWT 안에 있고 별도 테이블은 두지 않는다.
 
@@ -412,14 +412,14 @@ erDiagram
 
 **atelier_drafts** — 조향 중인 초안 (방문자별 1개)
 
-| 컬럼       | 타입        | 제약                                               | 설명                                  |
-| ---------- | ----------- | -------------------------------------------------- | ------------------------------------- |
-| guest_id   | VARCHAR(64) | PK                                                 | JWT의 `guestId`. 로그인 전후에도 유지 |
-| counts     | JSONB       | NOT NULL                                           | `{ 향료 ID: 횟수 }`                   |
-| name       | VARCHAR(30) | NOT NULL DEFAULT ''                                |                                       |
-| label      | VARCHAR(10) | NOT NULL, CHECK IN (`classic`, `paper`, `minimal`) |                                       |
-| step       | VARCHAR(10) | NOT NULL, CHECK IN (`select`, `result`)            |                                       |
-| updated_at | TIMESTAMPTZ | NOT NULL DEFAULT now()                             | 오래된 초안 정리 기준                 |
+| 컬럼       | 타입        | 제약                                               | 설명                                               |
+| ---------- | ----------- | -------------------------------------------------- | -------------------------------------------------- |
+| guest_id   | UUID        | PK                                                 | JWT의 `guestId`(UUID로 발급). 로그인 전후에도 유지 |
+| counts     | JSONB       | NOT NULL                                           | `{ 향료 ID: 횟수 }`                                |
+| name       | VARCHAR(30) | NOT NULL DEFAULT ''                                |                                                    |
+| label      | VARCHAR(10) | NOT NULL, CHECK IN (`classic`, `paper`, `minimal`) |                                                    |
+| step       | VARCHAR(10) | NOT NULL, CHECK IN (`select`, `result`)            |                                                    |
+| updated_at | TIMESTAMPTZ | NOT NULL DEFAULT now()                             | 오래된 초안 정리 기준                              |
 
 ### 3.4 주문
 

@@ -50,8 +50,9 @@ CREATE TABLE admins (
 CREATE UNIQUE INDEX admins_email_lower_key ON admins (lower(email));
 
 -- jti of customer or admin tokens signed out before they expired; prune past expires_at.
+-- The API issues every token, so jti is always a UUID; a non-UUID jti is rejected before lookup.
 CREATE TABLE revoked_tokens (
-    jti        VARCHAR(64) PRIMARY KEY,
+    jti        UUID        PRIMARY KEY,
     expires_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX revoked_tokens_expires_at_idx ON revoked_tokens (expires_at);
@@ -183,7 +184,7 @@ CREATE TABLE recipe_ingredients (
 );
 
 CREATE TABLE atelier_drafts (
-    guest_id   VARCHAR(64) PRIMARY KEY,   -- guestId from the JWT
+    guest_id   UUID        PRIMARY KEY,   -- guestId from the JWT (issued as UUID)
     counts     JSONB       NOT NULL,
     name       VARCHAR(30) NOT NULL DEFAULT '',
     label      VARCHAR(10) NOT NULL,
