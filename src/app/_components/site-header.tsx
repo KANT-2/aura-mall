@@ -54,10 +54,14 @@ function HeaderContents() {
           ref={nav}
           aria-label="주 메뉴"
           onMouseLeave={() => {
-            if (matchMedia("(hover: hover)").matches) setMenu(false);
+            if (matchMedia("(hover: hover)").matches) {
+              setMenu(false);
+            }
           }}
           onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget)) setMenu(false);
+            if (!e.currentTarget.contains(e.relatedTarget)) {
+              setMenu(false);
+            }
           }}
         >
           <button
@@ -66,7 +70,9 @@ function HeaderContents() {
             aria-expanded={menu}
             aria-controls="collection-menu"
             onMouseEnter={() => {
-              if (matchMedia("(hover: hover)").matches) setMenu(true);
+              if (matchMedia("(hover: hover)").matches) {
+                setMenu(true);
+              }
             }}
             onPointerDown={() => {
               menuPress.current = menu;
@@ -75,12 +81,16 @@ function HeaderContents() {
               menuPress.current = null;
             }}
             onFocus={(e) => {
-              if (menuPress.current === null && e.currentTarget.matches(":focus-visible"))
+              if (menuPress.current === null && e.currentTarget.matches(":focus-visible")) {
                 setMenu(true);
+              }
             }}
             onClick={(e) => {
-              if (e.detail === 0 || matchMedia("(hover: hover)").matches) setMenu(true);
-              else setMenu(!(menuPress.current ?? menu));
+              if (e.detail === 0 || matchMedia("(hover: hover)").matches) {
+                setMenu(true);
+              } else {
+                setMenu(!(menuPress.current ?? menu));
+              }
               menuPress.current = null;
             }}
           >

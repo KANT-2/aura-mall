@@ -21,8 +21,9 @@ export function backendConfig() {
       timeoutMs < 1 ||
       timeoutMs > 60000 ||
       (appOrigin !== undefined && !/^https?:\/\//.test(appOrigin))
-    )
+    ) {
       throw new Error("Invalid backend configuration");
+    }
     const base = baseUrl.href.replace(/\/$/, "");
     return { apiUrl: `${base}${prefix.replace(/\/$/, "")}`, sessionCookie, timeoutMs, appOrigin };
   } catch {

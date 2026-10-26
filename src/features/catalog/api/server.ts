@@ -9,7 +9,9 @@ export const getServerProduct = cache(async (id: string) => {
   try {
     return await serverRequest<Product>(`/catalog/products/${encodeURIComponent(id)}`);
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return null;
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
     throw error;
   }
 });

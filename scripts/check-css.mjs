@@ -27,10 +27,13 @@ for (const file of allFiles.filter((file) => /\.[jt]sx?$/.test(file))) {
   const syntax = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const imports = new Map();
   for (const statement of syntax.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
       continue;
+    }
     const reference = statement.moduleSpecifier.text;
-    if (!reference.endsWith(".css")) continue;
+    if (!reference.endsWith(".css")) {
+      continue;
+    }
     if (!reference.endsWith(".module.css")) {
       assert.equal(file, "src/app/layout.tsx", `${file}: only the root layout imports global CSS.`);
       assert.equal(reference, "@/app/globals.css", "Use a single global CSS entry.");
@@ -40,7 +43,9 @@ for (const file of allFiles.filter((file) => /\.[jt]sx?$/.test(file))) {
       ? `src/${reference.slice(2)}`
       : path.posix.normalize(path.posix.join(path.posix.dirname(file), reference));
     assert(modules.includes(stylesheet), `${file}: missing CSS Module ${stylesheet}.`);
-    if (statement.importClause?.name) imports.set(statement.importClause.name.text, stylesheet);
+    if (statement.importClause?.name) {
+      imports.set(statement.importClause.name.text, stylesheet);
+    }
   }
   function visit(node) {
     if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
@@ -65,7 +70,9 @@ for (const file of modules) {
       `${file}: document styles belong in src/styles.`,
     ),
   );
-  if (!file.startsWith("src/features/atelier/components/")) continue;
+  if (!file.startsWith("src/features/atelier/components/")) {
+    continue;
+  }
   assert(
     css.split("\n").length <= 800,
     `${file}: split styles by component responsibility before exceeding 800 lines.`,
@@ -77,11 +84,14 @@ for (const file of modules) {
   const declared = new Set();
   syntax.walkRules((rule) => {
     const local = rule.selector.replace(/:global\([^)]*\)/g, "").replace(/"[^"]*"|'[^']*'/g, "");
-    for (const match of local.matchAll(/\.([a-zA-Z][\w-]*)/g)) declared.add(match[1]);
+    for (const match of local.matchAll(/\.([a-zA-Z][\w-]*)/g)) {
+      declared.add(match[1]);
+    }
   });
   const referenced = uses.get(file) ?? new Set();
-  for (const name of referenced)
+  for (const name of referenced) {
     assert(declared.has(name), `${file}: referenced class ${name} is missing.`);
+  }
   for (const name of declared) {
     assert(/^[a-z][a-zA-Z0-9]*$/.test(name), `${file}: use semantic camelCase class names.`);
     assert(referenced.has(name), `${file}: local class ${name} is unused.`);

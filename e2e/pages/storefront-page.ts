@@ -32,17 +32,26 @@ export class StorefrontPage {
   }
   async prepareLayout(screen: string) {
     if (screen === "gift") {
-      for (let index = 0; index < 3; index++)
+      for (let index = 0; index < 3; index++) {
         await this.page.getByTestId(testIds.catalog.giftOption).nth(index).check();
+      }
     }
-    if (screen === "register") await this.page.getByTestId(testIds.account.submit).click();
-    if (screen === "mypage")
+    if (screen === "register") {
+      await this.page.getByTestId(testIds.account.submit).click();
+    }
+    if (screen === "mypage") {
       await expect(this.page.getByTestId(testIds.account.overview)).toBeVisible();
-    if (screen === "cart") await expect(this.page.getByTestId(testIds.cart.item)).toHaveCount(2);
-    if (screen === "checkout")
+    }
+    if (screen === "cart") {
+      await expect(this.page.getByTestId(testIds.cart.item)).toHaveCount(2);
+    }
+    if (screen === "checkout") {
       await expect(this.page.getByTestId(testIds.checkout.summary)).toBeVisible();
+    }
     await this.page.evaluate(async () => {
-      for (const image of document.images) image.loading = "eager";
+      for (const image of document.images) {
+        image.loading = "eager";
+      }
       await Promise.all([...document.images].map((image) => image.decode().catch(() => {})));
       await document.fonts.ready;
       window.scrollTo({ top: 0, behavior: "instant" });

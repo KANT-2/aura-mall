@@ -27,7 +27,9 @@ export function validCounts(
   value: unknown,
   ingredients: readonly Pick<Ingredient, "id">[],
 ): Record<string, number> | null {
-  if (!isRecord(value)) return null;
+  if (!isRecord(value)) {
+    return null;
+  }
   const ingredientIds = new Set(ingredients.map(({ id }) => id));
   const used: [string, number][] = [];
   let total = 0;
@@ -37,10 +39,13 @@ export function validCounts(
       typeof count !== "number" ||
       !Number.isInteger(count) ||
       count < 0
-    )
+    ) {
       return null;
+    }
     total += count;
-    if (count > 0) used.push([id, count]);
+    if (count > 0) {
+      used.push([id, count]);
+    }
   }
   return total > 0 && total <= MAX_DROPS ? Object.fromEntries(used) : null;
 }
@@ -52,7 +57,9 @@ export const recipeColor = (value: unknown): string =>
   typeof value === "string" && /^#[\da-f]{6}$/i.test(value) ? value : "#d5b575";
 
 export function restoreRecipes(raw: unknown, ingredients: readonly Ingredient[]): Recipe[] {
-  if (!Array.isArray(raw)) return [];
+  if (!Array.isArray(raw)) {
+    return [];
+  }
   const seen = new Set<string>();
   return raw.flatMap((recipe): Recipe[] => {
     if (
@@ -62,10 +69,13 @@ export function restoreRecipes(raw: unknown, ingredients: readonly Ingredient[])
       typeof recipe.name !== "string" ||
       !recipe.name.trim() ||
       seen.has(recipe.id)
-    )
+    ) {
       return [];
+    }
     const counts = validCounts(recipe.counts, ingredients);
-    if (!counts) return [];
+    if (!counts) {
+      return [];
+    }
     seen.add(recipe.id);
     return [
       {
@@ -91,9 +101,13 @@ export function restoreDraft(
   raw: unknown,
   ingredients: readonly Ingredient[],
 ): AtelierDraft | null {
-  if (!isRecord(raw)) return null;
+  if (!isRecord(raw)) {
+    return null;
+  }
   const counts = validCounts(raw.counts, ingredients);
-  if (!counts) return null;
+  if (!counts) {
+    return null;
+  }
   return {
     counts,
     name: typeof raw.name === "string" ? raw.name : "",
@@ -107,11 +121,15 @@ export const totalCount = (counts: Record<string, number>) =>
 
 export function mixColor(counts: Record<string, number>, ingredients: readonly Ingredient[]) {
   const total = totalCount(counts);
-  if (!total) return "#d5b575";
+  if (!total) {
+    return "#d5b575";
+  }
   const sum = [0, 0, 0];
   ingredients.forEach((i) => {
     const n = counts[i.id] || 0;
-    for (let c = 0; c < 3; c++) sum[c] += parseInt(i.color.slice(1 + c * 2, 3 + c * 2), 16) * n;
+    for (let c = 0; c < 3; c++) {
+      sum[c] += parseInt(i.color.slice(1 + c * 2, 3 + c * 2), 16) * n;
+    }
   });
   return (
     "#" +

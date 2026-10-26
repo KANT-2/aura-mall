@@ -69,8 +69,9 @@ export function atelierReducer(
         state.step !== "select" ||
         totalCount(state.counts) >= MAX_DROPS ||
         !ingredients.some((note) => note.id === action.id)
-      )
+      ) {
         return state;
+      }
       return {
         ...state,
         revision: state.revision + 1,
@@ -82,11 +83,18 @@ export function atelierReducer(
     }
     case "decrease":
     case "remove": {
-      if (state.step !== "select" || !Object.prototype.hasOwnProperty.call(state.counts, action.id))
+      if (
+        state.step !== "select" ||
+        !Object.prototype.hasOwnProperty.call(state.counts, action.id)
+      ) {
         return state;
+      }
       const counts = { ...state.counts };
-      if (action.type === "remove" || counts[action.id] <= 1) delete counts[action.id];
-      else counts[action.id]--;
+      if (action.type === "remove" || counts[action.id] <= 1) {
+        delete counts[action.id];
+      } else {
+        counts[action.id]--;
+      }
       return { ...state, revision: state.revision + 1, counts, saved: false, cartAdded: false };
     }
     case "name":
@@ -107,7 +115,9 @@ export function atelierReducer(
       };
     case "restore": {
       const draft = restoreDraft(action.draft, ingredients);
-      if (!draft) return state;
+      if (!draft) {
+        return state;
+      }
       return {
         ...initialAtelierState(),
         ...draft,
@@ -154,7 +164,9 @@ export function atelierReducer(
 export function percentages(counts: Record<string, number>): Record<string, number> {
   const entries = Object.entries(counts).filter(([, count]) => Number.isFinite(count) && count > 0);
   const total = entries.reduce((sum, [, count]) => sum + count, 0);
-  if (!total) return {};
+  if (!total) {
+    return {};
+  }
   const sorted = entries.map(([id, count]) => ({
     id,
     exact: (count * 100) / total,
@@ -162,7 +174,11 @@ export function percentages(counts: Record<string, number>): Record<string, numb
   }));
   let left = 100 - sorted.reduce((sum, entry) => sum + entry.value, 0);
   sorted.sort((a, b) => b.exact - b.value - (a.exact - a.value) || a.id.localeCompare(b.id));
-  for (const entry of sorted) if (left-- > 0) entry.value++;
+  for (const entry of sorted) {
+    if (left-- > 0) {
+      entry.value++;
+    }
+  }
   return Object.fromEntries(sorted.map(({ id, value }) => [id, value]));
 }
 

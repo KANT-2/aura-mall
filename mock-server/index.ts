@@ -14,5 +14,6 @@ const app = createMockApp({
 const server = app.listen(port, "127.0.0.1", () =>
   console.log(`Mock API listening on http://127.0.0.1:${port}`),
 );
-for (const signal of ["SIGTERM", "SIGINT"] as const)
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.on(signal, () => server.close(() => process.exit(0)));
+}

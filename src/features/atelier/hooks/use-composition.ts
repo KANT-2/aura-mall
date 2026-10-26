@@ -21,13 +21,16 @@ export function useComposition({ ingredients, draft, recipe, resume }: InitialCo
     undefined,
     () => {
       const empty = initialAtelierState();
-      if (recipe)
+      if (recipe) {
         return atelierReducer(
           empty,
           { type: "restore", draft: { ...recipe, step: "select" }, parent: recipe },
           ingredients,
         );
-      if (resume && draft) return atelierReducer(empty, { type: "restore", draft }, ingredients);
+      }
+      if (resume && draft) {
+        return atelierReducer(empty, { type: "restore", draft }, ingredients);
+      }
       return empty;
     },
   );
@@ -48,7 +51,9 @@ export function useComposition({ ingredients, draft, recipe, resume }: InitialCo
     markSaved: (revision: number) => dispatch({ type: "saved", revision }),
     markCartAdded: (revision: number) => dispatch({ type: "cart-added", revision }),
     resumeDraft() {
-      if (pendingDraft) dispatch({ type: "restore", draft: { ...pendingDraft, step: "select" } });
+      if (pendingDraft) {
+        dispatch({ type: "restore", draft: { ...pendingDraft, step: "select" } });
+      }
     },
     reset() {
       setPendingDraft(null);

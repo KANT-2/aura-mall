@@ -28,7 +28,9 @@ export function useStirGesture({
   const gesture = useRef<{ x: number; y: number; last: number } | null>(null);
   const lastUpdate = useRef(0);
   useEffect(() => {
-    if (!enabled || mode !== "manual" || rod.energy < 0.03) return;
+    if (!enabled || mode !== "manual" || rod.energy < 0.03) {
+      return;
+    }
     const timer = setTimeout(() => {
       setRod((current) => ({ ...current, energy: 0 }));
       setActive(false);
@@ -36,7 +38,9 @@ export function useStirGesture({
     return () => clearTimeout(timer);
   }, [enabled, mode, rod]);
   useEffect(() => {
-    if (!enabled || !settling) return;
+    if (!enabled || !settling) {
+      return;
+    }
     const timer = setTimeout(() => {
       setSettling(false);
       setRod((current) => ({ ...current, energy: 0 }));
@@ -54,7 +58,9 @@ export function useStirGesture({
     setRod(restingRod);
   }
   function start(event: PointerEvent<HTMLDivElement>) {
-    if (!enabled || mode === "auto" || mode === "shake") return;
+    if (!enabled || mode === "auto" || mode === "shake") {
+      return;
+    }
     const rect = event.currentTarget.getBoundingClientRect();
     gesture.current = { x: event.clientX, y: event.clientY, last: performance.now() };
     onStart();
@@ -65,12 +71,18 @@ export function useStirGesture({
       y: bound(((event.clientY - rect.top) / rect.height) * 100),
       energy: 0.5,
     });
-    if (event.pointerType !== "mouse") event.currentTarget.setPointerCapture(event.pointerId);
+    if (event.pointerType !== "mouse") {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
   }
   function move(event: PointerEvent<HTMLDivElement>) {
-    if (!enabled || mode !== "manual" || !gesture.current) return;
+    if (!enabled || mode !== "manual" || !gesture.current) {
+      return;
+    }
     const now = performance.now();
-    if (now - lastUpdate.current < 35) return;
+    if (now - lastUpdate.current < 35) {
+      return;
+    }
     lastUpdate.current = now;
     const previous = gesture.current;
     const movement = manualStir(
@@ -78,7 +90,9 @@ export function useStirGesture({
       now - previous.last,
     );
     gesture.current = { x: event.clientX, y: event.clientY, last: now };
-    if (!movement) return;
+    if (!movement) {
+      return;
+    }
     const rect = event.currentTarget.getBoundingClientRect();
     onProgress(movement.progress);
     setRod({
@@ -90,24 +104,30 @@ export function useStirGesture({
     setSettling(false);
   }
   function leave() {
-    if (!enabled || mode !== "manual") return;
+    if (!enabled || mode !== "manual") {
+      return;
+    }
     gesture.current = null;
     setActive(false);
     setSettling(true);
   }
   function end(event: PointerEvent<HTMLDivElement>) {
-    if (event.pointerType === "mouse") return;
+    if (event.pointerType === "mouse") {
+      return;
+    }
     leave();
-    if (event.currentTarget.hasPointerCapture(event.pointerId))
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   }
   function key(event: KeyboardEvent<HTMLDivElement>) {
     if (
       !enabled ||
       mode === "auto" ||
       !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Enter"].includes(event.key)
-    )
+    ) {
       return;
+    }
     event.preventDefault();
     onStart();
     onProgress(8);

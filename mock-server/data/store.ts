@@ -38,12 +38,15 @@ const empty = (): Database => ({
 });
 export function createDatabase(filename?: string) {
   let state = empty();
-  if (filename && existsSync(filename))
+  if (filename && existsSync(filename)) {
     state = JSON.parse(readFileSync(filename, "utf8")) as Database;
+  }
   return {
     state,
     persist() {
-      if (!filename) return;
+      if (!filename) {
+        return;
+      }
       mkdirSync(path.dirname(filename), { recursive: true });
       writeFileSync(filename + ".tmp", JSON.stringify(state, null, 2));
       renameSync(filename + ".tmp", filename);

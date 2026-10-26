@@ -12,8 +12,9 @@ function vector(value: Acceleration): [number, number, number] | null {
   if (
     !value ||
     ![value.x, value.y, value.z].every((n) => typeof n === "number" && Number.isFinite(n))
-  )
+  ) {
     return null;
+  }
   return [value.x!, value.y!, value.z!];
 }
 
@@ -24,7 +25,9 @@ export function motionSample(
   const direct = vector(acceleration);
   const gravity = vector(includingGravity);
   const components = direct ?? gravity;
-  if (!components) return null;
+  if (!components) {
+    return null;
+  }
   return {
     magnitude: direct ? Math.hypot(...direct) : Math.max(0, Math.hypot(...gravity!) - 9.81),
     x: components[0],
@@ -36,11 +39,14 @@ export function motionSample(
 export function detectShake(previous: ShakeTracker, sample: MotionSample, now: number) {
   const next = { ...previous, gravity: previous.gravity * 0.82 + sample.magnitude * 0.18 };
   const jerk = Math.abs(sample.magnitude - previous.gravity);
-  if (now - previous.last < 440 || (sample.magnitude < 3.8 && jerk < 3.2))
+  if (now - previous.last < 440 || (sample.magnitude < 3.8 && jerk < 3.2)) {
     return { tracker: next, progress: 0 };
+  }
   next.peaks = now - previous.lastPeak < 1050 ? previous.peaks + 1 : 1;
   next.lastPeak = now;
-  if (next.peaks < 2) return { tracker: next, progress: 0 };
+  if (next.peaks < 2) {
+    return { tracker: next, progress: 0 };
+  }
   next.peaks = 0;
   next.last = now;
   return { tracker: next, progress: Math.min(9, 5 + Math.round(sample.magnitude * 0.22)) };

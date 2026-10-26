@@ -37,9 +37,13 @@ export function useShakeBlending({
   } = useDeviceMotion({
     enabled,
     onMotion(event) {
-      if (!listening || noSignal) return;
+      if (!listening || noSignal) {
+        return;
+      }
       const sample = motionSample(event.acceleration, event.accelerationIncludingGravity);
-      if (!sample) return;
+      if (!sample) {
+        return;
+      }
       seen.current = true;
       const now = performance.now();
       if (now - lastVisual.current > 52) {
@@ -58,9 +62,13 @@ export function useShakeBlending({
   });
   const available = isHandheld && supported;
   useEffect(() => {
-    if (!enabled || !listening || !available || access !== "active") return;
+    if (!enabled || !listening || !available || access !== "active") {
+      return;
+    }
     const timer = setTimeout(() => {
-      if (!seen.current) setNoSignal(true);
+      if (!seen.current) {
+        setNoSignal(true);
+      }
     }, 4500);
     return () => clearTimeout(timer);
   }, [enabled, listening, available, access]);
@@ -76,7 +84,9 @@ export function useShakeBlending({
     seen.current = false;
     lastVisual.current = 0;
     setNoSignal(false);
-    if (await requestPermission()) onActivated();
+    if (await requestPermission()) {
+      onActivated();
+    }
   }
   function reset() {
     stop();

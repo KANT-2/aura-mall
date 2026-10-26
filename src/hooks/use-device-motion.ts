@@ -35,7 +35,9 @@ export function useDeviceMotion({
     [enabled],
   );
   useEffect(() => {
-    if (!enabled || permission !== "active" || !available) return;
+    if (!enabled || permission !== "active" || !available) {
+      return;
+    }
     const listener = (event: DeviceMotionEvent) => onReading(event);
     window.addEventListener("devicemotion", listener, { passive: true });
     return () => window.removeEventListener("devicemotion", listener);
@@ -46,7 +48,9 @@ export function useDeviceMotion({
     setPermission("idle");
   }, []);
   async function requestPermission() {
-    if (!enabled) return false;
+    if (!enabled) {
+      return false;
+    }
     if (!supported()) {
       setPermission("unavailable");
       return false;
@@ -59,11 +63,15 @@ export function useDeviceMotion({
       const result = constructor.requestPermission
         ? await constructor.requestPermission()
         : "granted";
-      if (token !== requestId.current) return false;
+      if (token !== requestId.current) {
+        return false;
+      }
       setPermission(result === "granted" ? "active" : "denied");
       return result === "granted";
     } catch {
-      if (token === requestId.current) setPermission("denied");
+      if (token === requestId.current) {
+        setPermission("denied");
+      }
       return false;
     }
   }

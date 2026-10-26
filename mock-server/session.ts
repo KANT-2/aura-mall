@@ -30,8 +30,9 @@ export function resolveSession(request: Request, response: Response, database: M
   }
   const session = database.state.sessions[token];
   const expectedOwner = request.get("X-Session-Owner");
-  if (expectedOwner && expectedOwner !== (session.userId ?? session.guestId))
+  if (expectedOwner && expectedOwner !== (session.userId ?? session.guestId)) {
     throw new HttpError(409, "계정이 변경되었어요. 다시 시도해 주세요.");
+  }
   const account = session.userId ? database.state.accounts[session.userId] : undefined;
   return {
     session,

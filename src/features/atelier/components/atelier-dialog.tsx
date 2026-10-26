@@ -28,7 +28,9 @@ export function AtelierModal({
         e.preventDefault();
         close.current();
       }
-      if (e.key !== "Tab" || !root) return;
+      if (e.key !== "Tab" || !root) {
+        return;
+      }
       const items = [
         ...root.querySelectorAll<HTMLElement>(
           'button:not(:disabled),a[href],input:not(:disabled),[tabindex="0"]',
@@ -62,7 +64,9 @@ export function AtelierModal({
     <div
       className={modalStyles.backdrop}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
       }}
     >
       <div

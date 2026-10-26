@@ -9,7 +9,9 @@ beforeAll(async () => {
   server = createMockApp({ testMode: true }).listen(0, "127.0.0.1");
   await once(server, "listening");
   const address = server.address();
-  if (!address || typeof address === "string") throw new Error("No mock address");
+  if (!address || typeof address === "string") {
+    throw new Error("No mock address");
+  }
   base = `http://127.0.0.1:${address.port}`;
 });
 afterAll(
@@ -49,8 +51,9 @@ describe("Mock API data ownership and validation", () => {
     expect(catalog.body.products).toHaveLength(30);
     expect(catalog.body.ingredients).toHaveLength(24);
     expect((await api("/api/catalog/products/bergamot-veil")).body.id).toBe("fresh-eau-de-parfum");
-    for (const id of ["unknown", "constructor", "toString", "__proto__"])
+    for (const id of ["unknown", "constructor", "toString", "__proto__"]) {
       expect((await api(`/api/catalog/products/${id}`)).status).toBe(404);
+    }
   });
   it("keeps guest and member carts separate, including after logout", async () => {
     const api = client();
@@ -187,7 +190,9 @@ describe("Mock API data ownership and validation", () => {
     await once(normal, "listening");
     try {
       const address = normal.address();
-      if (!address || typeof address === "string") throw new Error("No address");
+      if (!address || typeof address === "string") {
+        throw new Error("No address");
+      }
       expect(
         (
           await fetch(`http://127.0.0.1:${address.port}/__test__/seed`, {

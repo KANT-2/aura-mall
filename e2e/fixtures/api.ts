@@ -3,7 +3,9 @@ import { cart, member, originalRecipe, resumedDraft, savedRecipe } from "./data"
 
 export async function seedApi(page: Page, data: Record<string, unknown>) {
   const response = await page.request.post("http://127.0.0.1:4000/__test__/seed", { data });
-  if (!response.ok()) throw new Error(`Mock API fixture failed: ${await response.text()}`);
+  if (!response.ok()) {
+    throw new Error(`Mock API fixture failed: ${await response.text()}`);
+  }
 }
 export const seedDraft = (page: Page) => seedApi(page, { draft: resumedDraft });
 export const seedOriginalRecipe = (page: Page) => seedApi(page, { recipes: [originalRecipe] });

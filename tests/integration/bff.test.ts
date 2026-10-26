@@ -18,7 +18,9 @@ let base: string;
 const timers = new Set<ReturnType<typeof setTimeout>>();
 const server = createServer(async (req, res) => {
   const chunks = [];
-  for await (const chunk of req) chunks.push(Buffer.from(chunk));
+  for await (const chunk of req) {
+    chunks.push(Buffer.from(chunk));
+  }
   calls.push({
     url: req.url,
     method: req.method,
@@ -39,7 +41,9 @@ beforeAll(async () => {
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const address = server.address();
-  if (!address || typeof address === "string") throw new Error("No address");
+  if (!address || typeof address === "string") {
+    throw new Error("No address");
+  }
   base = `http://127.0.0.1:${address.port}`;
 });
 beforeEach(() => {
@@ -52,7 +56,9 @@ beforeEach(() => {
   respond = (res) => json(res, { ok: true });
 });
 afterEach(() => {
-  for (const timer of timers) clearTimeout(timer);
+  for (const timer of timers) {
+    clearTimeout(timer);
+  }
   timers.clear();
   vi.unstubAllEnvs();
 });

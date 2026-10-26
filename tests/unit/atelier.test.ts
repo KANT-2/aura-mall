@@ -28,8 +28,9 @@ const composed = () => atelierReducer(selecting(), { type: "add", id: "bergamot"
 
 test("sequential additions cannot exceed 20 drops, even when the UI batches rapid events", () => {
   let state = selecting();
-  for (let index = 0; index < 40; index++)
+  for (let index = 0; index < 40; index++) {
     state = atelierReducer(state, { type: "add", id: "rose" });
+  }
   assert.equal(totalCount(state.counts), 20);
   assert.equal(state.drop, 20);
   assert.equal(atelierReducer(state, { type: "add", id: "bergamot" }), state);
@@ -40,8 +41,9 @@ test("unknown ingredients and additions outside editing cannot change a composit
   assert.equal(atelierReducer(initial, { type: "add", id: "rose" }), initial);
   const state = composed();
   for (const id of ["unknown", "__proto__", "constructor", "toString"]) {
-    for (const type of ["add", "decrease", "remove"] as const)
+    for (const type of ["add", "decrease", "remove"] as const) {
       assert.equal(atelierReducer(state, { type, id }), state);
+    }
   }
 });
 
@@ -137,8 +139,9 @@ test("blend progress only accepts the current source and finishes exactly at 100
   let state = blendReducer(initialBlendState, { type: "mode", mode: "auto" });
   const automatic = state;
   assert.equal(blendReducer(state, { type: "advance", source: "shake", amount: 9 }), state);
-  for (let index = 0; index < 150; index++)
+  for (let index = 0; index < 150; index++) {
     state = blendReducer(state, { type: "advance", source: "auto", amount: 1 });
+  }
   assert.deepEqual(state, { progress: 100, mode: "done" });
   assert.equal(blendReducer(state, { type: "mode", mode: "manual" }), state);
   assert.equal(
