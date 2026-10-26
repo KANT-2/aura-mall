@@ -2,13 +2,12 @@
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aura_api.core.errors import ErrorResponse
-from aura_api.domain.errors import NotFound
 from aura_api.infra.database import get_session
 from aura_api.infra.models import Product
 from aura_api.infra.repositories.catalog import CatalogRows
@@ -218,8 +217,5 @@ async def read_catalog(session: Session) -> CatalogOut:
     responses={404: {"model": ErrorResponse}},
 )
 async def read_product(product_id: str, session: Session) -> ProductOut:
-    try:
-        product, type_name = await service.get_product(session, product_id)
-    except NotFound:
-        raise HTTPException(status_code=404) from None
+    product, type_name = await service.get_product(session, product_id)
     return product_out(product, type_name)
