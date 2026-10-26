@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     jwt_audience: str | None = None
     csrf_allowed_origins: list[str] = Field(default_factory=list)
     bff_shared_key: SecretStr | None = None
+    # postgresql+asyncpg://user:password@host:5432/db — unset means no database (fails closed).
+    database_url: SecretStr | None = None
 
     @model_validator(mode="after")
     def validate_jwt_configuration(self):
@@ -38,6 +40,13 @@ class Settings(BaseSettings):
     @classmethod
     def validate_origins(cls, values: list[str]) -> list[str]:
         return [source_origin(value) for value in values]
+
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None and not value.get_secret_value().startswith("postgresql+asyncpg://"):
+            raise ValueError("Database URL must use the postgresql+asyncpg:// driver")
+        return value
 
     @field_validator("bff_shared_key")
     @classmethod

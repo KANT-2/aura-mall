@@ -35,4 +35,4 @@ INSERT INTO admins (email, name, password_hash) VALUES ('관리자 이메일', '
 python apps/api/db/generate_seed.py
 ```
 
-마이그레이션 도구(Alembic) 도입 시 `schema.sql`을 첫 마이그레이션의 기준으로 사용합니다.
+Alembic 마이그레이션 `0001`이 `schema.sql`을 그대로 실행합니다. 사용법은 [API 개발 안내](../README.md#데이터베이스)를 참고합니다.

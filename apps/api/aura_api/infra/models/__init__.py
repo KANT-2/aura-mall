@@ -1,0 +1,43 @@
+"""Import every area's tables so Base.metadata is complete (Alembic, tests)."""
+
+from aura_api.infra.database import Base
+from aura_api.infra.models.admin import AdminAuditLog, StockAdjustment
+from aura_api.infra.models.atelier import AtelierDraft, Recipe, RecipeIngredient
+from aura_api.infra.models.catalog import (
+    Collection,
+    Ingredient,
+    Product,
+    ProductType,
+    Promotion,
+    ScentFamily,
+    ScentFamilyIngredient,
+    SuggestedName,
+)
+from aura_api.infra.models.identity import Admin, RevokedToken, User, UserCoupon
+from aura_api.infra.models.ordering import Order, OrderItem, OrderItemSelection
+from aura_api.infra.models.partner import PartnerInquiry
+
+__all__ = [
+    "Admin",
+    "AdminAuditLog",
+    "AtelierDraft",
+    "Base",
+    "Collection",
+    "Ingredient",
+    "Order",
+    "OrderItem",
+    "OrderItemSelection",
+    "PartnerInquiry",
+    "Product",
+    "ProductType",
+    "Promotion",
+    "Recipe",
+    "RecipeIngredient",
+    "RevokedToken",
+    "ScentFamily",
+    "ScentFamilyIngredient",
+    "StockAdjustment",
+    "SuggestedName",
+    "User",
+    "UserCoupon",
+]
