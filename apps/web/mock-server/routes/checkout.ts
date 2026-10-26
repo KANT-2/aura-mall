@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { itemPrice, shippingFee } from "@/features/cart/model/pricing";
-import { catalog, type MockDatabase } from "../data/store";
+import { catalogOf, type Inquiry, type MockDatabase } from "../data/store";
 import { resolveSession } from "../session";
 import { HttpError, requireJsonBody, requireString } from "../http";
 import { orderItems } from "../cart";
@@ -29,7 +29,8 @@ export function checkoutRoutes(database: MockDatabase) {
   });
   router.post("/orders", requireJsonBody, (req, res) => {
     const { owner, user } = resolveSession(req, res, database);
-    const items = orderItems(req.body.items);
+    const catalog = catalogOf(database);
+    const items = orderItems(req.body.items, catalog);
     const prices = items.map((item) => itemPrice(item, catalog.products));
     if (prices.some((price) => price === null)) {
       throw new HttpError(400, "주문 금액을 확인해 주세요.");
@@ -70,7 +71,7 @@ export function checkoutRoutes(database: MockDatabase) {
     const required = ["brand", "name", "email", "introduction", "message", "type"];
     const values = Object.fromEntries(
       required.map((key) => [key, requireString(req.body[key], "필수 입력 항목을 확인해 주세요.")]),
-    );
+    ) as Pick<Inquiry, "brand" | "name" | "email" | "introduction" | "message" | "type">;
     if (!/^\S+@\S+\.\S+$/.test(values.email) || req.body.consent !== "on") {
       throw new HttpError(400, "필수 입력 항목과 동의를 확인해 주세요.");
     }
@@ -78,8 +79,11 @@ export function checkoutRoutes(database: MockDatabase) {
     const inquiry = {
       id: randomUUID(),
       ...values,
-      website: req.body.website ?? "",
+      website: typeof req.body.website === "string" ? req.body.website.trim().slice(0, 500) : "",
       created: new Date().toISOString(),
+      status: "received" as const,
+      memo: "",
+      version: 1,
     };
     database.state.inquiries.push(inquiry);
     database.persist();

@@ -38,6 +38,7 @@ src/
     atelier/_components/       # 계정·장바구니·레시피·초안을 조향 편집기에 연결
     shop/, cart/, checkout/    # 얇은 서버 라우트 진입점
     mypage/, partner/
+    admin/                     # 관리자 화면 진입점(운영 요약·상품·주문·문의)
     api/                       # 명시적인 BFF Route Handlers
     loading.tsx, error.tsx, global-error.tsx
   features/
@@ -47,6 +48,7 @@ src/
     atelier/                   # 조향·혼합·레시피·초안
     checkout/                  # 주문 조회·주문 정보 화면
     partner/                   # 문의 등록
+    admin/                     # 관리자 DTO·조회·수정·화면(소비자 DTO와 분리)
     onboarding/                # 가입 후 안내
   components/
     ui/, brand/, illustrations/, layout/, feedback/
@@ -59,7 +61,7 @@ src/
   styles/                      # 토큰·기본값·공유 요소·사이트 셸·모션·공유 커머스 모듈
 mock-server/
   app.ts, index.ts             # 독립 Express HTTP 서버
-  routes/                     # 인증·조향·주문·문의 API
+  routes/                     # 인증·조향·주문·문의·관리자 API
   fixtures/catalog.json       # 상품·컬렉션·향료·프로모션·추천 이름 원본
   data/store.ts               # Mock 저장소
   .data/db.json               # 실행 중 생성되는 로컬 데이터, Git 제외
@@ -89,7 +91,7 @@ BFF는 요청 출처·JSON 크기·허용 쿠키·제한시간을 처리하고, 
 
 ## 데이터 소유권과 Mock API
 
-장바구니는 브라우저 `localStorage`의 `aura_cart_v1` 키에 상품 ID·수량·선택 구성을 저장합니다. 로그인·로그아웃과 관계없이 같은 브라우저에서 유지하며, 같은 출처의 다른 탭에도 변경을 반영합니다. 상품·컬렉션·향료·프로모션·추천 이름은 서버 fixture에서, 회원·세션·레시피·초안·주문·문의는 Mock 저장소에서 관리하고 HTTP로 접근합니다. `sessionStorage`에는 가입 안내 표시 여부만 남아 있습니다.
+장바구니는 브라우저 `localStorage`의 `aura_cart_v1` 키에 상품 ID·수량·선택 구성을 저장합니다. 로그인·로그아웃과 관계없이 같은 브라우저에서 유지하며, 같은 출처의 다른 탭에도 변경을 반영합니다. 컬렉션·향료·프로모션·추천 이름은 서버 fixture에서, 상품(fixture로 초기화한 뒤 관리자 수정 반영)·회원·세션·레시피·초안·주문·문의·관리자 이력은 Mock 저장소에서 관리하고 HTTP로 접근합니다. `sessionStorage`에는 가입 안내 표시 여부만 남아 있습니다.
 
 | API                                                 | 책임                          |
 | --------------------------------------------------- | ----------------------------- |
@@ -100,6 +102,7 @@ BFF는 요청 출처·JSON 크기·허용 쿠키·제한시간을 처리하고, 
 | `GET/PUT/DELETE /api/atelier/draft`                 | 방문자별 조향 초안            |
 | `GET/POST /api/orders`                              | 회원 주문 조회·모의 주문 생성 |
 | `POST /api/partner`                                 | 모의 입점 문의 저장           |
+| `/api/admin/**`                                     | 관리자 전용 운영 API          |
 
 Mock 서버는 HttpOnly·SameSite 쿠키로 세션을 식별하고 비밀번호는 서버에서 scrypt 검증값으로 저장합니다. 레시피와 주문은 회원별로 분리합니다. 로컬 장바구니는 인증 변경 시에도 그대로 유지합니다. 조향 초안은 가입·로그인 이동 중에도 이어지도록 방문자에 귀속합니다. 가격·유효한 구성·레시피 ID·버전·생성 시각은 서버에서 결정합니다. 클라이언트가 보낸 가격을 주문 계산에 사용하지 않습니다.
 
@@ -112,6 +115,8 @@ Mock 서버는 HttpOnly·SameSite 쿠키로 세션을 식별하고 비밀번호�
 TanStack Query는 서버 데이터의 조회·로딩·오류·변경 후 캐시 갱신을 맡습니다. 회원별 쿼리 키에 소유자를 포함하고 인증 변경 시 기존 개인 캐시를 취소·제거합니다. 레시피 변경 요청에는 시작 시점의 소유자를 보내 계정 전환 중 잘못된 소유자에게 적용되는 요청을 거절합니다. 초기 조회가 끝나기 전에 빈 초안으로 편집기를 초기화하지 않습니다.
 
 기본 저장 파일은 `apps/web/mock-server/.data/db.json`이며 서버를 재시작해도 유지합니다. 삭제하면 초기화됩니다. `MOCK_PERSIST=0 npm run mock`은 메모리에서만 동작합니다. `MOCK_PORT`로 포트를 지정할 수 있습니다. 이 저장소는 단일 프로세스 개발용 JSON 파일이며 운영 DB의 트랜잭션·배포·복구를 제공하지 않습니다. 기존 서버 장바구니는 브라우저로 자동 이전하지 않으며 저장 파일에서 다시 불러오지 않습니다.
+
+관리자 계약은 [BFF 문서의 관리자 API](../../docs/FASTAPI_BFF.md#관리자-api-1단계-제안)를 따릅니다. `npm run mock`은 시작할 때 개발용 관리자 계정 `admin@aura.local` / `aura-admin-local`을 생성하거나 관리자 역할로 되돌립니다. `MOCK_ADMIN_EMAIL`·`MOCK_ADMIN_PASSWORD`로 바꾸고, `MOCK_ADMIN_EMAIL=`(빈 값)이면 생성하지 않습니다. 이 계정은 로컬 Mock 전용이며 운영 관리자 발급 절차와 무관합니다. 로그인 후 `/admin` 또는 마이페이지의 관리자 링크로 이동합니다.
 
 Playwright는 `MOCK_TEST_MODE=1`, `MOCK_PERSIST=0`으로 API를 시작하고 테스트별 쿠키에 연결된 `POST /__test__/seed`로 데이터를 준비합니다. 일반 실행에서는 시드 경로를 노출하지 않습니다. 다른 테스트나 실제 개발 데이터를 전역 초기화하지 않습니다.
 

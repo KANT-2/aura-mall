@@ -7,6 +7,7 @@ import { Cormorant_Garamond, Noto_Serif_KR } from "next/font/google";
 import { AuraMotionEnhancer } from "@/app/_components/motion-effects";
 import { Providers } from "@/app/providers";
 import { SiteHeader } from "@/app/_components/site-header";
+import { StorefrontOnly } from "@/app/_components/storefront-only";
 import { WelcomeJourney } from "@/features/onboarding/components/welcome-dialog";
 import { Footer } from "@/components/layout/site-footer";
 import "@/app/globals.css";
@@ -47,10 +48,14 @@ export default async function Layout({ children }: { children: React.ReactNode }
         <Providers>
           <HydrationBoundary state={dehydrate(queryClient)}>
             <AuraMotionEnhancer />
-            <SiteHeader />
+            <StorefrontOnly>
+              <SiteHeader />
+            </StorefrontOnly>
             <div id="main-content">{children}</div>
-            <WelcomeJourney />
-            <Footer />
+            <StorefrontOnly>
+              <WelcomeJourney />
+              <Footer />
+            </StorefrontOnly>
           </HydrationBoundary>
         </Providers>
       </body>
