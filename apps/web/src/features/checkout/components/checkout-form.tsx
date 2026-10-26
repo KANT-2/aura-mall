@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { useCatalog } from "@/features/catalog/hooks/use-catalog";
 import { testIds } from "@/lib/test-ids";
 import styles from "@/styles/commerce.module.css";
@@ -20,7 +21,7 @@ export function Checkout() {
   if (!ready) {
     return (
       <main className={styles.root + " page-width checkout"} aria-busy="true">
-        <p role="status">주문 정보를 불러오고 있어요.</p>
+        <LoadingSkeleton variant="checkout" label="주문 정보를 불러오고 있어요." />
       </main>
     );
   }
