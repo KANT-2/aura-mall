@@ -15,6 +15,10 @@ RUN uv sync --locked --no-dev
 
 # 6. FastAPI 소스 코드 복사
 COPY aura_api ./aura_api
+COPY aura_api ./aura_api
+COPY alembic.ini ./alembic.ini
+COPY migrations ./migrations
+COPY db ./db
 
 # 7. 가상환경의 실행 프로그램 사용
 ENV PATH="/app/.venv/bin:$PATH"
