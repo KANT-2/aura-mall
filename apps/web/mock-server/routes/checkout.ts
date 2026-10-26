@@ -4,7 +4,8 @@ import { restoreCart } from "@/features/cart/model/cart";
 import { itemPrice, shippingFee } from "@/features/cart/model/pricing";
 import { catalog, type MockDatabase } from "../data/store";
 import { resolveSession } from "../session";
-import { HttpError, requireString } from "../http";
+import { HttpError, requireJsonBody, requireString } from "../http";
+import { assertCartStock, serializeCart } from "../cart";
 
 export function checkoutRoutes(database: MockDatabase) {
   const router = Router();
@@ -27,13 +28,14 @@ export function checkoutRoutes(database: MockDatabase) {
         })),
     );
   });
-  router.post("/orders", (req, res) => {
+  router.post("/orders", requireJsonBody, (req, res) => {
     const { owner, user } = resolveSession(req, res, database);
-    const items = restoreCart(database.state.carts[owner] ?? [], catalog);
+    const items = serializeCart(restoreCart(database.state.carts[owner] ?? [], catalog));
     if (!items.length) {
       throw new HttpError(400, "주문할 상품이 없어요.");
     }
 
+    assertCartStock(items);
     const prices = items.map((item) => itemPrice(item, catalog.products));
     if (prices.some((price) => price === null)) {
       throw new HttpError(400, "주문 금액을 확인해 주세요.");
@@ -71,7 +73,7 @@ export function checkoutRoutes(database: MockDatabase) {
       created: order.created,
     });
   });
-  router.post("/partner", (req, res) => {
+  router.post("/partner", requireJsonBody, (req, res) => {
     const required = ["brand", "name", "email", "introduction", "message", "type"];
     const values = Object.fromEntries(
       required.map((key) => [key, requireString(req.body[key], "필수 입력 항목을 확인해 주세요.")]),

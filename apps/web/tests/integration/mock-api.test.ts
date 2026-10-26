@@ -36,7 +36,7 @@ function client() {
       body: data === undefined ? undefined : JSON.stringify(data),
     });
     cookie = response.headers.get("set-cookie")?.split(";")[0] ?? cookie;
-    return { status: response.status, body: await response.json() };
+    return { status: response.status, body: await response.json(), headers: response.headers };
   };
 }
 const credentials = (name: string) => ({
@@ -46,6 +46,61 @@ const credentials = (name: string) => ({
 });
 
 describe("Mock API data ownership and validation", () => {
+  it.each([
+    ["/api/auth/register", "POST"],
+    ["/api/auth/login", "POST"],
+    ["/api/cart/items", "POST"],
+    ["/api/cart/items/missing", "PATCH"],
+    ["/api/recipes", "POST"],
+    ["/api/atelier/draft", "PUT"],
+    ["/api/orders", "POST"],
+    ["/api/partner", "POST"],
+  ])("requires a JSON object for %s %s", async (path, method) => {
+    for (const body of [undefined, "", "[]", "null", '"private-password"', '{"password":']) {
+      const response = await fetch(base + path, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: { message: "입력 형식을 확인해 주세요." },
+      });
+    }
+
+    const response = await fetch(base + path, {
+      method,
+      headers: { "Content-Type": "text/plain" },
+      body: "{}",
+    });
+    expect(response.status).toBe(415);
+  });
+  it("reports oversized JSON as 413 without echoing request data", async () => {
+    const response = await fetch(base + "/api/partner", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "private-input".repeat(3000) }),
+    });
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ error: { message: "입력 내용이 너무 길어요." } });
+  });
+  it("preserves guest identity and uses an opaque HttpOnly session cookie", async () => {
+    const api = client();
+    const guest = await api("/api/session");
+    expect(guest.body).toEqual({ user: null, guestId: expect.any(String) });
+    const cookie = guest.headers.get("set-cookie")!;
+    expect(cookie).toMatch(/^aura_mock_session=/);
+    expect(cookie).toMatch(/HttpOnly/i);
+    expect(cookie).toMatch(/SameSite=Lax/i);
+    expect(cookie).toContain("Path=/");
+    expect(cookie).not.toContain(guest.body.guestId);
+    const member = await api("/api/auth/register", "POST", credentials("identity-owner"));
+    expect(member.body.guestId).toBe(guest.body.guestId);
+    const loggedOut = await api("/api/auth/logout", "POST");
+    expect(loggedOut.body).toEqual(guest.body);
+    const loggedIn = await api("/api/auth/login", "POST", credentials("identity-owner"));
+    expect(loggedIn.body.guestId).toBe(guest.body.guestId);
+  });
   it("serves catalog data, legacy slugs and explicit missing products", async () => {
     const api = client();
     const catalog = await api("/api/catalog");
@@ -98,6 +153,77 @@ describe("Mock API data ownership and validation", () => {
       selection: ["fresh-hand-cream", "fresh-candle", "fresh-hand-wash"],
     });
     expect(gift.status).toBe(201);
+  });
+  it("requires exactly one product or custom composition and derives custom colors", async () => {
+    const api = client();
+    const custom = { name: "내 향", counts: { rose: 2 }, label: "paper", color: "#000000" };
+    for (const input of [
+      {},
+      { productId: "fresh-hand-cream", custom },
+      { custom: null },
+      { custom: "invalid" },
+      { custom: { ...custom, counts: { rose: 1.5 } } },
+      { custom: { ...custom, counts: { rose: 21 } } },
+      { custom: { ...custom, productType: "candle" } },
+    ]) {
+      expect((await api("/api/cart/items", "POST", { ...input, quantity: 1 })).status).toBe(400);
+    }
+
+    expect((await api("/api/cart")).body).toEqual([]);
+    const result = await api("/api/cart/items", "POST", { custom, quantity: 1 });
+    expect(result.status).toBe(201);
+    const catalog = (await api("/api/catalog")).body;
+    expect(result.body[0].custom.color).toBe(
+      catalog.ingredients.find((ingredient: { id: string }) => ingredient.id === "rose").color,
+    );
+    expect(result.body[0].unitPrice).toBe(98000);
+  });
+  it("rejects cumulative quantity overflow instead of silently clamping the cart", async () => {
+    const api = client();
+    const added = await api("/api/cart/items", "POST", {
+      productId: "fresh-hand-cream",
+      quantity: 15,
+    });
+    expect(added.status).toBe(201);
+    expect(
+      (await api("/api/cart/items", "POST", { productId: "fresh-hand-cream", quantity: 1 })).status,
+    ).toBe(400);
+    expect((await api("/api/cart")).body).toEqual(added.body);
+    const key = encodeURIComponent(added.body[0].key);
+    expect((await api(`/api/cart/items/${key}`, "PATCH", { quantity: 0 })).body).toEqual([]);
+  });
+  it("checks stock across single products and all gift selections before saving", async () => {
+    const api = client();
+    const selection = ["fresh-hand-cream", "fresh-candle", "fresh-hand-wash"];
+    const gift = await api("/api/cart/items", "POST", {
+      productId: "fresh-gift-set",
+      selection,
+      quantity: 10,
+    });
+    expect(gift.status).toBe(201);
+    expect(
+      (await api("/api/cart/items", "POST", { productId: "fresh-hand-cream", quantity: 6 })).status,
+    ).toBe(400);
+    const single = await api("/api/cart/items", "POST", {
+      productId: "fresh-hand-cream",
+      quantity: 5,
+    });
+    expect(single.status).toBe(201);
+    const giftKey = encodeURIComponent(gift.body[0].key);
+    expect((await api(`/api/cart/items/${giftKey}`, "PATCH", { quantity: 11 })).status).toBe(400);
+    expect((await api("/api/cart")).body).toEqual(single.body);
+    expect((await api(`/api/cart/items/${giftKey}`, "PATCH", { quantity: 9 })).status).toBe(200);
+  });
+  it("does not create an account when the session owner check rejects registration", async () => {
+    const api = client();
+    const guest = await api("/api/session");
+    const input = credentials("rejected-registration");
+    expect(
+      (await api("/api/auth/register", "POST", input, { "X-Session-Owner": "stale-owner" })).status,
+    ).toBe(409);
+    expect((await api("/api/session")).body).toEqual(guest.body);
+    expect((await api("/api/auth/login", "POST", input)).status).toBe(401);
+    expect((await api("/api/auth/register", "POST", input)).status).toBe(201);
   });
   it("rejects unregistered and incorrect credentials and duplicate concurrent registrations", async () => {
     const first = client(),
@@ -167,9 +293,32 @@ describe("Mock API data ownership and validation", () => {
     });
     expect(order.status).toBe(201);
     expect(order.body.total).toBe(28000);
+    expect(order.body.items[0].unitPrice).toBe(28000);
     expect((await api("/api/cart")).body).toEqual([]);
-    expect((await api("/api/orders")).body).toHaveLength(1);
+    expect((await api("/api/orders")).body).toEqual([order.body]);
     expect((await api("/api/session")).body.user.coupon).toBe(false);
+  });
+  it("rechecks stock at checkout and leaves the cart and coupon intact on failure", async () => {
+    const api = client();
+    await api("/api/auth/register", "POST", credentials("stock-order-owner"));
+    await api("/__test__/seed", "POST", {
+      cart: [
+        {
+          product: { id: "fresh-gift-set" },
+          selection: ["fresh-hand-cream", "fresh-candle", "fresh-hand-wash"],
+          quantity: 10,
+        },
+        { product: { id: "fresh-hand-cream" }, quantity: 6 },
+      ],
+    });
+    const cart = (await api("/api/cart")).body;
+    expect(
+      (await api("/api/orders", "POST", { recipient: "AURA", address: "서울", coupon: true }))
+        .status,
+    ).toBe(400);
+    expect((await api("/api/cart")).body).toEqual(cart);
+    expect((await api("/api/orders")).body).toEqual([]);
+    expect((await api("/api/session")).body.user.coupon).toBe(true);
   });
   it("stores validated partner inquiries and does not report invalid input as successful", async () => {
     const api = client();

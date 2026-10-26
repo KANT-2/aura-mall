@@ -6,7 +6,8 @@ import { cartRoutes } from "./routes/cart";
 import { atelierRoutes } from "./routes/atelier";
 import { checkoutRoutes } from "./routes/checkout";
 import { resolveSession, ownerOf } from "./session";
-import { HttpError } from "./http";
+import { HttpError, requireJsonBody } from "./http";
+import { isRecord } from "@/lib/validation";
 import { restoreCart } from "@/features/cart/model/cart";
 import { restoreDraft, restoreRecipes } from "@/features/atelier/model/recipes";
 
@@ -44,7 +45,7 @@ export function createMockApp({
     checkoutRoutes(database),
   );
   if (testMode) {
-    app.post("/__test__/seed", (req, res) => {
+    app.post("/__test__/seed", requireJsonBody, (req, res) => {
       const { session } = resolveSession(req, res, database);
       if (req.body.member) {
         const salt = randomBytes(16).toString("hex");
@@ -84,15 +85,23 @@ export function createMockApp({
     res.status(404).json({ error: { message: "API 경로를 찾을 수 없어요." } }),
   );
   const handleError: ErrorRequestHandler = (error, _req, res, _next) => {
-    const status =
-      error instanceof HttpError ? error.status : error instanceof SyntaxError ? 400 : 500;
+    const parserError = isRecord(error) ? error.type : undefined;
+    const failure =
+      error instanceof HttpError
+        ? error
+        : parserError === "entity.too.large"
+          ? new HttpError(413, "입력 내용이 너무 길어요.")
+          : parserError === "entity.parse.failed" || parserError === "request.size.invalid"
+            ? new HttpError(400, "입력 형식을 확인해 주세요.")
+            : parserError === "charset.unsupported" || parserError === "encoding.unsupported"
+              ? new HttpError(415, "JSON 형식으로 요청해 주세요.")
+              : new HttpError(500, "서버 요청을 처리하지 못했어요.");
+    const { status, message } = failure;
     if (status === 500) {
       console.error(error);
     }
 
-    res.status(status).json({
-      error: { message: status === 500 ? "서버 요청을 처리하지 못했어요." : error.message },
-    });
+    res.status(status).json({ error: { message } });
   };
   app.use(handleError);
   return app;
