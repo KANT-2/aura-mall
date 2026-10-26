@@ -1,7 +1,7 @@
 import pytest
 
-from aura_api.modules.errors import InvalidInput
-from aura_api.modules.partner.domain import validate_inquiry
+from aura_api.domain.errors import InvalidInput
+from aura_api.domain.partner import validate_inquiry
 
 VALID = {
     "brand": " AURA Lab ",

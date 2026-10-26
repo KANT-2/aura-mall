@@ -1,7 +1,7 @@
 import pytest
 
-from aura_api.modules.errors import Conflict, InvalidInput
-from aura_api.modules.identity.domain import (
+from aura_api.domain.errors import Conflict, InvalidInput
+from aura_api.domain.identity import (
     Coupon,
     RequestOwner,
     has_usable_coupon,

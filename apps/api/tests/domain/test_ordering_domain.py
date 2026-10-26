@@ -1,7 +1,7 @@
 import pytest
 
-from aura_api.modules.errors import InvalidInput
-from aura_api.modules.ordering.domain import (
+from aura_api.domain.errors import InvalidInput
+from aura_api.domain.ordering import (
     build_line,
     price_order,
     shipping_fee,
