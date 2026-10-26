@@ -1,0 +1,189 @@
+"""Order intake and history. Items keep a snapshot of the product as it was when ordered."""
+
+import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from aura_api.domain.ordering import PricedOrder
+from aura_api.infra.models import (
+    Order,
+    OrderItem,
+    OrderItemSelection,
+    Product,
+    ProductType,
+    UserCoupon,
+)
+
+
+@dataclass(frozen=True)
+class SavedItem:
+    key: str
+    product: dict[str, Any]  # Product DTO snapshot (camelCase)
+    quantity: int
+    selection: list[str]
+    custom: dict[str, Any] | None
+    unit_price: int
+
+
+@dataclass(frozen=True)
+class SavedOrder:
+    id: uuid.UUID
+    items: list[SavedItem]
+    total: int
+    recipient: str
+    address: str
+    created_at: datetime
+
+
+async def products_with_type_names(session: AsyncSession) -> dict[str, tuple[Product, str]]:
+    rows = await session.execute(
+        select(Product, ProductType.name).join(ProductType, Product.type_id == ProductType.id)
+    )
+    return {product.id: (product, type_name) for product, type_name in rows}
+
+
+async def lock_available_coupon(session: AsyncSession, user_id: uuid.UUID) -> UserCoupon | None:
+    """The member's unused free-shipping coupon, locked until the order commits."""
+    return await session.scalar(
+        select(UserCoupon)
+        .where(UserCoupon.user_id == user_id, UserCoupon.status == "AVAILABLE")
+        .with_for_update()
+    )
+
+
+async def take_stock(session: AsyncSession, product_id: str, quantity: int) -> bool:
+    """Decrement only if enough is left; False means another order got there first."""
+    result = await session.execute(
+        update(Product)
+        .where(Product.id == product_id, Product.stock >= quantity)
+        .values(stock=Product.stock - quantity)
+    )
+    return result.rowcount == 1
+
+
+async def use_coupon(session: AsyncSession, coupon_id: uuid.UUID, order_id: uuid.UUID) -> bool:
+    result = await session.execute(
+        update(UserCoupon)
+        .where(UserCoupon.id == coupon_id, UserCoupon.status == "AVAILABLE")
+        .values(status="USED", used_order_id=order_id, used_at=datetime.now(UTC))
+    )
+    return result.rowcount == 1
+
+
+async def add_order(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    priced: PricedOrder,
+    snapshots: list[dict[str, Any]],
+    selection_names: dict[str, str],
+    coupon_id: uuid.UUID | None,
+) -> SavedOrder:
+    """`snapshots[i]` is the product DTO for `priced.lines[i]`."""
+    order = Order(
+        user_id=user_id,
+        recipient=priced.recipient,
+        address=priced.address,
+        items_amount=priced.items_amount,
+        shipping_fee=priced.shipping_fee,
+        total=priced.total,
+        coupon_id=coupon_id,
+    )
+    session.add(order)
+    await session.flush()
+    items: list[SavedItem] = []
+    for position, (line, snapshot) in enumerate(zip(priced.lines, snapshots, strict=True)):
+        custom = (
+            {
+                "name": line.custom.name,
+                "label": line.custom.label,
+                "color": line.custom.color,
+                "counts": line.custom.counts,
+                "productType": line.custom.product_type,
+            }
+            if line.custom
+            else None
+        )
+        row = OrderItem(
+            order_id=order.id,
+            position=position,
+            line_key=line.key,
+            kind=line.kind,
+            product_id=snapshot["id"],
+            product_snapshot=snapshot,
+            unit_price=line.unit_price,
+            quantity=line.quantity,
+            custom=custom,
+        )
+        session.add(row)
+        await session.flush()
+        session.add_all(
+            OrderItemSelection(
+                order_item_id=row.id,
+                product_id=product_id,
+                product_name=selection_names[product_id],
+                unit_price=line.unit_price,
+                position=index,
+            )
+            for index, product_id in enumerate(line.selection)
+        )
+        items.append(
+            SavedItem(
+                line.key, snapshot, line.quantity, list(line.selection), custom, line.unit_price
+            )
+        )
+    await session.flush()
+    await session.refresh(order, ["created_at"])
+    return SavedOrder(
+        order.id, items, order.total, order.recipient, order.address, order.created_at
+    )
+
+
+async def list_orders(session: AsyncSession, user_id: uuid.UUID) -> list[SavedOrder]:
+    orders = list(
+        await session.scalars(
+            select(Order)
+            .where(Order.user_id == user_id)
+            .order_by(Order.created_at.desc(), Order.id)
+        )
+    )
+    if not orders:
+        return []
+    order_ids = [order.id for order in orders]
+    rows = list(
+        await session.scalars(
+            select(OrderItem)
+            .where(OrderItem.order_id.in_(order_ids))
+            .order_by(OrderItem.order_id, OrderItem.position)
+        )
+    )
+    selections: dict[uuid.UUID, list[str]] = {}
+    if rows:
+        chosen = await session.scalars(
+            select(OrderItemSelection)
+            .where(OrderItemSelection.order_item_id.in_([row.id for row in rows]))
+            .order_by(OrderItemSelection.order_item_id, OrderItemSelection.position)
+        )
+        for item in chosen:
+            selections.setdefault(item.order_item_id, []).append(item.product_id)
+    items: dict[uuid.UUID, list[SavedItem]] = {order_id: [] for order_id in order_ids}
+    for row in rows:
+        items[row.order_id].append(
+            SavedItem(
+                row.line_key,
+                row.product_snapshot,
+                row.quantity,
+                selections.get(row.id, []),
+                row.custom,
+                row.unit_price,
+            )
+        )
+    return [
+        SavedOrder(
+            order.id, items[order.id], order.total, order.recipient, order.address, order.created_at
+        )
+        for order in orders
+    ]
