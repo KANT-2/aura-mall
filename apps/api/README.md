@@ -107,9 +107,13 @@ API 접두사를 변경해도 `/health`는 유지됩니다. OpenAPI에는 접두
 API_URL=http://127.0.0.1:8000
 API_PREFIX=/api/v1
 API_SESSION_COOKIE=aura_session
+API_AUTH_MODE=jwt
+# API_BFF_SHARED_KEY=<AURA_BFF_SHARED_KEY와 같은 무작위 서버 비밀값>
 ```
 
 이후 `npm run dev:web`으로 웹 서버를 실행합니다. 브라우저는 동일 출처 `/api`를 호출하고 Next BFF가 FastAPI에 연결합니다. 현재 헬스 체크만 구현된 FastAPI로는 상품·세션 조회를 제공할 수 없습니다.
+
+JWT 모드의 BFF는 설정한 쿠키의 토큰을 Bearer로 바꿉니다. 인증 업무 API는 공개 `Session` JSON과 JWT `Set-Cookie`를 반환해야 하며, 서명·수명·폐기·익명 방문자 보존은 FastAPI가 담당합니다. 실제 검증기를 연결한 테스트 전용 HTTP 검증은 루트의 `npm run build && npm run test:e2e:jwt`로 실행합니다. 테스트 앱의 발급·메모리 폐기 저장소는 운영 앱에 등록되지 않습니다.
 
 ## 검증과 의존성 변경
 
