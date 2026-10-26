@@ -4,7 +4,9 @@ Uses the real JWT verifier, CSRF middleware and exception handlers. Issuance,
 users and revocation storage below are deliberately confined to this fixture.
 """
 
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 import jwt
@@ -19,6 +21,10 @@ from aura_api.main import create_app
 
 settings = Settings()
 app = create_app(settings)
+# Fixture routes must precede production routes as more resources are implemented.
+# Keep the actual middleware/state and append the production routes as fallbacks.
+production_routes = app.router.routes[:]
+app.router.routes.clear()
 COOKIE = "aura_session"
 
 
@@ -90,7 +96,8 @@ def session_data(guest_id: str, member_id: str | None = None) -> dict:
 
 @app.get("/api/v1/catalog")
 async def catalog():
-    return {"products": []}
+    path = Path(__file__).resolve().parents[4] / "apps/web/mock-server/fixtures/catalog.json"
+    return json.loads(path.read_text())
 
 
 @app.get("/api/v1/session")
@@ -132,4 +139,17 @@ async def recipes(request: Request, user: CurrentUser):
     expected = request.headers.get("x-session-owner")
     if expected and expected != user.user_id:
         raise HTTPException(409)
-    return [{"id": f"recipe-{user.user_id}"}]
+    return [
+        {
+            "id": f"recipe-{user.user_id}",
+            "version": 1,
+            "name": "전송 검증용 레시피",
+            "label": "paper",
+            "counts": {"bergamot": 3},
+            "color": "#e8d36b",
+            "created": "2026-10-26T00:00:00Z",
+        }
+    ]
+
+
+app.router.routes.extend(production_routes)
