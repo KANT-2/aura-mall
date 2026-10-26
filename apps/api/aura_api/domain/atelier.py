@@ -4,8 +4,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-from aura_api.modules.catalog.domain import Ingredient
-from aura_api.modules.errors import InvalidInput
+from aura_api.domain.catalog import Ingredient
+from aura_api.domain.errors import InvalidInput
 
 MAX_DROPS = 20
 NAME_MAX = 30

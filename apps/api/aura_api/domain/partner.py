@@ -4,7 +4,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from aura_api.modules.errors import InvalidInput
+from aura_api.domain.errors import InvalidInput
 
 EMAIL_PATTERN = re.compile(r"^\S+@\S+\.\S+$")
 TEXT_MAX = 3000

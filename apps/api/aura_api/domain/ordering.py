@@ -11,9 +11,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from aura_api.modules.atelier.domain import mix_color, normalize_label, validate_counts
-from aura_api.modules.catalog.domain import CUSTOM_PRODUCT_TYPE, Catalog, Product
-from aura_api.modules.errors import InvalidInput
+from aura_api.domain.atelier import mix_color, normalize_label, validate_counts
+from aura_api.domain.catalog import CUSTOM_PRODUCT_TYPE, Catalog, Product
+from aura_api.domain.errors import InvalidInput
 
 MAX_QUANTITY = 15
 GIFT_SET_SIZE = 3

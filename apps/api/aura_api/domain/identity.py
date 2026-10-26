@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass, replace
 from typing import Literal
 
-from aura_api.modules.errors import Conflict, InvalidInput
+from aura_api.domain.errors import Conflict, InvalidInput
 
 # Same email shape the signup form and Mock API accept.
 EMAIL_PATTERN = re.compile(r"^\S+@\S+\.\S+$")

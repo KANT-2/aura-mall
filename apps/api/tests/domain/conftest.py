@@ -1,6 +1,6 @@
 import pytest
 
-from aura_api.modules.catalog.domain import Catalog, Ingredient, Product
+from aura_api.domain.catalog import Catalog, Ingredient, Product
 
 
 def _product(product_id: str, collection: str, type_: str, price: int | None, stock: int = 15):
