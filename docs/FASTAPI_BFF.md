@@ -2,7 +2,7 @@
 
 [문서 목록](README.md) · [웹 개발 안내](../apps/web/README.md) · [API 개발 안내](../apps/api/README.md)
 
-장바구니는 브라우저 로컬 스토리지에 저장하며 로그인·로그아웃과 관계없이 같은 브라우저에서 유지합니다. 그 외 서버 데이터는 Next.js BFF를 통해 독립 Mock API에 연결되어 있습니다. FastAPI 기본 앱은 `apps/api`에 있으며 현재 헬스 체크만 제공합니다. 공통 Bearer JWT 검증기는 구현했지만 업무 API·DB·운영 토큰 발급·폐기와 BFF JWT 연결은 아직 구현하지 않았습니다. 아래 계약은 현재 화면을 유지하면서 FastAPI로 전환하기 위한 연결 기준입니다.
+장바구니는 브라우저 로컬 스토리지에 저장하며 로그인·로그아웃과 관계없이 같은 브라우저에서 유지합니다. 그 외 서버 데이터는 Next.js BFF를 통해 독립 Mock API에 연결되어 있습니다. FastAPI는 헬스 체크와 JWT 로그인·갱신·로그아웃 API 및 PostgreSQL 저장소 코드를 제공합니다. CRA-14의 실제 스키마·DB 검증과 BFF JWT 연결은 아직 대기 중이며 기존 화면을 FastAPI 인증으로 전환한 상태는 아닙니다. 아래 계약은 현재 Mock/BFF 계약과 후속 연결 기준을 구분합니다.
 
 ## 경계
 
@@ -55,6 +55,10 @@ APP_ORIGIN=http://localhost:3000
 
 ## FastAPI가 제공할 리소스
 
+아래 표의 Session 기반 로그인·로그아웃은 현재 Mock/BFF 화면 계약입니다.
+새 FastAPI JWT API는 TokenPair·204를 반환하므로 BFF 어댑터 없이 호환되지 않습니다.
+구현·요청·응답·DB 미연결 범위는 [JWT 생명주기](backend/JWT_LIFECYCLE.md)를 참고합니다.
+
 공개 BFF 경로의 `/api` 부분이 백엔드에서는 `API_PREFIX`로 바뀝니다. 예: `/api/catalog` → FastAPI `/api/v1/catalog`. 경로 끝에 `/`를 추가하지 않습니다. FastAPI의 trailing-slash redirect를 포함한 백엔드 3xx는 따라가지 않고 502로 처리합니다.
 
 | 메서드 | BFF 경로                     | 요청 / 성공 응답                                                                                  |
@@ -93,8 +97,9 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
 
 현재 Mock과 BFF의 인증 연결은 불투명한 세션 쿠키 방식입니다. 아래 쿠키 규칙과 `Session` DTO는
 이 구현의 현황이며 FastAPI가 이미 해당 세션을 발급·검증한다는 뜻은 아닙니다.
-FastAPI 공통 인증은 Bearer JWT 검증으로 전환했으며 로그인·세션 조회·토큰 발급 업무 API는
-아직 구현하지 않았습니다. 기존 BFF 전송부는 쿠키를 전달할 뿐 Authorization을 구성하지 않아
+FastAPI 공통 인증은 Bearer JWT이며 로그인·Refresh 회전·로그아웃과 PostgreSQL 저장소 코드를
+구현했습니다. 실제 DB 스키마 연결·검증과 Session 조회·회원가입 API는 미완료입니다.
+기존 BFF 전송부는 쿠키를 전달할 뿐 Authorization을 구성하지 않아
 JWT 보호 경로와 아직 호환되지 않습니다.
 
 - 브라우저에서 받은 쿠키 중 `API_SESSION_COOKIE`만 백엔드에 전달합니다. 브라우저의 `Authorization`, 임의 사용자 ID, `X-Forwarded-*`는 전달하지 않습니다.
@@ -109,15 +114,22 @@ JWT 보호 경로와 아직 호환되지 않습니다.
 FastAPI는 서버에 명시한 HS256·키·issuer·audience로 서명과 필수 `sub`, `jti`, `iat`, `exp`, `iss`, `aud`를
 검증하고, 401에는 기존 오류 JSON과 `WWW-Authenticate: Bearer`를 반환합니다.
 설정이 없으면 인증을 거절하며, 쿠키나 BFF 공유 키를 사용자 인증으로 사용하지 않습니다.
-서명 검증 후에는 jti 폐기 조회도 필요합니다. 현재 PostgreSQL 어댑터는 미연결이므로
-정상 서명 JWT라도 기본적으로 인증을 거절합니다. 폐기·조회 실패·미연결은 401입니다.
+서명 검증 후에는 jti 폐기 조회도 필요합니다. PostgreSQL 어댑터는 `AURA_DATABASE_URL`로
+명시적으로 연결하며, 현재 운영 스키마와 안전한 테스트 DB는 확인되지 않았습니다.
+저장소 미연결·폐기·조회 실패는 401입니다. 로그인·갱신·로그아웃 저장 실패는 503으로 완료를 보고하지 않습니다.
 실제 로그아웃은 jti를 만료시각까지 폐기 목록에 기록해야 하며 쿠키 삭제만으로 완료할 수 없습니다.
+
+새 FastAPI 서버 계약은 `POST /api/v1/auth/login`의 `{email,password}`, `POST /api/v1/auth/refresh`의
+`{refreshToken}` 요청에 `{accessToken,refreshToken,tokenType,expiresIn,refreshExpiresIn}`을 반환합니다.
+`POST /api/v1/auth/logout`은 유효한 Bearer Access JWT로 인증하고 폐기 커밋 후 204를 반환합니다.
+이 TokenPair를 기존 BFF가 그대로 브라우저로 전달하지 않도록 쿠키·Session 변환을 먼저 구현해야 합니다.
 
 브라우저 토큰은 HttpOnly·Secure 쿠키로 보호하고 BFF 서버가 허용된 쿠키에서만 토큰을 꺼내
 Authorization을 구성하는 방식을 우선 검토합니다. 이 어댑터는 아직 구현하지 않았으며,
 브라우저 Authorization을 무조건 전달하거나 JWT를 localStorage에 저장하는 코드는 추가하지 않았습니다.
-액세스 토큰 쿠키 이름·수명, Refresh Token, 로그인·로그아웃, 토큰 폐기·회전과 401 시 쿠키 삭제,
-계정 전환 409·권한 클레임 정책은 팀 연동 합의 후 구현합니다. BFF의 기존 출처·쿠키 보안과
+FastAPI Refresh·회전·계열 폐기 코드는 구현했지만 액세스 토큰 쿠키 이름·수명,
+BFF의 로그인·갱신·로그아웃 연결 및 401 시 쿠키 삭제, 계정 전환 409·권한 클레임 정책은
+팀 연동 합의 후 구현합니다. BFF의 기존 출처·쿠키 보안과
 요청 ID·공개 오류 형식은 유지해야 합니다. 기존 Mock의 세션 성공이 FastAPI JWT 성공을 뜻하지 않습니다.
 현재 BFF는 FastAPI의 `WWW-Authenticate` 헤더도 전달하지 않으므로 후속 어댑터에서 전달 여부를 정해야 합니다.
 구체적인 검증 정책·설정·미연결 업무 API의 제한은 [JWT 인증·인가 기반](backend/AUTHORIZATION_CORE.md)을 참고합니다.
