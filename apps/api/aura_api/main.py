@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from aura_api.api.errors import register_domain_errors
 from aura_api.api.health import router as health_router
 from aura_api.api.router import router as api_router
 from aura_api.config import Settings
@@ -37,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.add_middleware(RequestIDMiddleware)
     register_exception_handlers(app)
+    register_domain_errors(app)
     app.include_router(health_router, include_in_schema=False)
     app.include_router(api_router, prefix=settings.api_prefix)
     return app

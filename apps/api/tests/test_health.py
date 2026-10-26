@@ -29,6 +29,7 @@ def test_openapi_exposes_versioned_routes(client):
         "/api/v1/health",
         "/api/v1/catalog",
         "/api/v1/catalog/products/{product_id}",
+        "/api/v1/partner",
     }
 
 
