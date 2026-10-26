@@ -29,11 +29,16 @@ uv run --directory apps/api --locked uvicorn aura_api.main:app --reload --host 1
 aura_api/
   main.py             # 앱 팩토리·라우터 연결
   config.py           # 환경 변수와 .env 읽기
-  api/
+  api/                # 표현 계층: 라우터·요청/응답 모델
     router.py         # 업무 라우터 등록
     health.py         # 헬스 체크와 응답 모델
+  services/           # 서비스 계층: 유스케이스·트랜잭션
+  domain/             # 도메인 계층: 순수 Python 업무 규칙 (영역별 파일)
+  infra/              # 인프라 계층: DB·ORM 모델·저장소
+  core/               # 공통 모듈: 요청 ID·오류·인증·CSRF
 tests/
   test_health.py      # 헬스 체크·OpenAPI·접두사·리다이렉트 검사
+  domain/             # 도메인 규칙 단위 테스트 (DB 없음)
 pyproject.toml        # Python 의존성·Ruff·pytest 설정
 uv.lock               # 의존성 버전 고정
 .env.example          # 설정 예제
