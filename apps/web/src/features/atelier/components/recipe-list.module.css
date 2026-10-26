@@ -1,0 +1,521 @@
+.summary > :global(.button) {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.summary > :global(.micro) {
+  margin-top: 25px;
+}
+
+.chip {
+  border-bottom: 1px solid var(--line);
+}
+
+.chip > img {
+  width: 38px;
+  flex-shrink: 0;
+}
+
+.chip > div:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+
+.chip strong {
+  font-weight: 500;
+}
+
+.chip small {
+  display: block;
+}
+
+.chip > div:last-child:not(:nth-child(2)) {
+  display: flex;
+}
+
+.chip button {
+  font-size: 14px;
+  padding: 0;
+}
+
+@media (max-width: 560px) {
+  .summary {
+    padding: 25px 0 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .summary .list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 14px;
+  }
+
+  .chip > img {
+    width: 27px;
+  }
+
+  .chip > div:last-child:not(:nth-child(2)) {
+    margin-left: auto;
+  }
+}
+
+.chip button {
+  border-radius: 50%;
+}
+
+.chip {
+  margin-bottom: 12px;
+}
+
+.chip button {
+  min-width: 30px;
+  min-height: 36px;
+}
+
+.chip button:hover {
+  background: #e7d8c2;
+}
+
+@media (max-width: 560px) {
+  .chip button {
+    min-width: 36px;
+    min-height: 40px;
+  }
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.scroll {
+  min-height: 0;
+  overflow-y: auto;
+  flex: 1;
+  scrollbar-width: thin;
+}
+
+.list {
+  display: flex !important;
+  flex-direction: column;
+}
+
+.chip {
+  margin: 0;
+}
+
+.chip strong {
+  font-size: 12px;
+}
+
+.chip small {
+  font-size: 12px;
+}
+
+.summary > :global(.micro) {
+  margin: 16px 0 12px;
+}
+
+.summary > .blend {
+  margin-top: 0;
+  min-height: 52px;
+}
+
+.empty {
+  text-align: center;
+  padding: 40px 8px;
+  font-size: 13px;
+}
+
+.empty img {
+  height: 65px;
+  margin: 0 auto 18px;
+}
+
+:global([data-atelier-part="recipe-details"]) .list {
+  margin-top: 16px;
+}
+
+@media (min-width: 701px) and (max-width: 1050px) {
+  .summary {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 700px) {
+  .summary {
+    display: none;
+  }
+
+  :global([data-atelier-part="dialog-content"]) .list {
+    display: flex !important;
+  }
+}
+
+:global([data-atelier-part="dialog"]) .chip {
+  user-select: auto;
+}
+
+@media (min-width: 701px) and (max-width: 1050px) {
+  .summary {
+    height: 100%;
+    min-height: 0;
+    padding-bottom: 8px;
+  }
+
+  .summary > :global(.micro) {
+    margin: 8px 0;
+  }
+
+  .scroll {
+    max-height: none;
+  }
+
+  .summary > .blend {
+    min-height: 50px;
+    padding-block: 9px;
+    flex-shrink: 0;
+  }
+}
+
+:global([data-atelier]) .summary {
+  scrollbar-color: #666758 #252a27;
+}
+
+:global([data-atelier]) .summary {
+  border-left: 1px solid #484c42;
+  padding-left: 24px;
+}
+
+:global([data-atelier]) .scroll {
+  scrollbar-color: #666758 #252a27;
+}
+
+:global([data-atelier]) .chip {
+  background-color: #383d35;
+  color: #f2eee4;
+}
+
+:global([data-atelier]) .chip strong {
+  color: #f2eee4;
+}
+
+:global([data-atelier]) .chip small {
+  color: #c5bfb1;
+}
+
+:global([data-atelier]) .chip > img {
+  object-fit: contain;
+}
+
+:global([data-atelier]) .chip :global(.ratio) {
+  background: #252a26;
+}
+
+:global([data-atelier]) .empty {
+  border: 1px dashed #55574c;
+  background: #252a26;
+  border-radius: 5px;
+}
+
+:global([data-atelier]) .empty p {
+  color: #b7b9aa;
+}
+
+:global([data-atelier]) .summary > :global(.micro) {
+  color: #b5b5a8;
+}
+
+@media (min-width: 701px) and (max-width: 1050px) {
+  :global([data-atelier]) .summary {
+    border-left: 0;
+    border-top: 1px solid #4a4f44;
+    padding: 10px 0 0;
+  }
+
+  :global([data-atelier]) .scroll {
+    max-height: none;
+  }
+}
+
+:global([data-atelier]) .summary {
+  min-width: 0;
+}
+
+:global([data-atelier]) .empty {
+  min-height: 190px;
+}
+
+:global([data-atelier]) .empty img {
+  width: 62px;
+  max-height: 62px;
+}
+
+:global([data-atelier]) .chip > img {
+  width: 52px;
+  height: 48px;
+}
+
+:global([data-atelier]) .list {
+  gap: 9px;
+}
+
+:global([data-atelier]) .chip {
+  display: flex !important;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid #605347 !important;
+  flex-wrap: nowrap !important;
+  background: linear-gradient(105deg, #45453d, #323830) !important;
+  box-shadow: inset 0 1px #fff3d410;
+}
+
+:global([data-atelier]) .chip[data-note="middle"] {
+  background: linear-gradient(100deg, #544039, #393933) !important;
+}
+
+:global([data-atelier]) .chip[data-note="base"] {
+  background: linear-gradient(100deg, #584532, #39382f) !important;
+}
+
+:global([data-atelier]) .portrait {
+  flex: 0 0 44px;
+  width: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f3eadd;
+  box-shadow: inset 0 0 0 1px #cdb9a063;
+}
+
+:global([data-atelier]) .portrait > img {
+  width: 40px;
+  height: 37px;
+  max-width: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 2px #574b3925);
+}
+
+:global([data-atelier]) .content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+:global([data-atelier]) .category {
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  color: #d3b18a;
+}
+
+:global([data-atelier]) .content strong {
+  line-height: 1.3;
+  font-weight: 500;
+  color: #fff2df;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+:global([data-atelier]) .amount {
+  display: flex;
+  align-items: center;
+}
+
+:global([data-atelier]) .amount small {
+  font-size: 10px;
+  white-space: nowrap;
+  color: #c3bdb2;
+}
+
+:global([data-atelier]) .track {
+  flex: 1;
+  border-radius: 99px;
+  overflow: hidden;
+  background: #181c19;
+  min-width: 14px;
+}
+
+:global([data-atelier]) .track span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  min-width: 2px;
+  transition: width 0.3s;
+}
+
+:global([data-atelier]) .actions {
+  flex-shrink: 0;
+}
+
+:global([data-atelier]) .actions button:last-child {
+  font-size: 16px;
+}
+
+:global([data-atelier]) .actions button:hover:not(:disabled) {
+  color: #36271e;
+  background: #e6ccab;
+}
+
+:global([data-atelier]) .actions button:focus-visible {
+  outline: 2px solid #d5b47b;
+  outline-offset: 1px;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier]) .portrait {
+    width: 37px;
+  }
+
+  :global([data-atelier]) .portrait > img {
+    width: 34px;
+    height: 33px;
+  }
+}
+
+:global([data-atelier][data-atelier-step])
+  :global([data-atelier-part="result"])
+  :global([data-atelier-part="recipe-details"])
+  .list {
+  padding: 8px 0 0;
+}
+
+:global([data-atelier][data-atelier-step]) .actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+
+:global([data-atelier][data-atelier-step]) .actions button {
+  box-sizing: border-box;
+  flex: 0 0 30px !important;
+  width: 30px !important;
+  min-width: 30px !important;
+  max-width: 30px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  border: 1px solid transparent !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #f3e6d1 !important;
+  font-size: 17px !important;
+  line-height: 1 !important;
+  transform: none !important;
+  aspect-ratio: 1 !important;
+}
+
+:global([data-atelier][data-atelier-step]) .actions button:before {
+  content: none !important;
+}
+
+:global([data-atelier][data-atelier-step]) .actions button:after {
+  content: none !important;
+}
+
+:global([data-atelier][data-atelier-step]) .actions button:is(:hover, :focus-visible):not(:disabled) {
+  background: #ffffff1a !important;
+  border-color: #827561 !important;
+  border-radius: 5px !important;
+  color: #fff3df !important;
+  transform: none !important;
+}
+
+:global([data-atelier][data-atelier-step]) .actions button:last-child {
+  color: #cfb9a1 !important;
+}
+
+:global([data-atelier][data-atelier-step]) .actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+:global([data-atelier][data-atelier-step]) .chip {
+  border-radius: 10px !important;
+  padding: 8px 10px !important;
+  gap: 11px;
+}
+
+:global([data-atelier][data-atelier-step]) .portrait {
+  flex-basis: 44px;
+  max-width: 44px;
+  height: 44px;
+}
+
+:global([data-atelier][data-atelier-step]) .content strong {
+  font-size: 14px;
+}
+
+:global([data-atelier][data-atelier-step]) .amount {
+  gap: 9px;
+}
+
+:global([data-atelier][data-atelier-step]) .track {
+  height: 4px;
+}
+
+@media (max-width: 790px) {
+  :global([data-atelier][data-atelier-step]) .actions button {
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :global([data-atelier][data-atelier-step]) .blend {
+    transform: translate3d(var(--aura-mx, 0px), var(--aura-my, 0px), 0) !important;
+    transition:
+      transform 0.24s var(--aura-motion-ease),
+      background-color 0.22s ease,
+      color 0.22s ease,
+      border-color 0.22s ease !important;
+  }
+
+  :global([data-atelier][data-atelier-step]) .blend:active {
+    filter: brightness(0.91);
+  }
+
+  :global([data-atelier][data-atelier-step]) .chip {
+    animation: noteEnter 0.3s var(--aura-motion-ease) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global([data-atelier][data-atelier-step]) .blend {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+:global([data-atelier][data-atelier-step]) .blend {
+  touch-action: manipulation;
+}
+
+:global([data-atelier][data-atelier-step]) .actions button {
+  touch-action: manipulation;
+}
+
+@keyframes noteEnter {
+  from {
+    opacity: 0.3;
+    transform: translateY(9px) scale(0.93);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

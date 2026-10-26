@@ -1,0 +1,12 @@
+.next
+node_modules
+public
+mock-server/fixtures
+mock-server/.data
+src/app/*.svg
+src/app/*.ico
+package-lock.json
+e2e/snapshots
+test-results
+playwright-report
+AGENTS.md
