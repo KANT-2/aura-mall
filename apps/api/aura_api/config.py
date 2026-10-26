@@ -13,6 +13,9 @@ class Settings(BaseSettings):
 
     app_name: str = "AURA API"
     api_prefix: str = Field(default="/api/v1", pattern=r"^/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+$")
+    session_cookie_name: str = Field(
+        default="aura_session", pattern=r"^[!#$%&'*+.^_`|~A-Za-z0-9-]+$"
+    )
     csrf_allowed_origins: list[str] = Field(default_factory=list)
     bff_shared_key: SecretStr | None = None
 

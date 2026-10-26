@@ -11,6 +11,7 @@ from aura_api.core.middleware import RequestIDMiddleware
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     app = FastAPI(title=settings.app_name, version="0.1.0", redirect_slashes=False)
+    app.state.auth_session_cookie = settings.session_cookie_name
     app.add_middleware(
         CSRFMiddleware,
         allowed_origins=settings.csrf_allowed_origins,
