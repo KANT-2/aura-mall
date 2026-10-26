@@ -2,49 +2,40 @@
   "name": "aura-mall",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "concurrently -k -n api,web \"npm:mock:dev\" \"npm:dev:web\"",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint .",
-    "lint:css": "node scripts/check-css.mjs",
-    "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run",
-    "test:e2e": "playwright test",
-    "test:e2e:visual": "node scripts/test-visual.mjs",
-    "check": "npm run format:check && npm run lint && npm run lint:css && npm run typecheck && npm test",
-    "test:watch": "vitest",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "dev:web": "next dev",
-    "mock": "tsx mock-server/index.ts",
-    "start:mock": "concurrently -k -n api,web \"npm:mock\" \"npm:start\"",
-    "mock:dev": "tsx watch mock-server/index.ts"
+  "workspaces": [
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
   },
-  "dependencies": {
-    "@tanstack/react-query": "^5.104.5",
-    "next": "16.4.2",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "server-only": "^0.0.1"
+  "scripts": {
+    "dev": "npm run dev --workspace @aura/web --",
+    "dev:web": "npm run dev:web --workspace @aura/web --",
+    "build": "npm run build --workspace @aura/web --",
+    "start": "npm run start --workspace @aura/web --",
+    "lint": "npm run lint --workspace @aura/web --",
+    "lint:css": "npm run lint:css --workspace @aura/web --",
+    "typecheck": "npm run typecheck --workspace @aura/web --",
+    "test": "npm run test --workspace @aura/web --",
+    "test:e2e": "npm run test:e2e --workspace @aura/web --",
+    "test:e2e:visual": "npm run test:e2e:visual --workspace @aura/web --",
+    "test:watch": "npm run test:watch --workspace @aura/web --",
+    "mock": "npm run mock --workspace @aura/web --",
+    "mock:dev": "npm run mock:dev --workspace @aura/web --",
+    "start:mock": "npm run start:mock --workspace @aura/web --",
+    "format": "prettier --write . && uv run --directory apps/api --locked ruff format .",
+    "format:check": "prettier --check .",
+    "setup:api": "uv sync --directory apps/api --locked",
+    "dev:api": "uv run --directory apps/api --locked uvicorn aura_api.main:app --reload --host 127.0.0.1 --port 8000",
+    "start:api": "uv run --directory apps/api --locked uvicorn aura_api.main:app --host 127.0.0.1 --port 8000",
+    "lint:api": "uv run --directory apps/api --locked ruff check .",
+    "format:api": "uv run --directory apps/api --locked ruff format .",
+    "test:api": "uv run --directory apps/api --locked pytest",
+    "check:web": "npm run lint && npm run lint:css && npm run typecheck && npm test",
+    "check:api": "npm run lint:api && uv run --directory apps/api --locked ruff format --check . && npm run test:api",
+    "check": "npm run format:check && npm run check:web && npm run check:api"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.1",
-    "@tailwindcss/postcss": "^4",
-    "@tailwindcss/turbopack": "^4.3.3",
-    "@types/express": "^5.0.6",
-    "@types/node": "^22",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "concurrently": "^10.0.6",
-    "eslint": "^9",
-    "eslint-config-next": "16.4.2",
-    "express": "^5.3.0",
-    "postcss": "^8.5.31",
-    "prettier": "^3.9.10",
-    "tailwindcss": "^4",
-    "tsx": "^4.23.15",
-    "typescript": "^5",
-    "vitest": "^5.0.5"
+    "prettier": "^3.9.10"
   }
 }
