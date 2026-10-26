@@ -1,17 +1,17 @@
 # AURA — From Scent to Identity
 
-향을 발견하고 나만의 취향을 기록하는 프래그런스 커머스와 퍼스널 아틀리에입니다. Next.js 16.4.2 App Router, React 19, TypeScript를 사용합니다.
+향을 발견하고 나만의 취향을 기록하는 프래그런스 커머스와 퍼스널 아틀리에입니다. Next.js 16.4.2 App Router·React 19·TypeScript 프런트엔드와 Python FastAPI 백엔드를 함께 관리하는 모노레포입니다.
 
 ## 실행
 
-Node.js 22.12 이상이 필요합니다.
+웹 개발에는 Node.js 22.12 이상과 npm이 필요합니다. FastAPI 개발에는 Python 3.12 이상과 [uv](https://docs.astral.sh/uv/getting-started/installation/)가 추가로 필요합니다. 모든 명령은 저장소 루트에서 실행합니다.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-개발 명령은 Next.js(`http://localhost:3000`)와 독립 HTTP Mock API(`http://127.0.0.1:4000`)를 함께 실행합니다. API 주소는 `.env.example`의 `API_URL`을 참고하세요. Next 서버의 데이터 조회와 `/api` BFF가 같은 서버 전용 연결을 사용합니다. `API_URL`·`API_PREFIX`·세션 쿠키 이름은 서버 실행 환경에서 설정하며, 주소를 바꾸면 Next 서버를 재시작합니다. 같은 빌드를 Mock 또는 FastAPI에 연결할 수 있습니다.
+개발 명령은 Next.js(`http://localhost:3000`)와 독립 HTTP Mock API(`http://127.0.0.1:4000`)를 함께 실행합니다. API 주소는 `apps/web/.env.example`의 `API_URL`을 참고하세요. Next 서버의 데이터 조회와 `/api` BFF가 같은 서버 전용 연결을 사용합니다. `API_URL`·`API_PREFIX`·세션 쿠키 이름은 서버 실행 환경에서 설정하며, 주소를 바꾸면 Next 서버를 재시작합니다. 같은 빌드를 Mock 또는 FastAPI에 연결할 수 있습니다.
 
 ```sh
 npm run build
@@ -20,7 +20,66 @@ npm run start:mock
 
 `build`는 Mock API가 꺼진 상태에서도 실행할 수 있습니다. `next/font/google` 때문에 빌드 중 Google Fonts에는 접근해야 합니다. `start:mock`은 프로덕션 Next 서버와 Mock API를 함께 실행합니다. 외부 백엔드를 사용할 때는 `API_URL`을 설정하고 `npm start`로 Next 서버만 실행합니다. `npm run mock`과 `npm run dev:web`으로 각각 실행할 수도 있습니다.
 
-## 프로젝트 구조
+## FastAPI 개발 준비
+
+`apps/api`에는 헬스 체크와 환경 설정·라우터·테스트 골격을 준비했습니다. 상품·회원·장바구니 등 업무 API는 [BFF 계약](docs/FASTAPI_BFF.md)에 따라 구현할 예정입니다.
+
+`uv.lock`으로 Python 의존성을 고정하고 앱별 `.venv`를 사용합니다.
+
+```sh
+npm run setup:api
+cp apps/api/.env.example apps/api/.env
+npm run dev:api
+```
+
+FastAPI는 `http://127.0.0.1:8000`에서 실행됩니다. `GET /health`와 `GET /api/v1/health`는 `{ "status": "ok" }`를 반환하고, `/docs`에서 API 문서를 확인할 수 있습니다. API만 실행하려면 npm 없이 `uv run --directory apps/api --locked uvicorn aura_api.main:app --reload --host 127.0.0.1 --port 8000`을 사용할 수 있습니다.
+
+현재 스토어프런트는 업무 API가 있는 Mock에 연결합니다. FastAPI에 [전체 계약](docs/FASTAPI_BFF.md)을 구현한 뒤 `apps/web/.env.local`의 `API_URL`, `API_PREFIX`, `API_SESSION_COOKIE`를 변경하고 `npm run dev:web`으로 연결합니다. 헬스 체크만 제공하는 현재 FastAPI에 연결하면 상품·세션 조회는 동작하지 않습니다.
+
+```sh
+cp apps/web/.env.example apps/web/.env.local
+npm run check:web
+npm run check:api
+npm run check
+```
+
+`check:web`은 웹 린트·CSS·타입·테스트, `check:api`는 Ruff 린트·포맷·pytest를 실행합니다. `check`는 저장소 Prettier 검사와 두 앱 검증을 모두 실행합니다. `npm run format:api`는 Python 포맷을, `npm run format`은 두 언어의 포맷을 적용합니다.
+
+## 모노레포 구조
+
+```text
+aura-mall/
+  apps/
+    web/                       # npm workspace @aura/web
+      src/, public/            # Next.js 화면·BFF·정적 자산
+      mock-server/             # 웹 개발·E2E용 Mock API
+      tests/, e2e/, scripts/   # 웹 검증
+      .env.example             # Next 서버 전용 설정 예제
+      package.json             # 웹 의존성·앱 명령
+    api/                       # 독립 uv 프로젝트
+      aura_api/
+        main.py                # FastAPI 앱 생성·라우터 연결
+        config.py              # AURA_ 환경 변수·.env 설정
+        api/                   # 버전별 업무 라우터·헬스 체크
+      tests/                   # pytest
+      pyproject.toml, uv.lock   # Python 의존성·Ruff·pytest 설정
+      .env.example             # API 설정 예제
+  docs/                        # 제품·QA·BFF 계약
+  AGENTS.md                    # 모노레포 공통 작업 지침
+  README.md                    # 저장소 실행·구조 안내
+  package.json                 # npm workspaces·공통 실행 명령
+  package-lock.json            # Node 의존성 잠금 파일
+```
+
+Node 의존성은 루트에서 `npm ci`로 설치하고, Python 의존성은 `npm run setup:api`로 별도 설치합니다. `apps/api`는 Python 앱이므로 npm workspace에 포함하지 않습니다. 웹 전용 도구를 직접 실행할 때는 `npm exec --workspace @aura/web -- <명령>`을 사용합니다.
+
+루트에는 저장소 공통 파일만 두며 `.prettierrc.json`·`.prettierignore`는 공통 포맷 설정, `.gitignore`는 생성 파일·로컬 설정 제외 규칙입니다. Next.js 전용 작업 지침은 `apps/web/AGENTS.md`에 있습니다. 제품 기획은 [통합 PRD](docs/AURA_Integrated_PRD_v1.0.md)를 기준으로 하며 루트의 중복 `PRD.md`는 정리했습니다. 빌드·테스트 산출물은 각 앱 내부에서 생성합니다.
+
+기존 루트의 `src`, `public`, `mock-server`, `tests`, `e2e`, `scripts`와 웹 설정 파일은 `apps/web`로 이동했습니다. 기존 로컬 `.env.local` 파일이 있으면 `apps/web/.env.local`로 옮겨야 합니다. Next의 환경 파일은 웹 앱 루트에서 읽습니다. Mock 저장 파일은 `apps/web/mock-server/.data/db.json`입니다. 이전 저장소의 로컬 파일을 복사하는 경우 이 경로를 사용합니다.
+
+## 웹 앱 내부 구조
+
+아래 경로는 `apps/web` 기준입니다.
 
 라우팅과 화면 조합은 `app`, 업무별 구현은 `features`, 기능에 종속되지 않는 UI와 브라우저 훅은 `components`와 `hooks`에 둡니다. 파일은 kebab-case, React 컴포넌트는 PascalCase로 이름을 짓습니다.
 
@@ -79,7 +138,7 @@ e2e/
 
 브라우저는 동일 출처 `/api`만 호출합니다. Next의 명시적인 Route Handler가 허용한 리소스를 FastAPI 또는 Mock으로 연결합니다. 외부 rewrite와 catch-all 프록시는 제거했습니다. Server Components는 BFF를 HTTP로 재호출하지 않고 같은 서버 전용 통신 모듈로 데이터 원본을 직접 조회합니다.
 
-BFF는 요청 출처·JSON 크기·허용 쿠키·제한시간을 처리하고, FastAPI의 `detail` 및 422 오류를 공통 오류 형식으로 변환합니다. 가격·소유권·인증·트랜잭션은 백엔드에서 검증합니다. 실제 FastAPI 서버는 아직 구현하지 않았으며 현재 Mock으로 동작을 검증합니다.
+BFF는 요청 출처·JSON 크기·허용 쿠키·제한시간을 처리하고, FastAPI의 `detail` 및 422 오류를 공통 오류 형식으로 변환합니다. 가격·소유권·인증·트랜잭션은 백엔드에서 검증합니다. FastAPI 앱의 헬스 체크·설정·테스트 골격은 `apps/api`에 준비했으며, 업무 API는 현재 Mock으로 동작을 검증합니다.
 
 설정 예제, 리소스별 입력·응답 DTO, 세션·오류 계약, OpenAPI 인계 기준은 [FastAPI BFF 연결 문서](docs/FASTAPI_BFF.md)에 정리했습니다.
 
@@ -102,7 +161,7 @@ Mock 서버는 HttpOnly·SameSite 쿠키로 세션을 식별하고 비밀번호�
 
 TanStack Query는 서버 데이터의 조회·로딩·오류·변경 후 캐시 갱신을 맡습니다. 회원별 쿼리 키에 소유자를 포함하고 인증 변경 시 기존 개인 캐시를 취소·제거합니다. 장바구니·레시피 변경 요청에는 시작 시점의 소유자를 보내 계정 전환 중 잘못된 소유자에게 적용되는 요청을 거절합니다. 초기 조회가 끝나기 전에 빈 장바구니나 초안으로 편집기를 초기화하지 않습니다.
 
-기본 저장 파일은 `mock-server/.data/db.json`이며 서버를 재시작해도 유지합니다. 삭제하면 초기화됩니다. `MOCK_PERSIST=0 npm run mock`은 메모리에서만 동작합니다. `MOCK_PORT`로 포트를 지정할 수 있습니다. 이 저장소는 단일 프로세스 개발용 JSON 파일이며 운영 DB의 트랜잭션·배포·복구를 제공하지 않습니다. 기존 브라우저 저장소의 시연 데이터는 자동 이전하지 않습니다.
+기본 저장 파일은 `apps/web/mock-server/.data/db.json`이며 서버를 재시작해도 유지합니다. 삭제하면 초기화됩니다. `MOCK_PERSIST=0 npm run mock`은 메모리에서만 동작합니다. `MOCK_PORT`로 포트를 지정할 수 있습니다. 이 저장소는 단일 프로세스 개발용 JSON 파일이며 운영 DB의 트랜잭션·배포·복구를 제공하지 않습니다. 기존 브라우저 저장소의 시연 데이터는 자동 이전하지 않습니다.
 
 Playwright는 `MOCK_TEST_MODE=1`, `MOCK_PERSIST=0`으로 API를 시작하고 테스트별 쿠키에 연결된 `POST /__test__/seed`로 데이터를 준비합니다. 일반 실행에서는 시드 경로를 노출하지 않습니다. 다른 테스트나 실제 개발 데이터를 전역 초기화하지 않습니다.
 
@@ -121,11 +180,11 @@ Playwright는 `MOCK_TEST_MODE=1`, `MOCK_PERSIST=0`으로 API를 시작하고 테
 ```sh
 npm run check
 npm run build
-npx playwright install chromium
+npm exec --workspace @aura/web -- playwright install chromium
 npm run test:e2e
 ```
 
-`check`는 Prettier → ESLint → CSS 구조 검사 → Next 라우트 타입 생성·TypeScript → Vitest를 실행합니다. 단위 테스트는 조향·수량·복원·내부 리다이렉트 규칙을, 통합 테스트는 실제 HTTP 요청으로 회원 간 데이터 분리·가격 변조 거절·레시피 버전·초안·모의 주문·문의·파일 영속성을 검증합니다.
+`check`는 저장소 Prettier 검사 → 웹 ESLint·CSS 구조 검사·Next 라우트 타입 생성·TypeScript·Vitest → API Ruff·pytest를 실행합니다. 웹만 검증하려면 `npm run check:web`을 사용합니다. 단위 테스트는 조향·수량·복원·내부 리다이렉트 규칙을, 통합 테스트는 실제 HTTP 요청으로 회원 간 데이터 분리·가격 변조 거절·레시피 버전·초안·모의 주문·문의·파일 영속성을 검증합니다.
 
 Playwright는 포트 4000의 메모리 Mock API와 포트 3100의 프로덕션 Next BFF 서버를 자동 시작·종료합니다. 기본 검증은 데스크톱·모바일 조작, 로그인·로그아웃에 따른 장바구니 전환, 검색 URL 동기화, 조향 초안 복원·초기화, 혼합·센서 권한 정리를 포함합니다. 실제 iPhone Safari의 센서·권한 동작은 기기 검증이 필요합니다.
 

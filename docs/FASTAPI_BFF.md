@@ -1,6 +1,6 @@
 # FastAPI 연결을 위한 BFF 계약
 
-현재 Next.js BFF는 독립 Mock API에 연결되어 있습니다. FastAPI 애플리케이션·DB·운영 인증은 아직 구현하지 않았습니다. 아래 계약은 현재 화면을 유지하면서 FastAPI로 전환하기 위한 연결 기준입니다.
+현재 Next.js BFF는 독립 Mock API에 연결되어 있습니다. FastAPI 기본 앱은 `apps/api`에 있으며 현재 헬스 체크만 제공합니다. 업무 API·DB·운영 인증은 아직 구현하지 않았습니다. 아래 계약은 현재 화면을 유지하면서 FastAPI로 전환하기 위한 연결 기준입니다.
 
 ## 경계
 
@@ -14,11 +14,11 @@ flowchart LR
   Backend --> DB[백엔드 저장소]
 ```
 
-- `src/app/api/**/route.ts`: 공개할 경로와 메서드를 명시합니다. 포괄적인 catch-all 프록시나 rewrite를 사용하지 않습니다.
-- `src/server/bff`: 요청 출처·JSON 본문·세션 쿠키·브라우저 응답을 처리합니다.
-- `src/server/backend`: 서버 환경 설정과 백엔드 HTTP 요청·제한시간·오류 해석을 담당합니다.
-- `src/lib/api/client.ts`: 브라우저는 기존 `/api` 계약만 사용합니다.
-- `src/lib/api/server.ts`: Server Components는 같은 서버 전용 연결로 데이터 원본을 직접 조회합니다. Next Route Handler를 HTTP로 재호출하지 않습니다.
+- `apps/web/src/app/api/**/route.ts`: 공개할 경로와 메서드를 명시합니다. 포괄적인 catch-all 프록시나 rewrite를 사용하지 않습니다.
+- `apps/web/src/server/bff`: 요청 출처·JSON 본문·세션 쿠키·브라우저 응답을 처리합니다.
+- `apps/web/src/server/backend`: 서버 환경 설정과 백엔드 HTTP 요청·제한시간·오류 해석을 담당합니다.
+- `apps/web/src/lib/api/client.ts`: 브라우저는 기존 `/api` 계약만 사용합니다.
+- `apps/web/src/lib/api/server.ts`: Server Components는 같은 서버 전용 연결로 데이터 원본을 직접 조회합니다. Next Route Handler를 HTTP로 재호출하지 않습니다.
 - FastAPI: 인증·인가·가격·재고·레시피 버전·트랜잭션과 DB를 담당합니다. BFF의 출처 검사나 `X-Session-Owner`를 인증으로 간주하지 않습니다.
 
 BFF는 요청 사이에 사용자 상태를 메모리로 보관하지 않습니다. 현재 응답 DTO는 프런트에 필요한 공개 필드만 담는 계약이며, FastAPI의 `response_model`에서도 이를 제한해야 합니다. 실제 API의 필드가 달라지면 BFF의 리소스별 어댑터에서 변환하고 화면·훅까지 백엔드 형식을 전파하지 않습니다.
@@ -35,7 +35,7 @@ BFF는 요청 사이에 사용자 상태를 메모리로 보관하지 않습니�
 | `API_SESSION_COOKIE` | `aura_mock_session`     | 전달을 허용하는 백엔드 세션 쿠키 한 개의 이름                  |
 | `APP_ORIGIN`         | 요청 URL의 origin       | 브라우저의 정식 공개 origin. 프록시·HTTPS 종료 환경에서는 명시 |
 
-FastAPI가 아래 계약을 제공하는 경우의 `.env.local` 예:
+FastAPI가 아래 계약을 제공하는 경우의 `apps/web/.env.local` 예:
 
 ```dotenv
 API_URL=http://127.0.0.1:8000
@@ -45,7 +45,7 @@ API_SESSION_COOKIE=aura_session
 APP_ORIGIN=http://localhost:3000
 ```
 
-FastAPI를 별도로 실행한 뒤 `npm run dev:web`으로 Next 서버를 실행합니다. Mock을 함께 쓰는 기본 개발은 `npm run dev`입니다. 프로덕션 Next 서버만 실행하려면 `npm run build` 후 `npm start`를 사용합니다.
+`npm run setup:api` 후 `npm run dev:api`로 FastAPI를 실행할 수 있습니다. 현재 제공하는 경로는 `/health`와 `/api/v1/health`이며 아래 업무 계약의 구현이 끝난 후 Next를 연결합니다. FastAPI를 실행한 뒤 `npm run dev:web`으로 Next 서버를 실행합니다. Mock을 함께 쓰는 기본 개발은 `npm run dev`입니다. 프로덕션 Next 서버만 실행하려면 `npm run build` 후 `npm start`를 사용합니다.
 
 서버 설정은 요청 시점에 읽습니다. 따라서 같은 Next 빌드에 다른 백엔드 환경 변수를 주입할 수 있습니다. `.env.local` 파일 변경 후에는 Next 서버를 재시작합니다. `API_URL`에는 프로토콜·호스트 및 필요한 배포 기본 경로를, `API_PREFIX`에는 API 접두사를 둡니다. 접두사가 없다면 `/`로 설정합니다. 브라우저의 쿼리·본문·헤더로 목적지 호스트나 경로를 선택할 수 없습니다.
 
@@ -76,11 +76,11 @@ FastAPI를 별도로 실행한 뒤 `npm run dev:web`으로 Next 서버를 실행
 
 JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내부 이름은 snake_case를 사용할 수 있으나 요청과 응답의 JSON 별칭을 계약에 맞춰야 합니다. 정의 위치:
 
-- [상품·컬렉션·향료·프로모션·추천 이름](../src/features/catalog/model/catalog.ts)
-- [회원·세션·인증 입력](../src/features/account/model/account.ts)
-- [장바구니·맞춤 조향 구성](../src/features/cart/model/cart.ts)
-- [레시피·초안](../src/features/atelier/model/recipes.ts)
-- [주문](../src/features/checkout/model/order.ts)
+- [상품·컬렉션·향료·프로모션·추천 이름](../apps/web/src/features/catalog/model/catalog.ts)
+- [회원·세션·인증 입력](../apps/web/src/features/account/model/account.ts)
+- [장바구니·맞춤 조향 구성](../apps/web/src/features/cart/model/cart.ts)
+- [레시피·초안](../apps/web/src/features/atelier/model/recipes.ts)
+- [주문](../apps/web/src/features/checkout/model/order.ts)
 
 상품 또는 맞춤 조향 구성 중 하나를 전송합니다. 맞춤 조향의 `counts`는 향료 ID에 대한 정수 수량입니다. 서버가 가격·구성·수량·재고·소유권을 다시 검증하고 ID·버전·생성 시각을 결정해야 합니다. 장바구니 응답에는 서버가 계산한 `unitPrice`를 포함합니다. 문의의 `consent`는 현재 폼 계약인 `"on"`입니다. 날짜는 ISO 8601 문자열, 가격은 원 단위 숫자 또는 미확정일 때 `null`입니다.
 
@@ -119,7 +119,7 @@ BFF는 성공 시 기존 DTO를 유지하고 오류를 다음 형태로 반환�
 
 ## OpenAPI 인계
 
-FastAPI 구현 시 `/openapi.json`을 요청·응답 계약의 원본으로 확정합니다. 위 DTO와 차이가 있다면 서버 응답 모델 또는 BFF 리소스 어댑터로 맞춥니다. 확정한 스키마를 버전 관리하고 TypeScript 타입 생성·CI 계약 검사에 연결하는 것이 다음 단계입니다. 현재는 실제 FastAPI 스키마가 없으므로 가상의 OpenAPI 파일이나 생성된 타입을 추가하지 않았습니다.
+FastAPI 구현 시 `/openapi.json`을 요청·응답 계약의 원본으로 확정합니다. 위 DTO와 차이가 있다면 서버 응답 모델 또는 BFF 리소스 어댑터로 맞춥니다. 확정한 스키마를 버전 관리하고 TypeScript 타입 생성·CI 계약 검사에 연결하는 것이 다음 단계입니다. 현재 FastAPI `/openapi.json`에는 헬스 체크만 포함되어 있습니다. 업무 API의 스키마와 생성된 TypeScript 타입은 계약 구현 후 추가합니다.
 
 BFF HTTP 통합 테스트는 실제 서버 응답으로 FastAPI 형태의 오류·쿠키·제한시간·리다이렉트·헤더 경계를 검증합니다. Playwright는 Mock 백엔드에 연결한 실제 Next 프로덕션 서버를 통해 세션·인증·장바구니·초안과 BFF 경로를 검증합니다. FastAPI가 준비되면 같은 계약 검증을 해당 서버에서도 실행하고 DB 트랜잭션·운영 인증을 추가 검증해야 합니다.
 
