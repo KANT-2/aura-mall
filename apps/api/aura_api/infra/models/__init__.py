@@ -13,7 +13,14 @@ from aura_api.infra.models.catalog import (
     ScentFamilyIngredient,
     SuggestedName,
 )
-from aura_api.infra.models.identity import Admin, RevokedToken, User, UserCoupon
+from aura_api.infra.models.identity import (
+    Admin,
+    AuthTokenFamily,
+    RefreshToken,
+    RevokedToken,
+    User,
+    UserCoupon,
+)
 from aura_api.infra.models.ordering import Order, OrderItem, OrderItemSelection
 from aura_api.infra.models.partner import PartnerInquiry
 
@@ -21,6 +28,7 @@ __all__ = [
     "Admin",
     "AdminAuditLog",
     "AtelierDraft",
+    "AuthTokenFamily",
     "Base",
     "Collection",
     "Ingredient",
@@ -33,6 +41,7 @@ __all__ = [
     "Promotion",
     "Recipe",
     "RecipeIngredient",
+    "RefreshToken",
     "RevokedToken",
     "ScentFamily",
     "ScentFamilyIngredient",

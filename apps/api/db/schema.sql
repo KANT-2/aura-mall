@@ -3,6 +3,8 @@
 -- contract in docs/FASTAPI_BFF.md. Run once on an empty database (PostgreSQL 13+):
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/schema.sql
 -- Then load initial catalog data with db/seed.sql. The cart is not stored (browser only).
+-- This file is the latest full schema (migrations 0001 + 0002). Alembic applies the same
+-- DDL step by step from migrations/sql/; tests/db checks that both give the same tables.
 
 BEGIN;
 
@@ -17,7 +19,8 @@ CREATE TABLE users (
     name          VARCHAR(100) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     marketing     BOOLEAN      NOT NULL DEFAULT false,
-    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    is_active     BOOLEAN      NOT NULL DEFAULT true    -- false: login refused (0002)
 );
 -- Emails are stored lower-cased; the index also blocks case-only duplicates.
 CREATE UNIQUE INDEX users_email_lower_key ON users (lower(email));
@@ -56,6 +59,46 @@ CREATE TABLE revoked_tokens (
     expires_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX revoked_tokens_expires_at_idx ON revoked_tokens (expires_at);
+
+-- JWT refresh tokens (0002). Access tokens stay stateless.
+-- One family per login. Reusing a consumed refresh token revokes the whole family.
+-- The row is also the lock target when two refreshes race.
+CREATE TABLE auth_token_families (
+    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id    UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    revoked_at TIMESTAMPTZ,
+    CONSTRAINT auth_token_families_id_user_id_key UNIQUE (id, user_id)
+);
+CREATE INDEX auth_token_families_user_id_idx ON auth_token_families (user_id);
+
+-- Only the SHA-256 hex of a refresh token is stored. Each row also records the access
+-- token issued with it, so revoking a family can block those access tokens too.
+CREATE TABLE refresh_tokens (
+    id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id           UUID        NOT NULL,
+    family_id         UUID        NOT NULL,
+    token_hash        VARCHAR(64) NOT NULL,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at        TIMESTAMPTZ NOT NULL,
+    consumed_at       TIMESTAMPTZ,
+    revoked_at        TIMESTAMPTZ,
+    access_jti        UUID        NOT NULL,
+    access_expires_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT refresh_tokens_family_id_fkey FOREIGN KEY (family_id, user_id)
+        REFERENCES auth_token_families (id, user_id) ON DELETE CASCADE,
+    CONSTRAINT refresh_tokens_token_hash_key UNIQUE (token_hash),
+    CONSTRAINT refresh_tokens_access_jti_key UNIQUE (access_jti),
+    CONSTRAINT refresh_tokens_token_hash_check CHECK (token_hash ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT refresh_tokens_expires_check CHECK (expires_at > created_at),
+    CONSTRAINT refresh_tokens_access_expires_check CHECK (access_expires_at > created_at)
+);
+CREATE INDEX refresh_tokens_family_id_idx ON refresh_tokens (family_id);
+CREATE INDEX refresh_tokens_expires_at_idx ON refresh_tokens (expires_at);
+CREATE INDEX refresh_tokens_access_expires_at_idx ON refresh_tokens (access_expires_at);
+-- At most one usable refresh token per family at any time.
+CREATE UNIQUE INDEX refresh_tokens_family_active_key ON refresh_tokens (family_id)
+    WHERE consumed_at IS NULL AND revoked_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- Catalog: original string IDs from apps/web/mock-server/fixtures/catalog.json
