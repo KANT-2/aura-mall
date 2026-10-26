@@ -1,5 +1,6 @@
 import re
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,8 +19,26 @@ class Settings(BaseSettings):
     jwt_signing_key: SecretStr | None = None
     jwt_issuer: str | None = None
     jwt_audience: str | None = None
+    database_url: SecretStr | None = None
+    jwt_access_ttl_seconds: int = Field(default=900, ge=1, le=86400)
+    refresh_token_ttl_seconds: int = Field(default=604800, ge=1, le=7776000)
     csrf_allowed_origins: list[str] = Field(default_factory=list)
     bff_shared_key: SecretStr | None = None
+
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, value):
+        if value is not None:
+            parts = urlsplit(value.get_secret_value())
+            if (
+                parts.scheme not in {"postgres", "postgresql"}
+                or not parts.hostname
+                or not parts.path.strip("/")
+            ):
+                raise ValueError("An explicit PostgreSQL database URL is required")
+            if parts.port is not None and not 1 <= parts.port <= 65535:
+                raise ValueError("Invalid PostgreSQL port")
+        return value
 
     @model_validator(mode="after")
     def validate_jwt_configuration(self):

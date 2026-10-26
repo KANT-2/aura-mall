@@ -31,9 +31,7 @@ class JWTVerifier:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
 
-    async def verify_token(
-        self, token: str, revocations: TokenRevocationStore
-    ) -> AuthenticatedUser | None:
+    def decode_claims(self, token: str) -> dict | None:
         settings = self._settings
         if settings.jwt_signing_key is None:
             return None
@@ -70,17 +68,25 @@ class JWTVerifier:
                 not isinstance(item, str) or not item.strip() for item in permissions
             ):
                 return None
+            return claims
         except (jwt.InvalidTokenError, ValueError, TypeError, OverflowError):
+            return None
+
+    async def verify_token(
+        self, token: str, revocations: TokenRevocationStore
+    ) -> AuthenticatedUser | None:
+        claims = self.decode_claims(token)
+        if claims is None:
             return None
         try:
             # Only verified claims reach the store. Do not cache or log token material.
-            revoked = await revocations.is_revoked(issuer=claims["iss"], jti=jti)
+            revoked = await revocations.is_revoked(issuer=claims["iss"], jti=claims["jti"])
         except Exception:
             # Storage outages, timeouts, and integration errors must never allow a token.
             return None
         if revoked is not False:
             return None
-        return AuthenticatedUser(subject, frozenset(permissions))
+        return AuthenticatedUser(claims["sub"], frozenset(claims.get("permissions", [])))
 
 
 def get_jwt_verifier(request: Request) -> JWTVerifier:
