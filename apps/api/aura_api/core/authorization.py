@@ -6,7 +6,7 @@ from aura_api.core.auth import AuthenticatedUser, CurrentUser
 
 
 def require_permissions(*permissions: str) -> Callable[..., Awaitable[AuthenticatedUser]]:
-    """Require every named permission; role assignment belongs to the session adapter."""
+    """Require every named permission from the verified identity."""
     if not permissions or any(
         not isinstance(item, str) or not item.strip() for item in permissions
     ):

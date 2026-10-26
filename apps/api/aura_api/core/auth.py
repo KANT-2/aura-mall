@@ -1,12 +1,18 @@
+import re
 from dataclasses import dataclass, field
-from typing import Annotated, Protocol
+from math import isfinite
+from typing import Annotated
 
+import jwt
 from fastapi import Depends, HTTPException, Request
+
+from aura_api.config import Settings
+from aura_api.core.revocation import TokenRevocationStore, get_token_revocation_store
 
 
 @dataclass(frozen=True, slots=True)
 class AuthenticatedUser:
-    """Server-verified identity and permissions; never contains a session secret."""
+    """Server-verified identity and permissions; never contains a token or key."""
 
     user_id: str
     permissions: frozenset[str] = field(default_factory=frozenset)
@@ -21,43 +27,78 @@ class AuthenticatedUser:
             raise ValueError("Permissions must be a frozenset of nonempty strings")
 
 
-class SessionVerifier(Protocol):
-    async def verify_session(self, session_token: str) -> AuthenticatedUser | None:
-        """Return identity only after validating a live session; invalid sessions return None."""
-        ...
+class JWTVerifier:
+    def __init__(self, settings: Settings) -> None:
+        self._settings = settings
+
+    async def verify_token(
+        self, token: str, revocations: TokenRevocationStore
+    ) -> AuthenticatedUser | None:
+        settings = self._settings
+        if settings.jwt_signing_key is None:
+            return None
+        if len(token) > 8192 or not re.fullmatch(
+            r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", token
+        ):
+            return None
+        try:
+            # Never select an algorithm/key from the unverified token header.
+            claims = jwt.decode(
+                token,
+                settings.jwt_signing_key.get_secret_value(),
+                algorithms=[settings.jwt_algorithm],
+                issuer=settings.jwt_issuer,
+                audience=settings.jwt_audience,
+                options={"require": ["exp", "iss", "aud", "sub", "jti", "iat"], "strict_aud": True},
+            )
+            # Only inspect identity/permissions after signature and registered-claim validation.
+            for name in ("exp", "iat", "nbf"):
+                if name in claims and (
+                    type(claims[name]) not in (int, float) or not isfinite(claims[name])
+                ):
+                    return None
+            subject = claims["sub"]
+            if not isinstance(subject, str) or not subject.strip():
+                return None
+            jti = claims["jti"]
+            if not isinstance(jti, str) or not jti.strip():
+                return None
+            if claims["iat"] < 0 or claims["exp"] <= claims["iat"]:
+                return None
+            permissions = claims.get("permissions", [])
+            if not isinstance(permissions, list) or any(
+                not isinstance(item, str) or not item.strip() for item in permissions
+            ):
+                return None
+        except (jwt.InvalidTokenError, ValueError, TypeError, OverflowError):
+            return None
+        try:
+            # Only verified claims reach the store. Do not cache or log token material.
+            revoked = await revocations.is_revoked(issuer=claims["iss"], jti=jti)
+        except Exception:
+            # Storage outages, timeouts, and integration errors must never allow a token.
+            return None
+        if revoked is not False:
+            return None
+        return AuthenticatedUser(subject, frozenset(permissions))
 
 
-class RejectAllSessions:
-    async def verify_session(self, session_token: str) -> None:
-        return None
-
-
-def get_session_verifier() -> SessionVerifier:
-    # No real session store exists yet. Tests override this provider on their own app.
-    return RejectAllSessions()
+def get_jwt_verifier(request: Request) -> JWTVerifier:
+    return request.app.state.jwt_verifier
 
 
 async def require_authenticated_user(
     request: Request,
-    verifier: Annotated[SessionVerifier, Depends(get_session_verifier)],
+    verifier: Annotated[JWTVerifier, Depends(get_jwt_verifier)],
+    revocations: Annotated[TokenRevocationStore, Depends(get_token_revocation_store)],
 ) -> AuthenticatedUser:
-    cookie_name = request.app.state.auth_session_cookie
-    # Reject ambiguous duplicate session cookies rather than choosing first/last.
-    matching = [
-        part
-        for header in request.headers.getlist("cookie")
-        for part in header.split(";")
-        if part.partition("=")[0].strip() == cookie_name
-    ]
-    token = request.cookies.get(cookie_name) if len(matching) == 1 else None
-    if not token:
-        raise HTTPException(status_code=401)
-    user = await verifier.verify_session(token)
+    values = request.headers.getlist("authorization")
+    scheme, separator, token = values[0].partition(" ") if len(values) == 1 else ("", "", "")
+    if scheme.lower() != "bearer" or not separator or not token:
+        raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Bearer"})
+    user = await verifier.verify_token(token, revocations)
     if user is None:
-        raise HTTPException(status_code=401)
-    if not isinstance(user, AuthenticatedUser):
-        # An invalid adapter result is a server integration error, never an identity.
-        raise TypeError("Invalid session verifier result")
+        raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Bearer"})
     return user
 
 
