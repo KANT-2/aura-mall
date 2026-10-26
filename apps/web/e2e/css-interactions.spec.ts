@@ -1,7 +1,27 @@
 import { test, expect } from "./fixtures/test";
 import { routes } from "./fixtures/data";
+import { testIds } from "@/lib/test-ids";
 
 test.use({ reducedMotion: "no-preference" });
+
+test("motion keeps the hydrating client tree free of attribute mismatch errors", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && /hydrat/i.test(message.text())) {
+      errors.push(message.text());
+    }
+  });
+  for (const route of [routes.home, routes.shop, routes.product, routes.login]) {
+    await page.goto(route);
+    await expect(page.getByRole("main")).toBeVisible();
+    await page.getByTestId(testIds.navigation.cart).click();
+    await expect(page).toHaveURL((url) => url.pathname === routes.cart);
+  }
+
+  expect(errors).toEqual([]);
+});
 
 test("navigation, search and custom selects remain styled after client navigation", async ({
   page,

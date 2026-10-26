@@ -5,6 +5,7 @@ import { backendConfig } from "@/server/backend/config";
 import { backendRequest, backendError } from "@/server/backend/transport";
 import { requestSessionCookie, responseSessionCookies } from "@/server/bff/session-cookie";
 import { jsonRequestBody } from "@/server/bff/request-body";
+import { requestOrigin } from "@/server/bff/request-origin";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type Params = Record<string, string>;
@@ -22,7 +23,7 @@ export function createBffHandler(method: Method, path: BackendPath, { session = 
     });
     try {
       const config = backendConfig();
-      const origin = config.appOrigin ?? new URL(request.url).origin;
+      const origin = requestOrigin(request, config.appOrigin);
       const mutation = method !== "GET";
       if (request.method !== method && !(method === "GET" && request.method === "HEAD")) {
         throw new ApiError(405, "지원하지 않는 요청 방식이에요.", "METHOD_NOT_ALLOWED");

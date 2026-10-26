@@ -1,5 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
+const mockPort = process.env.AURA_E2E_MOCK_PORT ?? "4000";
+const mockUrl = `http://127.0.0.1:${mockPort}`;
+
 export default defineConfig({
   testDir: "./e2e",
   testIgnore: process.env.AURA_VISUAL_TESTS === "1" ? undefined : "**/*layout.spec.ts",
@@ -32,10 +35,10 @@ export default defineConfig({
   webServer: [
     {
       command: "npm run mock",
-      url: "http://127.0.0.1:4000/health",
+      url: `${mockUrl}/health`,
       reuseExistingServer: false,
       timeout: 30_000,
-      env: { MOCK_TEST_MODE: "1", MOCK_PERSIST: "0", MOCK_PORT: "4000" },
+      env: { MOCK_TEST_MODE: "1", MOCK_PERSIST: "0", MOCK_PORT: mockPort },
     },
     {
       command: "npm run start -- --hostname 127.0.0.1 --port 3100",
@@ -43,7 +46,7 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 30_000,
       env: {
-        API_URL: "http://127.0.0.1:4000",
+        API_URL: mockUrl,
         API_PREFIX: "/api",
         API_SESSION_COOKIE: "aura_mock_session",
         API_TIMEOUT_MS: "10000",

@@ -207,6 +207,23 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
     ).toBe(200);
   });
 
+  it("uses the direct loopback host in dev while preserving explicit and production origins", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const local = (host = "127.0.0.1:3000", origin = "http://127.0.0.1:3000") =>
+      new Request("http://localhost:3000/api/auth/login", {
+        method: "POST",
+        headers: { Host: host, Origin: origin },
+      });
+    expect((await login(local())).status).toBe(200);
+    expect((await login(local("127.0.0.1:4000", "http://127.0.0.1:4000"))).status).toBe(403);
+    expect((await login(local("attacker.test", "http://attacker.test"))).status).toBe(403);
+    vi.stubEnv("APP_ORIGIN", "https://mall.test");
+    expect((await login(local())).status).toBe(403);
+    vi.stubEnv("APP_ORIGIN", "");
+    vi.stubEnv("NODE_ENV", "production");
+    expect((await login(local())).status).toBe(403);
+  });
+
   it("rejects malformed, non-object, non-JSON and oversized request bodies", async () => {
     for (const [body, contentType, status] of [
       ["{", "application/json", 400],
