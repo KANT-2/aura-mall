@@ -10,6 +10,8 @@ type BackendOptions = {
   body?: string;
   cookie?: string;
   owner?: string;
+  /** Already filtered by the route's allow-list; never a raw browser query string. */
+  query?: URLSearchParams;
   signal?: AbortSignal;
   requestId?: string;
 };
@@ -75,7 +77,8 @@ export async function backendRequest(
       headers.set("X-Session-Owner", options.owner);
     }
 
-    const response = await fetch(`${config.apiUrl}${path}`, {
+    const search = options.query?.size ? `?${options.query}` : "";
+    const response = await fetch(`${config.apiUrl}${path}${search}`, {
       method: options.method ?? "GET",
       headers,
       body: options.body,

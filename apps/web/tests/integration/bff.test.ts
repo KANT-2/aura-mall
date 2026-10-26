@@ -9,6 +9,8 @@ import { POST as login } from "@/app/api/auth/login/route";
 import { PUT as saveDraft } from "@/app/api/atelier/draft/route";
 import { DELETE as removeRecipe } from "@/app/api/recipes/[id]/route";
 import { DELETE as removeDraft } from "@/app/api/atelier/draft/route";
+import { GET as adminProducts } from "@/app/api/admin/products/route";
+import { PATCH as updateAdminInquiry } from "@/app/api/admin/inquiries/[id]/route";
 import { createBffHandler } from "@/server/bff/handler";
 import { serverRequest } from "@/lib/api/server";
 
@@ -136,6 +138,42 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
     await expect(serverRequest("/catalog")).resolves.toEqual({ ok: true });
     expect(calls[1].url).toBe("/api/v1/catalog");
     expect(calls[1].headers.cookie).toBeUndefined();
+  });
+
+  it("forwards only allow-listed admin query parameters and keeps admin errors", async () => {
+    await adminProducts(
+      request(
+        "/api/admin/products?q=%20hand%20&collection=fresh&collection=warm&page=2&role=admin" +
+          "&url=https://attacker.test&stock=" +
+          "x".repeat(101),
+        { headers: { Cookie: "aura_session=admin-session" } },
+      ),
+    );
+    expect(calls[0].url).toBe("/api/admin/products?q=hand&collection=fresh&page=2");
+    expect(calls[0].headers.cookie).toBe("aura_session=admin-session");
+    respond = (res) => json(res, { detail: "관리자 권한이 필요해요." }, 403);
+    const denied = await updateAdminInquiry(
+      request("/api/admin/inquiries/a", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Origin: "http://mall.test" },
+        body: JSON.stringify({ version: 1, status: "done" }),
+      }),
+      { params: Promise.resolve({ id: "../orders" }) },
+    );
+    expect(denied.status).toBe(400);
+    const forbidden = await updateAdminInquiry(
+      request("/api/admin/inquiries/a", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Origin: "http://mall.test" },
+        body: JSON.stringify({ version: 1, status: "done" }),
+      }),
+      { params: Promise.resolve({ id: "a" }) },
+    );
+    expect(forbidden.status).toBe(403);
+    expect(await forbidden.json()).toEqual({
+      error: { code: "HTTP_403", message: "관리자 권한이 필요해요." },
+    });
+    expect(calls.at(-1)?.url).toBe("/api/admin/inquiries/a");
   });
 
   it("forwards only the session and owner headers and creates its own request ID", async () => {

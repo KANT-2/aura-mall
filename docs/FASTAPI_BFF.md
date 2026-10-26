@@ -85,7 +85,7 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
 
 주문 항목 `OrderItemInput`은 `{ productId?, quantity, selection?, custom? }`이며 각 항목에 상품 ID 또는 맞춤 조향 구성 중 하나를 전송합니다. `quantity`는 필수 정수이며 1~15입니다. 동일 항목은 합산하며 15개 초과를 거절합니다. 맞춤 조향의 `counts`는 향료 ID에 대한 정수 수량입니다. 서버가 가격·구성·수량·재고·소유권을 다시 검증하고 ID·버전·생성 시각을 결정해야 합니다. 주문 응답의 상품에는 서버가 계산한 `unitPrice`를 포함합니다. 로컬 가격·상품 객체·주문 합계를 신뢰하지 않습니다. 문의의 `consent`는 현재 폼 계약인 `"on"`입니다. 날짜는 ISO 8601 문자열, 가격은 원 단위 숫자 또는 미확정일 때 `null`입니다.
 
-현재 공개 API에는 쿼리 매개변수가 필요하지 않아 BFF가 전달하지 않습니다. 페이지네이션·필터 등을 서버로 옮길 때는 해당 Route Handler에 허용할 매개변수와 변환을 명시적으로 추가합니다. FastAPI `/docs`·`/openapi.json`·테스트 시드 경로를 BFF에 공개하지 않습니다.
+소비자 API에는 쿼리 매개변수가 필요하지 않아 BFF가 전달하지 않습니다. 관리자 목록처럼 페이지네이션·필터가 필요한 경로는 Route Handler의 `query` 옵션에 허용할 이름을 명시하며, BFF는 그 이름의 첫 값만(공백 제거, 100자 이하, 제어 문자 제외) 전달합니다. 그 외 매개변수는 버립니다. FastAPI `/docs`·`/openapi.json`·테스트 시드 경로를 BFF에 공개하지 않습니다.
 
 ## 세션
 
@@ -102,6 +102,63 @@ JWT·OAuth를 선택할 경우에는 토큰 발급·갱신·폐기와 서버 세
 변경 요청에는 동일 출처 `Origin` 또는 출처 헤더 없는 서버 API 호출을 허용하고, 다른 `Origin`과 `Sec-Fetch-Site: cross-site`는 403으로 차단합니다. `APP_ORIGIN`을 실제 공개 주소로 설정하며 클라이언트가 보낸 forwarded host로 허용 출처를 바꾸지 않습니다.
 
 `APP_ORIGIN`을 지정하지 않은 개발 환경에서 Next가 요청 URL을 `localhost`로 구성한 경우, 동일 포트의 직접 `Host`가 `localhost`·`127.0.0.1`·`[::1]`이면 해당 출처를 사용합니다. 로컬 브라우저의 초안 저장·인증·문의 요청도 실제 접속 주소로 검사하며 forwarded 헤더는 사용하지 않습니다. 운영 환경이나 `APP_ORIGIN`이 지정된 환경에는 이 보정을 적용하지 않습니다.
+
+## 관리자 API (1단계 제안)
+
+운영자가 상품·재고, 주문, 입점 문의를 관리하는 계약입니다. 아래 경로·DTO·저장 구조는 Mock으로 먼저 검증한 **제안**이며, 1단계 합의(CRA-5 모델, CRA-6 DB·초기 관리자 발급, CRA-8 인증·인가)에서 확정합니다. FastAPI에는 아직 구현되지 않았습니다.
+
+### 권한
+
+- 별도 로그인 없이 기존 세션 쿠키를 사용합니다. `Member`에 `role: "member" | "admin"`을 추가하며 `Session.user.role`은 화면 표시용 힌트입니다.
+- FastAPI는 모든 `/api/v1/admin/**` 요청마다 세션의 실제 계정 역할을 다시 조회합니다. 미인증은 401, 일반 회원은 403입니다. 로그아웃·세션 만료·역할 회수 즉시 거절해야 합니다.
+- 요청 본문·헤더·쿼리의 `role`, 사용자 ID를 신뢰하지 않습니다. 회원가입 본문의 `role`은 무시하고 항상 `member`로 생성합니다.
+- 관리자 발급·회수는 운영 절차(CLI 또는 마이그레이션 시드)로만 수행하며 이번 범위에 권한 편집 UI는 없습니다. Mock은 개발용 계정을 자동 생성합니다([웹 개발 안내](../apps/web/README.md#데이터-소유권과-mock-api)).
+- 웹은 `/admin` 레이아웃에서 비회원·일반 회원·세션 만료 화면을 구분하지만, 이는 접근 통제가 아닙니다. 관리자 API가 401/403을 반환하면 웹은 세션을 다시 조회해 해당 화면으로 전환합니다.
+
+### 경로
+
+| 메서드 | BFF 경로                                     | 요청 / 성공 응답                                                                                 |
+| ------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| GET    | `/api/admin/overview`                        | `AdminOverview`: 최근 7일 주문 수·금액, 문의 상태별 건수, 재고 5개 이하 상품                     |
+| GET    | `/api/admin/products`                        | 쿼리 `q`, `collection`, `stock=low\|out`, `page` → `AdminPage<AdminProduct>`                     |
+| GET    | `/api/admin/products/{id}`                   | `AdminProductDetail`: 상품, 선택 가능한 이미지 경로, 변경 이력                                   |
+| PATCH  | `/api/admin/products/{id}`                   | `{ version, name?, englishName?, description?, price?, image?, featured?, isNew? }`              |
+| POST   | `/api/admin/products/{id}/stock-adjustments` | `{ version, delta, reason, key }` → 201 `AdminProductDetail`, 같은 `key` 재전송은 200            |
+| GET    | `/api/admin/orders`                          | 쿼리 `from`, `to`(`YYYY-MM-DD`, 한국 시간, 종료일 포함), `page` → `AdminPage<AdminOrderSummary>` |
+| GET    | `/api/admin/orders/{id}`                     | `AdminOrder`: 주문 당시 상품명·단가 스냅샷, 주문자 이름·이메일, 받는 분·배송지                   |
+| GET    | `/api/admin/inquiries`                       | 쿼리 `status=received\|reviewing\|done`, `page` → `AdminPage<AdminInquirySummary>`               |
+| GET    | `/api/admin/inquiries/{id}`                  | `AdminInquiry`: 문의 원문, 처리 상태, 내부 메모, 변경 이력                                       |
+| PATCH  | `/api/admin/inquiries/{id}`                  | `{ version, status?, memo? }` → `AdminInquiry`                                                   |
+
+DTO는 [관리자 모델](../apps/web/src/features/admin/model/admin.ts)에 정의합니다. `AdminPage<T>`는 `{ items, total, page, pageSize }`이며 `pageSize`는 20입니다. 소비자 DTO와 분리하며 `version`·이력·메모·문의 상태를 공개 카탈로그·회원·문의 접수 응답에 포함하지 않습니다.
+
+### 변경 규칙
+
+- 상품 PATCH는 위 필드만 반영하고 `id`·재고·컬렉션 등 나머지 필드는 무시합니다. 가격은 `null`(미정) 또는 0~10,000,000의 정수입니다. 이미지는 등록된 상품 이미지 경로 중에서만 선택하며 파일 업로드는 저장소·용량·검증 정책 확정 후 별도로 다룹니다.
+- 재고는 PATCH로 바꾸지 않고 조정 명령만 사용합니다. `delta`는 0이 아닌 정수, 조정 후 재고는 0~99,999, `reason`은 필수(200자 이하)입니다.
+- 모든 변경 요청은 읽은 시점의 `version`을 보내고, 현재 버전과 다르면 409로 거절합니다. 웹은 409에서 최신 데이터를 다시 조회하고 사용자에게 재확인을 요청합니다. 실제 DB에서는 같은 트랜잭션 안에서 버전 비교·재고 변경·이력 기록을 수행합니다(조건부 UPDATE 또는 행 잠금).
+- `key`는 재고 조정 1건의 idempotency 키(8~64자 영숫자·하이픈)입니다. 같은 키·같은 내용의 재전송은 다시 적용하지 않고 현재 상태를 200으로 반환하며, 같은 키로 다른 내용을 보내면 409입니다.
+- 가격 변경은 기존 주문의 상품·단가 스냅샷을 바꾸지 않습니다. 주문 상태 변경·취소·재고 복구는 정책·DB 확장 합의 후 추가하며 현재는 조회만 제공합니다.
+- 수정 작업마다 작업자·대상·시각·변경 전후 값·재고 조정 사유를 감사 기록에 남기고 상세 응답의 `history`로 최근 30건을 반환합니다. 내부 메모는 이력에 변경 사실만 표시합니다.
+- 관리자 응답의 고객 정보는 주문자 이름·이메일, 받는 분·배송지로 제한합니다. 비밀번호 해시·세션·토큰·소유자 키는 응답과 로그에 포함하지 않습니다.
+
+### 저장 구조 확장 제안
+
+[ERD](backend/ERD.md) 기준 추가 제안입니다. 이름과 타입은 CRA-5에서 확정합니다.
+
+- `members.role`: `VARCHAR(20) NOT NULL DEFAULT 'member'`, `CHECK IN ('member', 'admin')`
+- `products.version`, `products.updated_at`: 낙관적 잠금과 최근 수정 표시
+- `stock_adjustments`: `id`, `product_id`, `delta`, `stock_before`, `stock_after`, `reason`, `request_key UNIQUE`, `actor_id`, `created_at`
+- `partner_inquiries.status`(`received`·`reviewing`·`done`), `internal_memo`, `version`, `updated_at`
+- `admin_audit_logs`: `id`, `actor_id`, `action`, `target_type`, `target_id`, `changes JSONB`, `reason`, `created_at`
+- `order_items`: 주문 당시 상품명·용량·단가 스냅샷 컬럼 유지 또는 추가
+
+### 1단계에서 결정할 사항
+
+- 초기 관리자 발급·회수 절차와 운영·테스트 계정 분리 방식
+- 세션 쿠키 유지 여부(JWT 채택 시 폐기·역할 회수 즉시 반영 방법)
+- 감사 기록 보존 기간, 관리자 화면의 고객 개인정보 노출 범위
+- 주문 처리 상태 모델과 취소 시 재고 복구 정책
 
 ## 오류·전송 계약
 

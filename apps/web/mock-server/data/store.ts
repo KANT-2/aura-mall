@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import catalogFixture from "../fixtures/catalog.json";
-import type { Catalog } from "@/features/catalog/model/catalog";
+import type { Catalog, Product } from "@/features/catalog/model/catalog";
 import type { Member } from "@/features/account/model/account";
+import type { AdminHistoryEntry, InquiryStatus } from "@/features/admin/model/admin";
 import type { CartItem } from "@/features/cart/model/cart";
 import type { AtelierDraft, Recipe } from "@/features/atelier/model/recipes";
 
@@ -18,13 +19,34 @@ export type Order = {
   address: string;
   created: string;
 };
+export type Inquiry = {
+  id: string;
+  brand: string;
+  name: string;
+  email: string;
+  introduction: string;
+  message: string;
+  type: string;
+  website: string;
+  created: string;
+  status?: InquiryStatus;
+  memo?: string;
+  version?: number;
+  updated?: string;
+};
+export type AuditRecord = AdminHistoryEntry & { actorId: string; target: string };
 export type Database = {
   accounts: Record<string, Account>;
   sessions: Record<string, MockSession>;
   recipes: Record<string, Recipe[]>;
   drafts: Record<string, AtelierDraft>;
   orders: Order[];
-  inquiries: Record<string, unknown>[];
+  inquiries: Inquiry[];
+  /** Mutable catalog products. Orders keep their own product snapshots. */
+  products: Product[];
+  productVersions: Record<string, { version: number; updated: string }>;
+  adminAudit: AuditRecord[];
+  stockRequests: Record<string, { productId: string; delta: number; reason: string }>;
 };
 const empty = (): Database => ({
   accounts: {},
@@ -33,11 +55,15 @@ const empty = (): Database => ({
   drafts: {},
   orders: [],
   inquiries: [],
+  products: structuredClone(catalog.products),
+  productVersions: {},
+  adminAudit: [],
+  stockRequests: {},
 });
 export function createDatabase(filename?: string) {
   let state = empty();
   if (filename && existsSync(filename)) {
-    state = JSON.parse(readFileSync(filename, "utf8")) as Database;
+    state = { ...state, ...(JSON.parse(readFileSync(filename, "utf8")) as Partial<Database>) };
     // Carts moved to browser storage; do not persist legacy server carts again.
     Reflect.deleteProperty(state, "carts");
   }
@@ -56,3 +82,7 @@ export function createDatabase(filename?: string) {
   };
 }
 export type MockDatabase = ReturnType<typeof createDatabase>;
+export const catalogOf = (database: MockDatabase): Catalog => ({
+  ...catalog,
+  products: database.state.products,
+});

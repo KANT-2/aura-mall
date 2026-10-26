@@ -32,7 +32,7 @@ export function useAuth() {
         predicate: (query) => ["session", "recipes", "orders"].includes(String(query.queryKey[0])),
       });
       client.removeQueries({
-        predicate: (query) => ["recipes", "orders"].includes(String(query.queryKey[0])),
+        predicate: (query) => ["recipes", "orders", "admin"].includes(String(query.queryKey[0])),
       });
       client.setQueryData(sessionKey, session);
     },
