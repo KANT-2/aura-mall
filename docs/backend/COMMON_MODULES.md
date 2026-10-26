@@ -1,5 +1,9 @@
 # FastAPI 공통 요청 처리 — CRA-8
 
+후속 보안 작업의 CSRF 검사·보안 헤더·현재 미들웨어 순서는
+[CSRF·XSS 공통 보안](SECURITY_CSRF_XSS.md)을 참고합니다. 아래 내용과 57개 테스트 결과는
+CRA-8 최초 구현 시점의 기록입니다.
+
 이 문서는 AURA 백엔드의 **공통 요청 ID 및 예외 처리 모듈** 최초 구현과 검증 결과를 정리합니다.
 
 - **담당자:** 전예진
@@ -13,30 +17,30 @@
 
 공통 모듈은 여러 API에서 반복하는 작업을 한곳에서 처리하는 기능입니다. 이번 구현에서는 요청마다 추적 번호를 부여하고, 오류가 발생하면 내부 정보를 숨긴 일관된 응답을 반환하도록 구성했습니다.
 
-| 용어 | 읽는 법 | 설명 |
-| --- | --- | --- |
-| FastAPI | 패스트에이피아이 | Python으로 HTTP API를 만드는 프레임워크 |
-| Starlette | 스타렛 | FastAPI의 요청·응답·오류 처리 기반 |
-| Middleware | 미들웨어 | 요청이 들어오고 응답이 나가는 사이에 공통 작업을 처리하는 기능 |
-| Exception handler | 익셉션 핸들러 | 오류를 적절한 HTTP 응답으로 바꾸는 함수 |
-| UUID | 유유아이디 | 요청을 구분하기 위한 고유 식별자 |
-| ASGI | 에이에스지아이 | Python 웹 서버와 애플리케이션 간 통신 규약 |
-| BFF | 비에프에프 | 프론트엔드와 업무 백엔드 사이에서 요청을 중계하는 계층 |
-| Request ID | 리퀘스트 아이디 | 요청 추적을 위한 접수 번호 |
+| 용어              | 읽는 법          | 설명                                                           |
+| ----------------- | ---------------- | -------------------------------------------------------------- |
+| FastAPI           | 패스트에이피아이 | Python으로 HTTP API를 만드는 프레임워크                        |
+| Starlette         | 스타렛           | FastAPI의 요청·응답·오류 처리 기반                             |
+| Middleware        | 미들웨어         | 요청이 들어오고 응답이 나가는 사이에 공통 작업을 처리하는 기능 |
+| Exception handler | 익셉션 핸들러    | 오류를 적절한 HTTP 응답으로 바꾸는 함수                        |
+| UUID              | 유유아이디       | 요청을 구분하기 위한 고유 식별자                               |
+| ASGI              | 에이에스지아이   | Python 웹 서버와 애플리케이션 간 통신 규약                     |
+| BFF               | 비에프에프       | 프론트엔드와 업무 백엔드 사이에서 요청을 중계하는 계층         |
+| Request ID        | 리퀘스트 아이디  | 요청 추적을 위한 접수 번호                                     |
 
 요청 ID는 식당의 **접수 번호**와 비슷합니다. 요청이 여러 서버를 지나갈 때 같은 요청을 추적하는 데 쓰지만, 사용자 신원이나 접근 권한을 증명하지는 않습니다.
 
 ## 2. 구현 파일과 역할
 
-| 파일 | 역할 |
-| --- | --- |
-| [`apps/api/aura_api/core/__init__.py`](../../apps/api/aura_api/core/__init__.py) | 공통 모듈 패키지 구성 |
-| [`apps/api/aura_api/core/middleware.py`](../../apps/api/aura_api/core/middleware.py) | `X-Request-ID` 확인·생성, 요청별 상태 저장, 응답 헤더 추가 |
-| [`apps/api/aura_api/core/errors.py`](../../apps/api/aura_api/core/errors.py) | 공통 오류 응답 형식과 안전한 공개 메시지 정의 |
-| [`apps/api/aura_api/core/exception_handlers.py`](../../apps/api/aura_api/core/exception_handlers.py) | HTTP 오류, 입력 검증 실패, 예상하지 못한 서버 오류 처리 |
-| [`apps/api/aura_api/main.py`](../../apps/api/aura_api/main.py) | 기존 `create_app()`에 공통 미들웨어와 예외 처리기 연결 |
-| [`apps/api/tests/test_core.py`](../../apps/api/tests/test_core.py) | 공통 처리, 보안, 동시 요청, 예외 상황 자동 테스트 |
-| [`apps/api/tests/test_health.py`](../../apps/api/tests/test_health.py) | 기존 헬스 체크, OpenAPI 및 설정 동작 검증 |
+| 파일                                                                                                 | 역할                                                       |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [`apps/api/aura_api/core/__init__.py`](../../apps/api/aura_api/core/__init__.py)                     | 공통 모듈 패키지 구성                                      |
+| [`apps/api/aura_api/core/middleware.py`](../../apps/api/aura_api/core/middleware.py)                 | `X-Request-ID` 확인·생성, 요청별 상태 저장, 응답 헤더 추가 |
+| [`apps/api/aura_api/core/errors.py`](../../apps/api/aura_api/core/errors.py)                         | 공통 오류 응답 형식과 안전한 공개 메시지 정의              |
+| [`apps/api/aura_api/core/exception_handlers.py`](../../apps/api/aura_api/core/exception_handlers.py) | HTTP 오류, 입력 검증 실패, 예상하지 못한 서버 오류 처리    |
+| [`apps/api/aura_api/main.py`](../../apps/api/aura_api/main.py)                                       | 기존 `create_app()`에 공통 미들웨어와 예외 처리기 연결     |
+| [`apps/api/tests/test_core.py`](../../apps/api/tests/test_core.py)                                   | 공통 처리, 보안, 동시 요청, 예외 상황 자동 테스트          |
+| [`apps/api/tests/test_health.py`](../../apps/api/tests/test_health.py)                               | 기존 헬스 체크, OpenAPI 및 설정 동작 검증                  |
 
 기존 설정 및 헬스 라우터는 변경하지 않았습니다. 새로운 공통 오류 응답 모델은 실제 오류 응답에 사용하지만, OpenAPI의 공통 오류 스키마 등록은 이번 범위에 포함하지 않았습니다.
 
@@ -89,13 +93,13 @@
 
 주요 동작은 다음과 같습니다.
 
-| 상황 | HTTP 상태 | 오류 코드 | 공개 메시지 |
-| --- | --- | --- | --- |
-| `GET /health` 정상 응답 | 200 | 해당 없음 | `{"status":"ok"}` |
-| 존재하지 않는 경로 | 404 | `HTTP_404` | 요청한 경로를 찾을 수 없습니다. |
-| 허용하지 않는 HTTP 메서드 | 405 | `HTTP_405` | 지원하지 않는 요청 방식입니다. |
-| 입력값 검증 실패 | 422 | `VALIDATION_ERROR` | 입력 항목을 확인해 주세요. |
-| 예상하지 못한 서버 오류 | 500 | `INTERNAL_ERROR` | 요청을 처리하지 못했어요. |
+| 상황                      | HTTP 상태 | 오류 코드          | 공개 메시지                     |
+| ------------------------- | --------- | ------------------ | ------------------------------- |
+| `GET /health` 정상 응답   | 200       | 해당 없음          | `{"status":"ok"}`               |
+| 존재하지 않는 경로        | 404       | `HTTP_404`         | 요청한 경로를 찾을 수 없습니다. |
+| 허용하지 않는 HTTP 메서드 | 405       | `HTTP_405`         | 지원하지 않는 요청 방식입니다.  |
+| 입력값 검증 실패          | 422       | `VALIDATION_ERROR` | 입력 항목을 확인해 주세요.      |
+| 예상하지 못한 서버 오류   | 500       | `INTERNAL_ERROR`   | 요청을 처리하지 못했어요.       |
 
 500 오류의 JSON 예시는 다음과 같습니다.
 
@@ -170,15 +174,15 @@ git status -sb
 
 **2026-10-26 최종 검증 완료**
 
-| 검증 항목 | 결과 |
-| --- | --- |
-| Ruff 린트 검사 | 통과 — `All checks passed!` |
-| Ruff 포맷 검사 | 통과 — `13 files already formatted` |
-| pytest 자동 테스트 | **57개 통과, 0개 실패** |
-| 기존 헬스 체크 테스트 | 9개 통과 |
-| 공통 모듈 테스트 | 48개 통과 — 500 오류 보완용 신규 사례 3개 포함 |
-| pytest 실행 시간 | 0.95초 |
-| 현재 브랜치 | `feature/backend-core-yejin` |
+| 검증 항목             | 결과                                           |
+| --------------------- | ---------------------------------------------- |
+| Ruff 린트 검사        | 통과 — `All checks passed!`                    |
+| Ruff 포맷 검사        | 통과 — `13 files already formatted`            |
+| pytest 자동 테스트    | **57개 통과, 0개 실패**                        |
+| 기존 헬스 체크 테스트 | 9개 통과                                       |
+| 공통 모듈 테스트      | 48개 통과 — 500 오류 보완용 신규 사례 3개 포함 |
+| pytest 실행 시간      | 0.95초                                         |
+| 현재 브랜치           | `feature/backend-core-yejin`                   |
 
 `git diff --check` 실행 시 기존 Git 추적 파일의 공백 오류 메시지는 출력되지 않았습니다. 신규 파일은 Git에 등록한 뒤 `git diff --cached --check`로 별도 최종 확인합니다.
 
@@ -221,11 +225,11 @@ git status -sb
 
 ### 8.2 담당 영역
 
-| 담당자 | 역할 |
-| --- | --- |
-| **전예진** | 공통 요청 ID, 미들웨어, 오류 처리 및 공통 보안 기반 |
+| 담당자     | 역할                                                           |
+| ---------- | -------------------------------------------------------------- |
+| **전예진** | 공통 요청 ID, 미들웨어, 오류 처리 및 공통 보안 기반            |
 | **정다라** | PostgreSQL, Alembic, CI, 배포 등 초기 인프라 및 서버 로그 정책 |
-| **심우섭** | 회원·상품·주문 모델 및 도메인 업무 규칙 |
+| **심우섭** | 회원·상품·주문 모델 및 도메인 업무 규칙                        |
 
 ### 8.3 후속 협의 사항
 
