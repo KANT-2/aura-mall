@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { cart, member, originalRecipe, resumedDraft, savedRecipe } from "./data";
+import { CART_STORAGE_KEY } from "@/features/cart/storage/cart-storage";
 
 export async function seedApi(page: Page, data: Record<string, unknown>) {
   const response = await page.request.post("http://127.0.0.1:4000/__test__/seed", { data });
@@ -12,8 +13,21 @@ export const seedOriginalRecipe = (page: Page) => seedApi(page, { recipes: [orig
 export async function seedLayout(page: Page, screen: string) {
   await seedApi(page, {
     ...(screen === "mypage" ? { member, recipes: [savedRecipe] } : {}),
-    ...(["cart", "checkout"].includes(screen) ? { cart } : {}),
   });
+  if (["cart", "checkout"].includes(screen)) {
+    await seedLocalCart(page, cart);
+  }
+}
+
+export async function seedLocalCart(page: Page, items: unknown) {
+  await page.goto("/");
+  await page.evaluate(
+    ({ key, items }) => {
+      localStorage.setItem(key, JSON.stringify(items));
+      window.dispatchEvent(new StorageEvent("storage", { key }));
+    },
+    { key: CART_STORAGE_KEY, items },
+  );
 }
 
 export const getDraft = async (page: Page) => (await page.request.get("/api/atelier/draft")).json();

@@ -59,7 +59,7 @@ src/
   styles/                      # 토큰·기본값·공유 요소·사이트 셸·모션·공유 커머스 모듈
 mock-server/
   app.ts, index.ts             # 독립 Express HTTP 서버
-  routes/                     # 인증·상품·장바구니·조향·주문·문의 API
+  routes/                     # 인증·조향·주문·문의 API
   fixtures/catalog.json       # 상품·컬렉션·향료·프로모션·추천 이름 원본
   data/store.ts               # Mock 저장소
   .data/db.json               # 실행 중 생성되는 로컬 데이터, Git 제외
@@ -89,24 +89,29 @@ BFF는 요청 출처·JSON 크기·허용 쿠키·제한시간을 처리하고, 
 
 ## 데이터 소유권과 Mock API
 
-DB에 해당하는 데이터는 브라우저 저장소에서 제거했습니다. 상품·컬렉션·향료·프로모션·추천 이름은 서버 fixture에서, 회원·세션·장바구니·레시피·초안·주문·문의는 Mock 저장소에서 관리합니다. 프런트엔드는 HTTP로만 접근합니다. `sessionStorage`에는 가입 안내 표시 여부만 남아 있습니다.
+장바구니는 브라우저 `localStorage`의 `aura_cart_v1` 키에 상품 ID·수량·선택 구성을 저장합니다. 로그인·로그아웃과 관계없이 같은 브라우저에서 유지하며, 같은 출처의 다른 탭에도 변경을 반영합니다. 상품·컬렉션·향료·프로모션·추천 이름은 서버 fixture에서, 회원·세션·레시피·초안·주문·문의는 Mock 저장소에서 관리하고 HTTP로 접근합니다. `sessionStorage`에는 가입 안내 표시 여부만 남아 있습니다.
 
-| API                                                                   | 책임                          |
-| --------------------------------------------------------------------- | ----------------------------- |
-| `GET /api/catalog`, `GET /api/catalog/products/:id`                   | 공용 상품·향료·홈 데이터      |
-| `GET /api/session`                                                    | 현재 회원과 익명 방문자 식별  |
-| `POST /api/auth/register`, `/login`, `/logout`                        | 회원·세션 변경                |
-| `GET /api/cart`, `POST /api/cart/items`, `PATCH /api/cart/items/:key` | 소유자별 장바구니·수량·삭제   |
-| `GET/POST /api/recipes`, `DELETE /api/recipes/:id`                    | 회원별 레시피와 버전          |
-| `GET/PUT/DELETE /api/atelier/draft`                                   | 방문자별 조향 초안            |
-| `GET/POST /api/orders`                                                | 회원 주문 조회·모의 주문 생성 |
-| `POST /api/partner`                                                   | 모의 입점 문의 저장           |
+| API                                                 | 책임                          |
+| --------------------------------------------------- | ----------------------------- |
+| `GET /api/catalog`, `GET /api/catalog/products/:id` | 공용 상품·향료·홈 데이터      |
+| `GET /api/session`                                  | 현재 회원과 익명 방문자 식별  |
+| `POST /api/auth/register`, `/login`, `/logout`      | 회원·세션 변경                |
+| `GET/POST /api/recipes`, `DELETE /api/recipes/:id`  | 회원별 레시피와 버전          |
+| `GET/PUT/DELETE /api/atelier/draft`                 | 방문자별 조향 초안            |
+| `GET/POST /api/orders`                              | 회원 주문 조회·모의 주문 생성 |
+| `POST /api/partner`                                 | 모의 입점 문의 저장           |
 
-Mock 서버는 HttpOnly·SameSite 쿠키로 세션을 식별하고 비밀번호는 서버에서 scrypt 검증값으로 저장합니다. 회원과 방문자의 장바구니·레시피를 분리하며, 로그아웃하면 방문자 장바구니로 돌아옵니다. 조향 초안은 가입·로그인 이동 중에도 이어지도록 방문자에 귀속합니다. 가격·유효한 구성·레시피 ID·버전·생성 시각은 서버에서 결정합니다. 클라이언트가 보낸 가격을 주문 계산에 사용하지 않습니다.
+Mock 서버는 HttpOnly·SameSite 쿠키로 세션을 식별하고 비밀번호는 서버에서 scrypt 검증값으로 저장합니다. 레시피와 주문은 회원별로 분리합니다. 로컬 장바구니는 인증 변경 시에도 그대로 유지합니다. 조향 초안은 가입·로그인 이동 중에도 이어지도록 방문자에 귀속합니다. 가격·유효한 구성·레시피 ID·버전·생성 시각은 서버에서 결정합니다. 클라이언트가 보낸 가격을 주문 계산에 사용하지 않습니다.
 
-TanStack Query는 서버 데이터의 조회·로딩·오류·변경 후 캐시 갱신을 맡습니다. 회원별 쿼리 키에 소유자를 포함하고 인증 변경 시 기존 개인 캐시를 취소·제거합니다. 장바구니·레시피 변경 요청에는 시작 시점의 소유자를 보내 계정 전환 중 잘못된 소유자에게 적용되는 요청을 거절합니다. 초기 조회가 끝나기 전에 빈 장바구니나 초안으로 편집기를 초기화하지 않습니다.
+본문이 필요한 API는 JSON 객체만 받으며, 본문 누락·잘못된 JSON·배열은 400, 비 JSON 본문은 415, 32KiB 초과는 413으로 응답합니다. 파서 오류에 입력값을 포함하지 않습니다. 로그아웃과 삭제는 본문 없이 호출할 수 있습니다.
 
-기본 저장 파일은 `apps/web/mock-server/.data/db.json`이며 서버를 재시작해도 유지합니다. 삭제하면 초기화됩니다. `MOCK_PERSIST=0 npm run mock`은 메모리에서만 동작합니다. `MOCK_PORT`로 포트를 지정할 수 있습니다. 이 저장소는 단일 프로세스 개발용 JSON 파일이며 운영 DB의 트랜잭션·배포·복구를 제공하지 않습니다. 기존 브라우저 저장소의 시연 데이터는 자동 이전하지 않습니다.
+장바구니는 `useSyncExternalStore`로 구독하며 초기 복원이 끝나기 전에 빈 배열을 저장하지 않습니다. 손상된 JSON은 빈 장바구니로 복원하고, 저장 공간이 차단되면 저장 실패를 알리며 담기 성공을 표시하지 않습니다. 로컬 상품·가격·`unitPrice`는 신뢰하지 않고 현재 카탈로그로 복원합니다. 같은 항목의 누적 수량 15개 상한과 단품·Gift Set 구성품의 합산 재고를 화면에서 검사합니다.
+
+장바구니 API는 제거했습니다. 모의 주문은 `{ recipient, address, coupon?, items }`를 받으며, 각 `items` 항목에 `{ productId?, quantity, selection?, custom? }`를 전송합니다. 서버가 가격·구성·수량·재고와 맞춤 색을 다시 계산하고 응답의 상품에 `unitPrice`를 포함합니다. 사용자 간 재고 예약이나 주문 후 fixture 재고 차감은 수행하지 않습니다. 실제 주문 UI를 연결할 때는 주문 성공을 확인한 뒤 로컬 장바구니를 비웁니다.
+
+TanStack Query는 서버 데이터의 조회·로딩·오류·변경 후 캐시 갱신을 맡습니다. 회원별 쿼리 키에 소유자를 포함하고 인증 변경 시 기존 개인 캐시를 취소·제거합니다. 레시피 변경 요청에는 시작 시점의 소유자를 보내 계정 전환 중 잘못된 소유자에게 적용되는 요청을 거절합니다. 초기 조회가 끝나기 전에 빈 초안으로 편집기를 초기화하지 않습니다.
+
+기본 저장 파일은 `apps/web/mock-server/.data/db.json`이며 서버를 재시작해도 유지합니다. 삭제하면 초기화됩니다. `MOCK_PERSIST=0 npm run mock`은 메모리에서만 동작합니다. `MOCK_PORT`로 포트를 지정할 수 있습니다. 이 저장소는 단일 프로세스 개발용 JSON 파일이며 운영 DB의 트랜잭션·배포·복구를 제공하지 않습니다. 기존 서버 장바구니는 브라우저로 자동 이전하지 않으며 저장 파일에서 다시 불러오지 않습니다.
 
 Playwright는 `MOCK_TEST_MODE=1`, `MOCK_PERSIST=0`으로 API를 시작하고 테스트별 쿠키에 연결된 `POST /__test__/seed`로 데이터를 준비합니다. 일반 실행에서는 시드 경로를 노출하지 않습니다. 다른 테스트나 실제 개발 데이터를 전역 초기화하지 않습니다.
 
@@ -131,7 +136,7 @@ npm run test:e2e
 
 `check:web`은 ESLint·CSS 구조 검사·Next 라우트 타입 생성·TypeScript·Vitest를 실행합니다. 저장소 포맷과 Python까지 검증하려면 루트에서 `npm run check`를 사용합니다. 단위 테스트는 조향·수량·복원·내부 리다이렉트 규칙을, 통합 테스트는 실제 HTTP 요청으로 회원 간 데이터 분리·가격 변조 거절·레시피 버전·초안·모의 주문·문의·파일 영속성을 검증합니다.
 
-Playwright는 포트 4000의 메모리 Mock API와 포트 3100의 프로덕션 Next BFF 서버를 자동 시작·종료합니다. 기본 검증은 데스크톱·모바일 조작, 로그인·로그아웃에 따른 장바구니 전환, 검색 URL 동기화, 조향 초안 복원·초기화, 혼합·센서 권한 정리를 포함합니다. 실제 iPhone Safari의 센서·권한 동작은 기기 검증이 필요합니다.
+Playwright는 포트 4000의 메모리 Mock API와 포트 3100의 프로덕션 Next BFF 서버를 자동 시작·종료합니다. 기본 검증은 데스크톱·모바일 조작, 로그인·로그아웃 후 로컬 장바구니 유지, 새로고침·탭 간 동기화·저장 실패, 검색 URL 동기화, 조향 초안 복원·초기화, 혼합·센서 권한 정리를 포함합니다. 실제 iPhone Safari의 센서·권한 동작은 기기 검증이 필요합니다.
 
 테스트 선택자는 화면 문구·CSS 클래스와 분리합니다. 역할은 `getByRole`, 특정 조작은 `src/lib/test-ids.ts`의 식별자를 사용합니다. 선택자와 반복 조작은 `e2e/pages`, 데이터와 API 시드는 `e2e/fixtures`, 명세는 사용자 시나리오와 독립적인 기대 결과를 담당합니다. [Playwright Best Practices](https://playwright.dev/docs/best-practices)와 [Page Object Models](https://playwright.dev/docs/pom)를 기준으로 합니다.
 

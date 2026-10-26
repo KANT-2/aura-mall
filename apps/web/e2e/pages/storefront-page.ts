@@ -13,6 +13,9 @@ export class StorefrontPage {
   get sort() {
     return this.page.getByTestId(testIds.catalog.sort);
   }
+  get addToCart() {
+    return this.page.getByTestId(testIds.catalog.addToCart);
+  }
 
   async openCatalogFromMenu() {
     await this.page.goto(routes.home);
