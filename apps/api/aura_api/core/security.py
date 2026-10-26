@@ -1,6 +1,7 @@
 import re
 from html import escape
-from urllib.parse import urlsplit
+from unicodedata import category
+from urllib.parse import unquote, urlsplit
 
 from starlette.datastructures import MutableHeaders
 
@@ -41,15 +42,34 @@ def escape_html_text(value: str) -> str:
 
 
 def validate_public_url(value: str) -> str:
-    """Allow HTTP(S) URLs or root-relative paths; not an SSRF/fetch allowlist."""
-    if not value or any(ord(char) <= 32 or ord(char) >= 127 for char in value):
-        raise ValueError("Invalid public URL")
-    if "\\" in value:
-        raise ValueError("Invalid public URL")
-    if value.startswith("/") and not value.startswith("//"):
-        return value
-    source_origin(value, referer=True)
-    return value
+    """Validate raw and decoded URLs, preserving the original output string."""
+    candidate = value
+    # Bound repeated decoding and fail closed on excessive encoding layers.
+    for _ in range(8):
+        if not candidate or any(
+            char.isspace() or category(char) in {"Cc", "Cf", "Cs"} for char in candidate
+        ):
+            raise ValueError("Invalid public URL")
+        if "\\" in candidate:
+            raise ValueError("Invalid public URL")
+        try:
+            parts = urlsplit(candidate)
+            if candidate.startswith("/"):
+                if candidate.startswith("//") or parts.netloc:
+                    raise ValueError("Invalid public URL")
+            elif (
+                parts.scheme not in {"http", "https"}
+                or not AUTHORITY.fullmatch(parts.netloc)
+                or (parts.port is not None and not 1 <= parts.port <= 65535)
+            ):
+                raise ValueError("Invalid public URL")
+            decoded = unquote(candidate, errors="strict")
+        except ValueError:
+            raise ValueError("Invalid public URL") from None
+        if decoded == candidate:
+            return value
+        candidate = decoded
+    raise ValueError("Invalid public URL")
 
 
 def apply_security_headers(headers: MutableHeaders) -> None:
