@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { MAX_QUANTITY } from "@/features/cart/model/cart";
 import { useCatalog } from "@/features/catalog/hooks/use-catalog";
 import { testIds } from "@/lib/test-ids";
@@ -28,7 +29,7 @@ export function Cart() {
   if (!ready) {
     return (
       <main className={styles.root + " page-width cart-page"} aria-busy="true">
-        <p role="status">장바구니를 불러오고 있어요.</p>
+        <LoadingSkeleton variant="cart" label="장바구니를 불러오고 있어요." />
       </main>
     );
   }
