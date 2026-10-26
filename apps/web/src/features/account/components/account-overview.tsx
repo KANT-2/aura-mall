@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { useOrders } from "@/features/checkout/hooks/use-orders";
 import { money } from "@/lib/format";
 import { testIds } from "@/lib/test-ids";
@@ -25,7 +26,7 @@ export function MyPage() {
   if (!ready || !recipesReady) {
     return (
       <main className={styles.root + " page-width"} aria-busy="true">
-        <p>내 정보를 불러오고 있어요.</p>
+        <LoadingSkeleton variant="account" label="내 정보를 불러오고 있어요." />
       </main>
     );
   }
@@ -189,7 +190,7 @@ export function MyPage() {
           ))}
         </section>
       ) : tab === "orders" && orders.isLoading ? (
-        <p role="status">주문 내역을 불러오고 있어요.</p>
+        <LoadingSkeleton variant="orders" label="주문 내역을 불러오고 있어요." />
       ) : tab === "orders" && orders.error ? (
         <p role="alert">주문 내역을 불러오지 못했어요.</p>
       ) : tab === "orders" ? (
