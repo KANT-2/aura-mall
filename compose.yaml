@@ -26,6 +26,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    environment:
+      AURA_DATABASE_URL: ${AURA_DATABASE_URL:?Set AURA_DATABASE_URL in .env}
     expose:
       - "8000"
     networks:
