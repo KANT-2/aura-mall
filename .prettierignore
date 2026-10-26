@@ -10,7 +10,8 @@ package-lock.json
 **/test-results
 **/playwright-report
 **/AGENTS.md
-docs
+docs/archive
+docs/product/PRD.md
 **/.venv
 **/__pycache__
 **/.pytest_cache

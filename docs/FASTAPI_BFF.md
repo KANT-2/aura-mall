@@ -1,5 +1,7 @@
 # FastAPI 연결을 위한 BFF 계약
 
+[문서 목록](README.md) · [웹 개발 안내](../apps/web/README.md) · [API 개발 안내](../apps/api/README.md)
+
 현재 Next.js BFF는 독립 Mock API에 연결되어 있습니다. FastAPI 기본 앱은 `apps/api`에 있으며 현재 헬스 체크만 제공합니다. 업무 API·DB·운영 인증은 아직 구현하지 않았습니다. 아래 계약은 현재 화면을 유지하면서 FastAPI로 전환하기 위한 연결 기준입니다.
 
 ## 경계

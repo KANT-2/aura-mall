@@ -1,5 +1,7 @@
 # AURA 섹션별 인터랙션 레퍼런스 적용표
 
+> 보관 기록입니다. 구현·경로·명령·검증 결과는 작성 당시 기준입니다. 현재 개발 방법은 [문서 목록](../README.md)에서 확인하세요.
+
 팀 전달본 기준: `develop` 커밋 `de182f357f5440e9edd41043f94036448426f3ec` (2026-10-23).
 
 사용자가 공유한 인터랙션 레퍼런스 카탈로그(Posts.design, Refero, Refs.Gallery, Landing.love, Design Spells, 60fps.design, Motion Primitives, React Bits, Aceternity UI 등) 가운데

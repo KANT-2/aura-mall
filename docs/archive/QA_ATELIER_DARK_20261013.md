@@ -1,5 +1,7 @@
 # AURA ATELIER — DARK VISUAL POLISH / 2026-10-13
 
+> 보관 기록입니다. 구현·경로·명령·검증 결과는 작성 당시 기준입니다. 현재 개발 방법은 [문서 목록](../README.md)에서 확인하세요.
+
 ## 범위와 결과
 
 - 업로드된 `AURA_ATELIER_UIUX_FULL_SOURCE_20261013(1).zip` 전체 소스를 바탕으로 변경한 **전체 교체용 소스**입니다.
@@ -42,7 +44,7 @@
 
 ### 검증되지 않은 부분 (중요)
 
-이 작업 환경에서는 npm registry 도메인 조회가 차단되어 `npm ci`가 완료되지 않았습니다. 따라서 **수정 후 Next.js `npm run build`, ESLint, 실제 React 사용자 플로우 및 실기기 검수는 PASS라고 주장하지 않습니다**. 이전 ZIP의 `docs/refined-functional-qa.json`과 `docs/refined-layout-qa.json`은 **수정 전 버전의 결과**입니다.
+이 작업 환경에서는 npm registry 도메인 조회가 차단되어 `npm ci`가 완료되지 않았습니다. 따라서 **수정 후 Next.js `npm run build`, ESLint, 실제 React 사용자 플로우 및 실기기 검수는 PASS라고 주장하지 않습니다**. 이전 ZIP의 [refined-functional-qa.json](refined-functional-qa.json)과 [refined-layout-qa.json](refined-layout-qa.json)은 **수정 전 버전의 결과**입니다.
 
 ## 로컬 최종 확인 체크리스트
 

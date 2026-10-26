@@ -1,5 +1,7 @@
 # AURA V5 — Atelier Mixing & Result UX Repair
 
+> 보관 기록입니다. 구현·경로·명령·검증 결과는 작성 당시 기준입니다. 현재 개발 방법은 [문서 목록](../README.md)에서 확인하세요.
+
 Date: 2026-10-13. Base: AURA V4, all app pages and assets preserved.
 
 ## Fixed in source
