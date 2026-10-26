@@ -59,6 +59,10 @@ export async function backendRequest(
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
   try {
     const headers = new Headers({ Accept: "application/json", "X-Request-ID": requestId });
+    if (config.bffSharedKey && !["GET", "HEAD", "OPTIONS"].includes(options.method ?? "GET")) {
+      headers.set("X-Aura-BFF-Key", config.bffSharedKey);
+    }
+
     if (options.body !== undefined) {
       headers.set("Content-Type", "application/json");
     }
