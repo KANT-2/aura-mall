@@ -2,7 +2,7 @@
 
 [문서 목록](README.md) · [웹 개발 안내](../apps/web/README.md) · [API 개발 안내](../apps/api/README.md)
 
-장바구니는 브라우저 로컬 스토리지에 저장하며 로그인·로그아웃과 관계없이 같은 브라우저에서 유지합니다. 그 외 서버 데이터는 Next.js BFF를 통해 독립 Mock API에 연결되어 있습니다. FastAPI는 헬스 체크와 JWT 로그인·갱신·로그아웃 API 및 PostgreSQL 저장소 코드를 제공합니다. CRA-14의 실제 스키마·DB 검증과 BFF JWT 연결은 아직 대기 중이며 기존 화면을 FastAPI 인증으로 전환한 상태는 아닙니다. 아래 계약은 현재 Mock/BFF 계약과 후속 연결 기준을 구분합니다.
+장바구니는 브라우저 로컬 스토리지에 저장하며 로그인·로그아웃과 관계없이 같은 브라우저에서 유지합니다. 그 외 서버 데이터는 Next.js BFF를 통해 기본적으로 독립 Mock API에 연결됩니다. BFF에는 쿠키 모드와 FastAPI용 JWT→Bearer 어댑터가 있습니다. FastAPI에는 헬스 체크, JWT 검증·인가 및 로그인·Refresh 회전·로그아웃 API와 PostgreSQL 저장소 코드가 있습니다. 실제 DB 스키마에는 인증 확장이 없으며 PostgreSQL 통합 테스트도 대기 중입니다. BFF의 Session·쿠키 계약과 백엔드 TokenPair JSON·로그아웃 204 계약은 아직 연결되지 않았습니다. 아래는 실제 구현과 후속 연동 요구사항을 구분합니다.
 
 ## 경계
 
@@ -31,13 +31,15 @@ BFF는 요청 사이에 사용자 상태를 메모리로 보관하지 않습니�
 
 모든 변수는 Next 서버 전용이며 브라우저 번들에 포함하지 않습니다.
 
-| 변수                 | 기본값                  | 용도                                                           |
-| -------------------- | ----------------------- | -------------------------------------------------------------- |
-| `API_URL`            | `http://127.0.0.1:4000` | 백엔드 주소. 내부 네트워크 주소 사용 가능                      |
-| `API_PREFIX`         | `/api`                  | 백엔드 API 접두사. FastAPI 예: `/api/v1`                       |
-| `API_TIMEOUT_MS`     | `10000`                 | 헤더 수신부터 JSON 본문 읽기까지의 제한시간. 1~60000ms         |
-| `API_SESSION_COOKIE` | `aura_mock_session`     | 전달을 허용하는 백엔드 세션 쿠키 한 개의 이름                  |
-| `APP_ORIGIN`         | 요청 URL의 origin       | 브라우저의 정식 공개 origin. 프록시·HTTPS 종료 환경에서는 명시 |
+| 변수                 | 기본값                  | 용도                                                                                 |
+| -------------------- | ----------------------- | ------------------------------------------------------------------------------------ |
+| `API_URL`            | `http://127.0.0.1:4000` | 백엔드 주소. 내부 네트워크 주소 사용 가능                                            |
+| `API_PREFIX`         | `/api`                  | 백엔드 API 접두사. FastAPI 예: `/api/v1`                                             |
+| `API_TIMEOUT_MS`     | `10000`                 | 헤더 수신부터 JSON 본문 읽기까지의 제한시간. 1~60000ms                               |
+| `API_SESSION_COOKIE` | `aura_mock_session`     | 전달을 허용하는 백엔드 세션 쿠키 한 개의 이름                                        |
+| `API_AUTH_MODE`      | `cookie`                | `cookie`: Mock 쿠키 전달, `jwt`: 허용 쿠키의 JWT를 Bearer로 변환                     |
+| `API_BFF_SHARED_KEY` | 미설정                  | FastAPI `AURA_BFF_SHARED_KEY`와 같은 서버 전용 공유 키. 변경 요청의 CSRF 경계에 사용 |
+| `APP_ORIGIN`         | 요청 URL의 origin       | 브라우저의 정식 공개 origin. 프록시·HTTPS 종료 환경에서는 명시                       |
 
 FastAPI가 아래 계약을 제공하는 경우의 `apps/web/.env.local` 예:
 
@@ -46,6 +48,8 @@ API_URL=http://127.0.0.1:8000
 API_PREFIX=/api/v1
 API_TIMEOUT_MS=10000
 API_SESSION_COOKIE=aura_session
+API_AUTH_MODE=jwt
+# API_BFF_SHARED_KEY=<FastAPI AURA_BFF_SHARED_KEY와 같은 무작위 서버 비밀값>
 APP_ORIGIN=http://localhost:3000
 ```
 
@@ -89,54 +93,114 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
 
 주문 항목 `OrderItemInput`은 `{ productId?, quantity, selection?, custom? }`이며 각 항목에 상품 ID 또는 맞춤 조향 구성 중 하나를 전송합니다. `quantity`는 필수 정수이며 1~15입니다. 동일 항목은 합산하며 15개 초과를 거절합니다. 맞춤 조향의 `counts`는 향료 ID에 대한 정수 수량입니다. 서버가 가격·구성·수량·재고·소유권을 다시 검증하고 ID·버전·생성 시각을 결정해야 합니다. 주문 응답의 상품에는 서버가 계산한 `unitPrice`를 포함합니다. 로컬 가격·상품 객체·주문 합계를 신뢰하지 않습니다. 문의의 `consent`는 현재 폼 계약인 `"on"`입니다. 날짜는 ISO 8601 문자열, 가격은 원 단위 숫자 또는 미확정일 때 `null`입니다.
 
-현재 공개 API에는 쿼리 매개변수가 필요하지 않아 BFF가 전달하지 않습니다. 페이지네이션·필터 등을 서버로 옮길 때는 해당 Route Handler에 허용할 매개변수와 변환을 명시적으로 추가합니다. FastAPI `/docs`·`/openapi.json`·테스트 시드 경로를 BFF에 공개하지 않습니다.
+소비자 API에는 쿼리 매개변수가 필요하지 않아 BFF가 전달하지 않습니다. 관리자 목록처럼 페이지네이션·필터가 필요한 경로는 Route Handler의 `query` 옵션에 허용할 이름을 명시하며, BFF는 그 이름의 첫 값만(공백 제거, 100자 이하, 제어 문자 제외) 전달합니다. 그 외 매개변수는 버립니다. FastAPI `/docs`·`/openapi.json`·테스트 시드 경로를 BFF에 공개하지 않습니다.
 
 ## 세션
 
-### 현재 Mock·BFF 구현
+### 쿠키 모드와 공통 규칙
 
-현재 Mock과 BFF의 인증 연결은 불투명한 세션 쿠키 방식입니다. 아래 쿠키 규칙과 `Session` DTO는
-이 구현의 현황이며 FastAPI가 이미 해당 세션을 발급·검증한다는 뜻은 아닙니다.
-FastAPI 공통 인증은 Bearer JWT이며 로그인·Refresh 회전·로그아웃과 PostgreSQL 저장소 코드를
-구현했습니다. 실제 DB 스키마 연결·검증과 Session 조회·회원가입 API는 미완료입니다.
-기존 BFF 전송부는 쿠키를 전달할 뿐 Authorization을 구성하지 않아
-JWT 보호 경로와 아직 호환되지 않습니다.
+`API_AUTH_MODE=cookie`는 기존 Mock의 불투명 세션 쿠키를 그대로 전달합니다.
+FastAPI용 `API_AUTH_MODE=jwt`에서는 HttpOnly 쿠키를 Bearer로 변환합니다. 브라우저의 공개 경로·본문·`Session` DTO는 두 모드에서 같습니다. 이 전송 어댑터가 구현됐다는 것이 아래 TokenPair API와 로그인·로그아웃까지 연결됐다는 뜻은 아닙니다.
 
-- 브라우저에서 받은 쿠키 중 `API_SESSION_COOKIE`만 백엔드에 전달합니다. 브라우저의 `Authorization`, 임의 사용자 ID, `X-Forwarded-*`는 전달하지 않습니다.
+- 브라우저에서 받은 쿠키 중 `API_SESSION_COOKIE`만 사용합니다. 쿠키 모드는 `Cookie`, JWT 모드는 `Authorization: Bearer <쿠키 값>`으로 전달합니다. 브라우저의 `Authorization`, 임의 사용자 ID, `X-Forwarded-*`는 전달하지 않습니다.
 - 응답에서도 허용한 쿠키만 전달합니다. 백엔드 `Domain`과 `Path`를 제거하고 BFF 호스트의 `Path=/`, `HttpOnly`, `SameSite=Lax`를 적용합니다. 공개 origin이 HTTPS이면 `Secure`도 적용합니다.
 - `Expires`·`Max-Age`를 보존해 회전·만료·로그아웃 삭제를 지원합니다. 401 응답에서 세션 삭제를 보내는 경우도 전달합니다.
 - 회원과 익명 방문자를 구분하고, 로그인·로그아웃 중에도 `guestId`를 유지해야 현재 방문자 조향 초안 정책을 보존할 수 있습니다.
 - `X-Session-Owner`는 계정 변경 중 시작한 레시피 요청을 거절하기 위한 보조 값입니다. 쿠키로 확인한 실제 소유자와 다르면 409를 반환합니다. 소유권을 이 헤더로 결정하면 안 됩니다.
 
-### JWT 전환 목표와 후속 BFF 작업
+### JWT 어댑터와 백엔드 발급 계약
 
-목표 흐름은 `브라우저 → Next.js BFF → Authorization: Bearer <JWT> → FastAPI`입니다.
+구현한 흐름은 `브라우저의 HttpOnly 쿠키 → Next.js BFF → Authorization: Bearer <JWT> → FastAPI`입니다.
 FastAPI는 서버에 명시한 HS256·키·issuer·audience로 서명과 필수 `sub`, `jti`, `iat`, `exp`, `iss`, `aud`를
 검증하고, 401에는 기존 오류 JSON과 `WWW-Authenticate: Bearer`를 반환합니다.
 설정이 없으면 인증을 거절하며, 쿠키나 BFF 공유 키를 사용자 인증으로 사용하지 않습니다.
-서명 검증 후에는 jti 폐기 조회도 필요합니다. PostgreSQL 어댑터는 `AURA_DATABASE_URL`로
-명시적으로 연결하며, 현재 운영 스키마와 안전한 테스트 DB는 확인되지 않았습니다.
-저장소 미연결·폐기·조회 실패는 401입니다. 로그인·갱신·로그아웃 저장 실패는 503으로 완료를 보고하지 않습니다.
+서명 검증 후에는 jti 폐기 조회도 필요합니다. PostgreSQL 어댑터 코드는 있으나 인증 확장 스키마와
+실제 DB 검증은 대기 중입니다. 미설정·스키마 불일치·폐기·조회 실패는 정상 서명 JWT라도 401입니다.
 실제 로그아웃은 jti를 만료시각까지 폐기 목록에 기록해야 하며 쿠키 삭제만으로 완료할 수 없습니다.
 
-새 FastAPI 서버 계약은 `POST /api/v1/auth/login`의 `{email,password}`, `POST /api/v1/auth/refresh`의
-`{refreshToken}` 요청에 `{accessToken,refreshToken,tokenType,expiresIn,refreshExpiresIn}`을 반환합니다.
-`POST /api/v1/auth/logout`은 유효한 Bearer Access JWT로 인증하고 폐기 커밋 후 204를 반환합니다.
-이 TokenPair를 기존 BFF가 그대로 브라우저로 전달하지 않도록 쿠키·Session 변환을 먼저 구현해야 합니다.
+- 아래는 현재 BFF가 기대하는 후속 FastAPI 계약입니다. 실제 백엔드 발급 API는 아래 TokenPair 응답이므로 아직 호환되지 않습니다. FastAPI 업무 API는 `Set-Cookie: aura_session=<JWT>; Max-Age=...`처럼 설정한 이름으로 토큰을 발급·회전합니다. 본문은 기존 `Session`이며 JSON 토큰 발급 응답을 사용하는 경우에는 별도 어댑터가 필요합니다. BFF는 인증 경로의 응답을 `Session`·`Member` 공개 필드로 제한해 추가 토큰·비밀번호 필드를 제거합니다. 잘못된 DTO·JWT 쿠키는 502입니다.
+- 쿠키의 `Domain`·백엔드 `Path`를 제거하고 `Path=/; HttpOnly; SameSite=Lax`를 적용합니다. HTTPS 공개 origin에서는 `Secure`를 적용합니다. 운영에서는 `APP_ORIGIN=https://...`를 지정합니다. 수명은 발급자가 `exp`와 일치하도록 `Max-Age`/`Expires`로 정하며 BFF는 이를 보존합니다.
+- BFF는 쿠키 값의 JWT 세 부분 형식과 3,800자 상한만 검사합니다. 브라우저 쿠키 4KiB 제한에 여유를 두기 위한 전송 상한이며 FastAPI 검증기의 8,192자 상한보다 작습니다. 중복·빈 값·잘못된 형식은 백엔드를 호출하기 전에 401입니다. 서명·클레임·권한·폐기 검증이나 JWT 발급은 BFF에서 하지 않습니다. JWT 서명키를 웹 환경에 설정하지 않습니다.
+- JWT 모드에서는 백엔드에 `Cookie`를 보내지 않습니다. 토큰이 없으면 Bearer도 보내지 않으며 브라우저 `Authorization`을 대체값으로 사용하지 않습니다. 공개 카탈로그와 공용 RSC 조회는 사용자 토큰을 전달하지 않습니다.
+- 백엔드 401 또는 BFF의 잘못된 JWT 쿠키 401은 같은 호스트·경로·보안 속성의 쿠키를 `Max-Age=0`으로 삭제하고 고정 `WWW-Authenticate: Bearer`를 반환합니다. 백엔드 challenge의 임의 설명은 노출하지 않습니다. 로그인 실패의 401도 쿠키를 삭제하므로 이후 `/session`에서 익명 세션을 다시 발급해야 합니다.
+- JWT 모드의 오류 응답에 포함된 백엔드 쿠키는 적용하지 않습니다. 403·409·502·504에서는 현재 쿠키를 유지합니다. 로그아웃은 현재 JWT를 백엔드에 보내고 폐기 기록의 성공 응답을 기다립니다. BFF가 쿠키만 지우고 성공 응답을 만들지 않습니다.
+- `guestId`는 서명된 토큰 안에 보관하며 로그인·회전·로그아웃 때 유지합니다. 로그아웃 API는 회원 토큰을 폐기한 뒤 같은 `guestId`를 담은 익명 토큰과 `Session { user: null, guestId }`를 반환해야 합니다. 익명 토큰을 회원용 `CurrentUser`로 허용하지 않도록 업무 API에서 회원·익명을 구별해야 합니다. 익명 토큰 발급·검증 업무 구현은 후속 범위입니다.
+- 현재 BFF에는 Refresh Token 보관·자동 갱신·자동 재시도가 없습니다. 백엔드 Refresh API는 구현되어 있으며 BFF 연결은 후속 작업입니다. 만료 시 401로 세션을 다시 확인하고 로그인합니다. 계정 변경 409와 관리자 권한 검증은 FastAPI가 담당합니다.
 
-브라우저 토큰은 HttpOnly·Secure 쿠키로 보호하고 BFF 서버가 허용된 쿠키에서만 토큰을 꺼내
-Authorization을 구성하는 방식을 우선 검토합니다. 이 어댑터는 아직 구현하지 않았으며,
-브라우저 Authorization을 무조건 전달하거나 JWT를 localStorage에 저장하는 코드는 추가하지 않았습니다.
-FastAPI Refresh·회전·계열 폐기 코드는 구현했지만 액세스 토큰 쿠키 이름·수명,
-BFF의 로그인·갱신·로그아웃 연결 및 401 시 쿠키 삭제, 계정 전환 409·권한 클레임 정책은
-팀 연동 합의 후 구현합니다. BFF의 기존 출처·쿠키 보안과
-요청 ID·공개 오류 형식은 유지해야 합니다. 기존 Mock의 세션 성공이 FastAPI JWT 성공을 뜻하지 않습니다.
-현재 BFF는 FastAPI의 `WWW-Authenticate` 헤더도 전달하지 않으므로 후속 어댑터에서 전달 여부를 정해야 합니다.
-구체적인 검증 정책·설정·미연결 업무 API의 제한은 [JWT 인증·인가 기반](backend/AUTHORIZATION_CORE.md)을 참고합니다.
+가입·Session 조회·업무 API와 BFF 응답 변환이 미완료이므로 현재 설정만 바꿔 실제 화면의 가입·로그인을 사용할 수는 없습니다.
+테스트 전용 FastAPI 앱에서 실제 JWT 검증기·CSRF·오류 처리를 사용해 서명·만료·위조·폐기 후 재접근·회원 분리를 검증합니다.
+PostgreSQL 발급·회전·폐기 어댑터와 API 코드는 구현됐지만 인증 확장 스키마 합의와 실제 DB 통합 검증은 별도로 필요합니다.
+구체적인 검증 정책은 [JWT 인증·인가 기반](backend/AUTHORIZATION_CORE.md)을 참고합니다.
+
+#### 구현된 백엔드 생명주기 API와 연결 차이
+
+- `POST /api/v1/auth/login`의 `{email,password}`, `POST /api/v1/auth/refresh`의 `{refreshToken}` 요청은 `{accessToken,refreshToken,tokenType,expiresIn,refreshExpiresIn}` JSON을 반환합니다. 쿠키나 `Session` DTO는 발급하지 않습니다.
+- `POST /api/v1/auth/logout`은 유효한 Bearer Access JWT로 인증하고 연결 계열의 Refresh·Access 폐기 커밋 뒤 204를 반환합니다. 익명 JWT나 `guestId`는 발급하지 않습니다.
+- 현재 BFF의 `publicSession()`은 Session DTO를 요구하므로 TokenPair를 그대로 연결하면 502가 됩니다. TokenPair를 안전한 HttpOnly·Secure 쿠키와 공개 Session으로 변환하는 어댑터, Refresh 쿠키의 Path·수명, 로그아웃 204 처리·익명 방문자 유지 정책을 정민님과 합의해야 합니다. 토큰 JSON을 브라우저에 그대로 전달해서는 안 됩니다.
+- 기존 BFF는 JWT 쿠키→Bearer, 401 쿠키 삭제·고정 Bearer challenge, 출처 검사를 제공합니다. 자동 갱신은 별개이며 현재 미구현입니다. 백엔드 재사용 감지 시 계열 전체가 폐기되므로 BFF 갱신 직렬화와 재시도 정책도 필요합니다.
+- 사용자 JWT에는 현재 여섯 필수 클레임만 발급합니다. `guestId`, 관리자 권한, 계정 변경 409 정책은 임의로 추가하지 않았습니다. 기존 Mock 성공이나 테스트 전용 FastAPI 앱의 성공은 운영 DB 연결 완료를 뜻하지 않습니다.
+- `AURA_DATABASE_URL`의 PostgreSQL 저장소와 인증 확장 스키마가 필요합니다. PR #33·#36 기본 스키마에는 아직 인증 확장이 없습니다. 저장소 미연결·조회 실패는 보호 요청 401, 로그인·갱신·로그아웃 저장 실패는 503이며 쿠키 삭제만으로 폐기 완료를 보고하지 않습니다.
 
 변경 요청에는 동일 출처 `Origin` 또는 출처 헤더 없는 서버 API 호출을 허용하고, 다른 `Origin`과 `Sec-Fetch-Site: cross-site`는 403으로 차단합니다. `APP_ORIGIN`을 실제 공개 주소로 설정하며 클라이언트가 보낸 forwarded host로 허용 출처를 바꾸지 않습니다.
 
 `APP_ORIGIN`을 지정하지 않은 개발 환경에서 Next가 요청 URL을 `localhost`로 구성한 경우, 동일 포트의 직접 `Host`가 `localhost`·`127.0.0.1`·`[::1]`이면 해당 출처를 사용합니다. 로컬 브라우저의 초안 저장·인증·문의 요청도 실제 접속 주소로 검사하며 forwarded 헤더는 사용하지 않습니다. 운영 환경이나 `APP_ORIGIN`이 지정된 환경에는 이 보정을 적용하지 않습니다.
+
+## 관리자 API (1단계 제안)
+
+운영자가 상품·재고, 주문, 입점 문의를 관리하는 계약입니다. 아래 경로·DTO·저장 구조는 Mock으로 먼저 검증한 **제안**이며, 1단계 합의(CRA-5 모델, CRA-6 DB·초기 관리자 발급, CRA-8 인증·인가)에서 확정합니다. FastAPI에는 아직 구현되지 않았습니다.
+
+### 권한
+
+- 별도 로그인 없이 기존 세션 쿠키를 사용합니다. `Member`에 `role: "member" | "admin"`을 추가하며 `Session.user.role`은 화면 표시용 힌트입니다.
+- FastAPI는 모든 `/api/v1/admin/**` 요청마다 세션의 실제 계정 역할을 다시 조회합니다. 미인증은 401, 일반 회원은 403입니다. 로그아웃·세션 만료·역할 회수 즉시 거절해야 합니다.
+- 요청 본문·헤더·쿼리의 `role`, 사용자 ID를 신뢰하지 않습니다. 회원가입 본문의 `role`은 무시하고 항상 `member`로 생성합니다.
+- 관리자 발급·회수는 운영 절차(CLI 또는 마이그레이션 시드)로만 수행하며 이번 범위에 권한 편집 UI는 없습니다. Mock은 개발용 계정을 자동 생성합니다([웹 개발 안내](../apps/web/README.md#데이터-소유권과-mock-api)).
+- 웹은 `/admin` 레이아웃에서 비회원·일반 회원·세션 만료 화면을 구분하지만, 이는 접근 통제가 아닙니다. 관리자 API가 401/403을 반환하면 웹은 세션을 다시 조회해 해당 화면으로 전환합니다.
+
+### 경로
+
+| 메서드 | BFF 경로                                     | 요청 / 성공 응답                                                                                 |
+| ------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| GET    | `/api/admin/overview`                        | `AdminOverview`: 최근 7일 주문 수·금액, 문의 상태별 건수, 재고 5개 이하 상품                     |
+| GET    | `/api/admin/products`                        | 쿼리 `q`, `collection`, `stock=low\|out`, `page` → `AdminPage<AdminProduct>`                     |
+| GET    | `/api/admin/products/{id}`                   | `AdminProductDetail`: 상품, 선택 가능한 이미지 경로, 변경 이력                                   |
+| PATCH  | `/api/admin/products/{id}`                   | `{ version, name?, englishName?, description?, price?, image?, featured?, isNew? }`              |
+| POST   | `/api/admin/products/{id}/stock-adjustments` | `{ version, delta, reason, key }` → 201 `AdminProductDetail`, 같은 `key` 재전송은 200            |
+| GET    | `/api/admin/orders`                          | 쿼리 `from`, `to`(`YYYY-MM-DD`, 한국 시간, 종료일 포함), `page` → `AdminPage<AdminOrderSummary>` |
+| GET    | `/api/admin/orders/{id}`                     | `AdminOrder`: 주문 당시 상품명·단가 스냅샷, 주문자 이름·이메일, 받는 분·배송지                   |
+| GET    | `/api/admin/inquiries`                       | 쿼리 `status=received\|reviewing\|done`, `page` → `AdminPage<AdminInquirySummary>`               |
+| GET    | `/api/admin/inquiries/{id}`                  | `AdminInquiry`: 문의 원문, 처리 상태, 내부 메모, 변경 이력                                       |
+| PATCH  | `/api/admin/inquiries/{id}`                  | `{ version, status?, memo? }` → `AdminInquiry`                                                   |
+
+DTO는 [관리자 모델](../apps/web/src/features/admin/model/admin.ts)에 정의합니다. `AdminPage<T>`는 `{ items, total, page, pageSize }`이며 `pageSize`는 20입니다. 소비자 DTO와 분리하며 `version`·이력·메모·문의 상태를 공개 카탈로그·회원·문의 접수 응답에 포함하지 않습니다.
+
+### 변경 규칙
+
+- 상품 PATCH는 위 필드만 반영하고 `id`·재고·컬렉션 등 나머지 필드는 무시합니다. 가격은 `null`(미정) 또는 0~10,000,000의 정수입니다. 이미지는 등록된 상품 이미지 경로 중에서만 선택하며 파일 업로드는 저장소·용량·검증 정책 확정 후 별도로 다룹니다.
+- 재고는 PATCH로 바꾸지 않고 조정 명령만 사용합니다. `delta`는 0이 아닌 정수, 조정 후 재고는 0~99,999, `reason`은 필수(200자 이하)입니다.
+- 모든 변경 요청은 읽은 시점의 `version`을 보내고, 현재 버전과 다르면 409로 거절합니다. 웹은 409에서 최신 데이터를 다시 조회하고 사용자에게 재확인을 요청합니다. 실제 DB에서는 같은 트랜잭션 안에서 버전 비교·재고 변경·이력 기록을 수행합니다(조건부 UPDATE 또는 행 잠금).
+- `key`는 재고 조정 1건의 idempotency 키(8~64자 영숫자·하이픈)입니다. 같은 키·같은 내용의 재전송은 다시 적용하지 않고 현재 상태를 200으로 반환하며, 같은 키로 다른 내용을 보내면 409입니다.
+- 가격 변경은 기존 주문의 상품·단가 스냅샷을 바꾸지 않습니다. 주문 상태 변경·취소·재고 복구는 정책·DB 확장 합의 후 추가하며 현재는 조회만 제공합니다.
+- 수정 작업마다 작업자·대상·시각·변경 전후 값·재고 조정 사유를 감사 기록에 남기고 상세 응답의 `history`로 최근 30건을 반환합니다. 내부 메모는 이력에 변경 사실만 표시합니다.
+- 관리자 응답의 고객 정보는 주문자 이름·이메일, 받는 분·배송지로 제한합니다. 비밀번호 해시·세션·토큰·소유자 키는 응답과 로그에 포함하지 않습니다.
+
+### 저장 구조 확장 제안
+
+[ERD](backend/ERD.md) 기준 추가 제안입니다. 이름과 타입은 CRA-5에서 확정합니다.
+
+- `members.role`: `VARCHAR(20) NOT NULL DEFAULT 'member'`, `CHECK IN ('member', 'admin')`
+- `products.version`, `products.updated_at`: 낙관적 잠금과 최근 수정 표시
+- `stock_adjustments`: `id`, `product_id`, `delta`, `stock_before`, `stock_after`, `reason`, `request_key UNIQUE`, `actor_id`, `created_at`
+- `partner_inquiries.status`(`received`·`reviewing`·`done`), `internal_memo`, `version`, `updated_at`
+- `admin_audit_logs`: `id`, `actor_id`, `action`, `target_type`, `target_id`, `changes JSONB`, `reason`, `created_at`
+- `order_items`: 주문 당시 상품명·용량·단가 스냅샷 컬럼 유지 또는 추가
+
+### 1단계에서 결정할 사항
+
+- 초기 관리자 발급·회수 절차와 운영·테스트 계정 분리 방식
+- 세션 쿠키 유지 여부(JWT 채택 시 폐기·역할 회수 즉시 반영 방법)
+- 감사 기록 보존 기간, 관리자 화면의 고객 개인정보 노출 범위
+- 주문 처리 상태 모델과 취소 시 재고 복구 정책
 
 ## 오류·전송 계약
 

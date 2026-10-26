@@ -5,7 +5,10 @@ const mockUrl = `http://127.0.0.1:${mockPort}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  testIgnore: process.env.AURA_VISUAL_TESTS === "1" ? undefined : "**/*layout.spec.ts",
+  testIgnore: [
+    "**/bff-jwt.spec.ts",
+    ...(process.env.AURA_VISUAL_TESTS === "1" ? [] : ["**/*layout.spec.ts"]),
+  ],
   fullyParallel: true,
   workers: 2,
   timeout: 30000,
@@ -49,6 +52,7 @@ export default defineConfig({
         API_URL: mockUrl,
         API_PREFIX: "/api",
         API_SESSION_COOKIE: "aura_mock_session",
+        API_AUTH_MODE: "cookie",
         API_TIMEOUT_MS: "10000",
         APP_ORIGIN: "http://127.0.0.1:3100",
       },

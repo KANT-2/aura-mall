@@ -27,11 +27,11 @@ class Settings(BaseSettings):
 
     @field_validator("database_url")
     @classmethod
-    def validate_database_url(cls, value):
+    def validate_database_url(cls, value: SecretStr | None) -> SecretStr | None:
         if value is not None:
             parts = urlsplit(value.get_secret_value())
             if (
-                parts.scheme not in {"postgres", "postgresql"}
+                parts.scheme not in {"postgres", "postgresql", "postgresql+asyncpg"}
                 or not parts.hostname
                 or not parts.path.strip("/")
             ):
