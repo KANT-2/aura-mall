@@ -1,8 +1,8 @@
 # AURA 백엔드 ERD
 
-> **상태:** 초안 · 팀 검토 전 · Linear CRA-5
+> **상태:** 초안 · Linear CRA-5, 관리자 확장 CRA-14 · **SQL:** [`apps/api/db/schema.sql`](../../apps/api/db/schema.sql), 초기 데이터 [`seed.sql`](../../apps/api/db/seed.sql)
 > **기준:** [FastAPI BFF 계약](../FASTAPI_BFF.md), Mock API(`apps/web/mock-server`), 상품 원본(`apps/web/mock-server/fixtures/catalog.json`)
-> **범위:** 회원·세션, 상품, 조향, 주문, 입점 문의. **장바구니는 백엔드 범위에서 제외**한다(프론트 보관).
+> **범위:** 회원·인증, 상품, 조향, 주문, 입점 문의, 관리자(재고 조정·감사 기록). **장바구니는 백엔드 범위에서 제외**한다(프론트 보관). 테이블 20개.
 
 ## 1. 이 문서의 역할
 
@@ -40,12 +40,17 @@ erDiagram
     order_items ||--o{ order_item_selections : "Gift Set 구성"
     user_coupons |o--o| orders : "사용"
 
+    products ||--o{ stock_adjustments : "재고 조정"
+    users ||--o{ stock_adjustments : "조정한 관리자"
+    users ||--o{ admin_audit_logs : "작업한 관리자"
+
     users {
         uuid id PK
         varchar email UK
         varchar name
         varchar password_hash
         boolean marketing
+        varchar role "member | admin"
         timestamptz created_at
     }
     user_coupons {
@@ -58,7 +63,7 @@ erDiagram
         timestamptz used_at
     }
     revoked_tokens {
-        uuid jti PK
+        varchar jti PK
         timestamptz expires_at
     }
     collections {
@@ -96,6 +101,8 @@ erDiagram
         boolean is_new
         smallint bestseller_rank
         smallint sort_order
+        int version
+        timestamptz updated_at
     }
     ingredients {
         varchar id PK
@@ -150,7 +157,7 @@ erDiagram
         smallint count
     }
     atelier_drafts {
-        uuid guest_id PK
+        varchar guest_id PK
         jsonb counts
         varchar name
         varchar label
@@ -198,6 +205,31 @@ erDiagram
         text introduction
         text message
         boolean consent
+        varchar status
+        text internal_memo
+        int version
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    stock_adjustments {
+        uuid id PK
+        varchar product_id FK
+        int delta
+        int stock_before
+        int stock_after
+        varchar reason
+        varchar request_key UK
+        uuid actor_id FK
+        timestamptz created_at
+    }
+    admin_audit_logs {
+        uuid id PK
+        uuid actor_id FK
+        varchar action
+        varchar target_type
+        varchar target_id
+        jsonb changes
+        varchar reason
         timestamptz created_at
     }
 ```
@@ -211,18 +243,19 @@ erDiagram
 - 시간은 `TIMESTAMPTZ`(UTC 저장). API 응답은 ISO 8601 문자열.
 - API JSON 이름은 camelCase(`englishName`), DB 컬럼은 snake_case(`english_name`)로 두고 응답 모델에서 변환한다.
 
-### 3.1 회원·세션
+### 3.1 회원·인증
 
 **users** — 회원
 
-| 컬럼          | 타입         | 제약                         | 설명                                     |
-| ------------- | ------------ | ---------------------------- | ---------------------------------------- |
-| id            | UUID         | PK                           | 회원 ID (`Member.id`)                    |
-| email         | VARCHAR(254) | NOT NULL, UK(`lower(email)`) | 소문자로 저장, 대소문자 무관 중복 금지   |
-| name          | VARCHAR(100) | NOT NULL                     | 이름                                     |
-| password_hash | VARCHAR(255) | NOT NULL                     | 서버 해시값(Argon2id 등). 평문 저장 금지 |
-| marketing     | BOOLEAN      | NOT NULL DEFAULT false       | 마케팅 수신 동의                         |
-| created_at    | TIMESTAMPTZ  | NOT NULL DEFAULT now()       | 가입 시각                                |
+| 컬럼          | 타입         | 제약                                                    | 설명                                                     |
+| ------------- | ------------ | ------------------------------------------------------- | -------------------------------------------------------- |
+| id            | UUID         | PK                                                      | 회원 ID (`Member.id`)                                    |
+| email         | VARCHAR(254) | NOT NULL, UK(`lower(email)`)                            | 소문자로 저장, 대소문자 무관 중복 금지                   |
+| name          | VARCHAR(100) | NOT NULL                                                | 이름                                                     |
+| password_hash | VARCHAR(255) | NOT NULL                                                | 서버 해시값(Argon2id 등). 평문 저장 금지                 |
+| marketing     | BOOLEAN      | NOT NULL DEFAULT false                                  | 마케팅 수신 동의                                         |
+| role          | VARCHAR(20)  | NOT NULL DEFAULT 'member', CHECK IN (`member`, `admin`) | 관리자 API 권한. 가입 본문의 role은 무시하고 항상 member |
+| created_at    | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                  | 가입 시각                                                |
 
 **user_coupons** — 신규 회원 배송비 쿠폰
 
@@ -241,12 +274,12 @@ erDiagram
 
 **revoked_tokens** — 로그아웃한 세션 토큰(JWT) 차단 목록
 
-| 컬럼       | 타입        | 제약            | 설명                                      |
-| ---------- | ----------- | --------------- | ----------------------------------------- |
-| jti        | UUID        | PK              | 토큰 고유 번호                            |
-| expires_at | TIMESTAMPTZ | NOT NULL, INDEX | 원래 만료 시각. 지난 행은 주기적으로 삭제 |
+| 컬럼       | 타입        | 제약            | 설명                                                         |
+| ---------- | ----------- | --------------- | ------------------------------------------------------------ |
+| jti        | VARCHAR(64) | PK              | 토큰 고유 번호 (UUID로 제한하지 않음, 공통 인증 모듈과 동일) |
+| expires_at | TIMESTAMPTZ | NOT NULL, INDEX | 원래 만료 시각. 지난 행은 주기적으로 삭제                    |
 
-> 세션 방식(쿠키 값을 JWT로 발급)은 공통 모듈과 합의가 필요하다. 불투명 세션 ID 방식으로 정하면 이 테이블 대신 `sessions(id, guest_id, user_id, expires_at)`를 둔다. 비회원 식별값 `guestId`는 어느 방식이든 세션에 들어 있고 별도 테이블은 두지 않는다.
+> 인증은 JWT로 결정했다(쿠키 값 = 서명된 JWT). 서버 세션 테이블은 두지 않는다. 비회원 식별값 `guestId`는 JWT 안에 있고 별도 테이블은 두지 않는다.
 
 ### 3.2 상품 (공용 카탈로그)
 
@@ -275,28 +308,30 @@ erDiagram
 
 **products** — 상품 30개 (단품 27 + Gift Set 3)
 
-| 컬럼            | 타입         | 제약                                | 설명                                   |
-| --------------- | ------------ | ----------------------------------- | -------------------------------------- |
-| id              | VARCHAR(50)  | PK                                  | `fresh-hand-cream` 등 원본 ID          |
-| collection_id   | VARCHAR(20)  | FK → collections, NOT NULL, INDEX   |                                        |
-| type_id         | VARCHAR(30)  | FK → product_types, NOT NULL, INDEX |                                        |
-| name            | VARCHAR(100) | NOT NULL                            |                                        |
-| english_name    | VARCHAR(100) | NOT NULL                            |                                        |
-| volume          | VARCHAR(30)  | NOT NULL                            | `50 mL`, Gift Set은 `3종 구성`         |
-| price           | INTEGER      | NULL, CHECK(price ≥ 0)              | **NULL = 가격 확인 중** (Gift Set 3종) |
-| stock           | INTEGER      | NOT NULL, CHECK(stock ≥ 0)          | 재고                                   |
-| image           | VARCHAR(255) | NOT NULL                            | 프론트 `public/` 경로                  |
-| image_url       | VARCHAR(255) | NOT NULL                            |                                        |
-| description     | TEXT         | NOT NULL                            |                                        |
-| category        | VARCHAR(50)  | NOT NULL                            |                                        |
-| notes           | TEXT[]       | NOT NULL                            | 향 노트 이름                           |
-| note_images     | JSONB        | NULL                                | `{ 노트 이름: 이미지 경로 }`           |
-| gift_images     | TEXT[]       | NULL                                | Gift Set 대표 이미지 3장               |
-| featured        | BOOLEAN      | NOT NULL DEFAULT false              |                                        |
-| is_new          | BOOLEAN      | NOT NULL DEFAULT false              |                                        |
-| bestseller_rank | SMALLINT     | NULL, UK                            | 홈 베스트셀러 순서. NULL = 대상 아님   |
-| sort_order      | SMALLINT     | NOT NULL                            | 카탈로그 원본 순서                     |
-|                 |              | UK(collection_id, type_id)          | 컬렉션마다 유형별 상품 1개             |
+| 컬럼            | 타입         | 제약                                | 설명                                       |
+| --------------- | ------------ | ----------------------------------- | ------------------------------------------ |
+| id              | VARCHAR(50)  | PK                                  | `fresh-hand-cream` 등 원본 ID              |
+| collection_id   | VARCHAR(20)  | FK → collections, NOT NULL, INDEX   |                                            |
+| type_id         | VARCHAR(30)  | FK → product_types, NOT NULL, INDEX |                                            |
+| name            | VARCHAR(100) | NOT NULL                            |                                            |
+| english_name    | VARCHAR(100) | NOT NULL                            |                                            |
+| volume          | VARCHAR(30)  | NOT NULL                            | `50 mL`, Gift Set은 `3종 구성`             |
+| price           | INTEGER      | NULL, CHECK(0~10,000,000)           | **NULL = 가격 확인 중** (Gift Set 3종)     |
+| stock           | INTEGER      | NOT NULL, CHECK(0~99,999)           | 재고                                       |
+| image           | VARCHAR(255) | NOT NULL                            | 프론트 `public/` 경로                      |
+| image_url       | VARCHAR(255) | NOT NULL                            |                                            |
+| description     | TEXT         | NOT NULL                            |                                            |
+| category        | VARCHAR(50)  | NOT NULL                            |                                            |
+| notes           | TEXT[]       | NOT NULL                            | 향 노트 이름                               |
+| note_images     | JSONB        | NULL                                | `{ 노트 이름: 이미지 경로 }`               |
+| gift_images     | TEXT[]       | NULL                                | Gift Set 대표 이미지 3장                   |
+| featured        | BOOLEAN      | NOT NULL DEFAULT false              |                                            |
+| is_new          | BOOLEAN      | NOT NULL DEFAULT false              |                                            |
+| bestseller_rank | SMALLINT     | NULL, UK                            | 홈 베스트셀러 순서. NULL = 대상 아님       |
+| sort_order      | SMALLINT     | NOT NULL                            | 카탈로그 원본 순서                         |
+| version         | INTEGER      | NOT NULL DEFAULT 1                  | 관리자 수정 시 동시 수정 방지(낙관적 잠금) |
+| updated_at      | TIMESTAMPTZ  | NULL                                | 마지막 관리자 수정 시각                    |
+|                 |              | UK(collection_id, type_id)          | 컬렉션마다 유형별 상품 1개                 |
 
 > `typeName`은 `product_types.name`에서 가져오고 상품에 중복 저장하지 않는다.
 
@@ -368,33 +403,33 @@ erDiagram
 
 **atelier_drafts** — 조향 중인 초안 (방문자별 1개)
 
-| 컬럼       | 타입        | 제약                                               | 설명                                   |
-| ---------- | ----------- | -------------------------------------------------- | -------------------------------------- |
-| guest_id   | UUID        | PK                                                 | 세션의 `guestId`. 로그인 전후에도 유지 |
-| counts     | JSONB       | NOT NULL                                           | `{ 향료 ID: 횟수 }`                    |
-| name       | VARCHAR(30) | NOT NULL DEFAULT ''                                |                                        |
-| label      | VARCHAR(10) | NOT NULL, CHECK IN (`classic`, `paper`, `minimal`) |                                        |
-| step       | VARCHAR(10) | NOT NULL, CHECK IN (`select`, `result`)            |                                        |
-| updated_at | TIMESTAMPTZ | NOT NULL DEFAULT now()                             | 오래된 초안 정리 기준                  |
+| 컬럼       | 타입        | 제약                                               | 설명                                  |
+| ---------- | ----------- | -------------------------------------------------- | ------------------------------------- |
+| guest_id   | VARCHAR(64) | PK                                                 | JWT의 `guestId`. 로그인 전후에도 유지 |
+| counts     | JSONB       | NOT NULL                                           | `{ 향료 ID: 횟수 }`                   |
+| name       | VARCHAR(30) | NOT NULL DEFAULT ''                                |                                       |
+| label      | VARCHAR(10) | NOT NULL, CHECK IN (`classic`, `paper`, `minimal`) |                                       |
+| step       | VARCHAR(10) | NOT NULL, CHECK IN (`select`, `result`)            |                                       |
+| updated_at | TIMESTAMPTZ | NOT NULL DEFAULT now()                             | 오래된 초안 정리 기준                 |
 
 ### 3.4 주문
 
 **orders** — 주문 접수 (실제 결제 없음)
 
-| 컬럼            | 타입         | 제약                            | 설명                               |
-| --------------- | ------------ | ------------------------------- | ---------------------------------- |
-| id              | UUID         | PK                              | `Order.id`                         |
-| user_id         | UUID         | FK → users, NOT NULL            | 회원만 주문 내역 조회              |
-| recipient       | VARCHAR(100) | NOT NULL                        | 받는 분                            |
-| address         | VARCHAR(500) | NOT NULL                        | 주소                               |
-| items_amount    | INTEGER      | NOT NULL, CHECK ≥ 0             | 서버가 계산한 상품 합계            |
-| shipping_fee    | INTEGER      | NOT NULL, CHECK ≥ 0             | 0 또는 3,000                       |
-| total           | INTEGER      | NOT NULL, CHECK ≥ 0             | `Order.total` = 상품 합계 + 배송비 |
-| coupon_id       | UUID         | FK → user_coupons, NULL         | 사용한 쿠폰                        |
-| idempotency_key | VARCHAR(64)  | NULL                            | 같은 주문 중복 생성 방지           |
-| created_at      | TIMESTAMPTZ  | NOT NULL DEFAULT now()          | `Order.created`                    |
-|                 |              | UK(user_id, idempotency_key)    |                                    |
-|                 |              | INDEX(user_id, created_at DESC) | 내 주문 최신순 조회                |
+| 컬럼            | 타입         | 제약                                                     | 설명                               |
+| --------------- | ------------ | -------------------------------------------------------- | ---------------------------------- |
+| id              | UUID         | PK                                                       | `Order.id`                         |
+| user_id         | UUID         | FK → users, NOT NULL                                     | 회원만 주문 내역 조회              |
+| recipient       | VARCHAR(100) | NOT NULL                                                 | 받는 분                            |
+| address         | VARCHAR(500) | NOT NULL                                                 | 주소                               |
+| items_amount    | INTEGER      | NOT NULL, CHECK ≥ 0, total = items_amount + shipping_fee | 서버가 계산한 상품 합계            |
+| shipping_fee    | INTEGER      | NOT NULL, CHECK ≥ 0                                      | 0 또는 3,000                       |
+| total           | INTEGER      | NOT NULL, CHECK ≥ 0                                      | `Order.total` = 상품 합계 + 배송비 |
+| coupon_id       | UUID         | FK → user_coupons, NULL                                  | 사용한 쿠폰                        |
+| idempotency_key | VARCHAR(64)  | NULL                                                     | 같은 주문 중복 생성 방지           |
+| created_at      | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                   | `Order.created`                    |
+|                 |              | UK(user_id, idempotency_key)                             |                                    |
+|                 |              | INDEX(user_id, created_at DESC)                          | 내 주문 최신순 조회                |
 
 **order_items** — 주문 항목 (주문 시점 스냅샷)
 
@@ -425,34 +460,73 @@ erDiagram
 
 **partner_inquiries**
 
-| 컬럼         | 타입         | 제약                   | 설명                                              |
-| ------------ | ------------ | ---------------------- | ------------------------------------------------- |
-| id           | UUID         | PK                     | 응답 `{ id }`                                     |
-| brand        | VARCHAR(100) | NOT NULL               |                                                   |
-| name         | VARCHAR(50)  | NOT NULL               | 담당자                                            |
-| email        | VARCHAR(254) | NOT NULL               |                                                   |
-| website      | VARCHAR(255) | NULL                   |                                                   |
-| type         | VARCHAR(30)  | NOT NULL               | 향수 / 바디 · 헤어 / 홈 프래그런스 / 기타 향 제품 |
-| introduction | TEXT         | NOT NULL, ≤ 3,000자    |                                                   |
-| message      | TEXT         | NOT NULL, ≤ 3,000자    |                                                   |
-| consent      | BOOLEAN      | NOT NULL, CHECK(true)  | 폼의 `"on"`을 true로 저장                         |
-| created_at   | TIMESTAMPTZ  | NOT NULL DEFAULT now() |                                                   |
+| 컬럼          | 타입         | 제약                                                                    | 설명                                              |
+| ------------- | ------------ | ----------------------------------------------------------------------- | ------------------------------------------------- |
+| id            | UUID         | PK                                                                      | 응답 `{ id }`                                     |
+| brand         | VARCHAR(100) | NOT NULL                                                                |                                                   |
+| name          | VARCHAR(50)  | NOT NULL                                                                | 담당자                                            |
+| email         | VARCHAR(254) | NOT NULL                                                                |                                                   |
+| website       | VARCHAR(255) | NULL                                                                    |                                                   |
+| type          | VARCHAR(30)  | NOT NULL                                                                | 향수 / 바디 · 헤어 / 홈 프래그런스 / 기타 향 제품 |
+| introduction  | TEXT         | NOT NULL, ≤ 3,000자                                                     |                                                   |
+| message       | TEXT         | NOT NULL, ≤ 3,000자                                                     |                                                   |
+| consent       | BOOLEAN      | NOT NULL, CHECK(true)                                                   | 폼의 `"on"`을 true로 저장                         |
+| status        | VARCHAR(20)  | NOT NULL DEFAULT 'received', CHECK IN (`received`, `reviewing`, `done`) | 관리자 처리 상태                                  |
+| internal_memo | TEXT         | NOT NULL DEFAULT ''                                                     | 관리자 내부 메모 (공개 응답에 포함하지 않음)      |
+| version       | INTEGER      | NOT NULL DEFAULT 1                                                      | 관리자 수정 시 동시 수정 방지                     |
+| created_at    | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                                  |                                                   |
+| updated_at    | TIMESTAMPTZ  | NULL                                                                    | 마지막 관리자 수정 시각                           |
+
+### 3.6 관리자 (재고 조정·감사 기록)
+
+관리자 API 계약([FASTAPI_BFF.md](../FASTAPI_BFF.md) "관리자 API")을 위한 확장이다. 관리자 여부는 `users.role`로 판단하고, 요청마다 DB에서 다시 확인한다.
+
+**stock_adjustments** — 재고 조정 기록 (재고는 PATCH가 아니라 조정 명령으로만 바꾼다)
+
+| 컬럼         | 타입         | 제약                                              | 설명                              |
+| ------------ | ------------ | ------------------------------------------------- | --------------------------------- |
+| id           | UUID         | PK                                                |                                   |
+| product_id   | VARCHAR(50)  | FK → products, NOT NULL                           |                                   |
+| delta        | INTEGER      | NOT NULL, CHECK(delta ≠ 0)                        | 늘리면 양수, 줄이면 음수          |
+| stock_before | INTEGER      | NOT NULL                                          |                                   |
+| stock_after  | INTEGER      | NOT NULL, CHECK(= stock_before + delta, 0~99,999) |                                   |
+| reason       | VARCHAR(200) | NOT NULL, 공백만은 불가                           | 조정 사유 (필수)                  |
+| request_key  | VARCHAR(64)  | NOT NULL, UK                                      | 같은 조정 재전송을 막는 멱등성 키 |
+| actor_id     | UUID         | FK → users, NOT NULL                              | 조정한 관리자                     |
+| created_at   | TIMESTAMPTZ  | NOT NULL DEFAULT now()                            |                                   |
+
+**admin_audit_logs** — 관리자 작업 감사 기록 (상세 화면의 `history` 최근 30건)
+
+| 컬럼        | 타입         | 제약                                                                     | 설명                                             |
+| ----------- | ------------ | ------------------------------------------------------------------------ | ------------------------------------------------ |
+| id          | UUID         | PK                                                                       |                                                  |
+| actor_id    | UUID         | FK → users, NOT NULL                                                     | 작업한 관리자                                    |
+| action      | VARCHAR(40)  | NOT NULL, CHECK IN (`product.update`, `product.stock`, `inquiry.update`) |                                                  |
+| target_type | VARCHAR(20)  | NOT NULL, CHECK IN (`product`, `inquiry`)                                |                                                  |
+| target_id   | VARCHAR(64)  | NOT NULL                                                                 | 상품 ID 또는 문의 ID                             |
+| changes     | JSONB        | NOT NULL DEFAULT '[]'                                                    | `[{ field, from, to }]`. 내부 메모는 변경 사실만 |
+| reason      | VARCHAR(200) | NULL                                                                     | 재고 조정 사유 등                                |
+| created_at  | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                                   |                                                  |
+|             |              | INDEX(target_type, target_id, created_at DESC)                           | 대상별 최근 이력                                 |
+
+> 관리자 수정은 같은 트랜잭션 안에서 **버전 비교 → 변경 → 이력 기록**을 한다. 버전이 다르면 409. 주문 상태 변경·취소는 정책 합의 전까지 조회만 제공한다.
 
 ## 4. 계약 경로 ↔ 테이블
 
-| BFF 경로                                    | 읽기                                                                                                                     | 쓰기                                                                     |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| `GET /catalog`                              | collections, product_types, products, ingredients, scent_families, scent_family_ingredients, suggested_names, promotions | —                                                                        |
-| `GET /catalog/products/{id}`                | products                                                                                                                 | —                                                                        |
-| `GET /session`                              | users, user_coupons, revoked_tokens                                                                                      | —                                                                        |
-| `POST /auth/register`                       | users                                                                                                                    | users, user_coupons                                                      |
-| `POST /auth/login`                          | users                                                                                                                    | —                                                                        |
-| `POST /auth/logout`                         | —                                                                                                                        | revoked_tokens                                                           |
-| `GET·POST /recipes`, `DELETE /recipes/{id}` | recipes, recipe_ingredients, ingredients                                                                                 | recipes, recipe_ingredients                                              |
-| `GET·PUT·DELETE /atelier/draft`             | atelier_drafts, ingredients                                                                                              | atelier_drafts                                                           |
-| `GET·POST /orders`                          | orders, order_items, order_item_selections, products                                                                     | orders, order_items, order_item_selections, products(재고), user_coupons |
-| `POST /partner`                             | —                                                                                                                        | partner_inquiries                                                        |
-| ~~`/cart`~~                                 | 범위 제외                                                                                                                | 범위 제외                                                                |
+| BFF 경로                                    | 읽기                                                                                                                     | 쓰기                                                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `GET /catalog`                              | collections, product_types, products, ingredients, scent_families, scent_family_ingredients, suggested_names, promotions | —                                                                                      |
+| `GET /catalog/products/{id}`                | products                                                                                                                 | —                                                                                      |
+| `GET /session`                              | users, user_coupons, revoked_tokens                                                                                      | —                                                                                      |
+| `POST /auth/register`                       | users                                                                                                                    | users, user_coupons                                                                    |
+| `POST /auth/login`                          | users                                                                                                                    | —                                                                                      |
+| `POST /auth/logout`                         | —                                                                                                                        | revoked_tokens                                                                         |
+| `GET·POST /recipes`, `DELETE /recipes/{id}` | recipes, recipe_ingredients, ingredients                                                                                 | recipes, recipe_ingredients                                                            |
+| `GET·PUT·DELETE /atelier/draft`             | atelier_drafts, ingredients                                                                                              | atelier_drafts                                                                         |
+| `GET·POST /orders`                          | orders, order_items, order_item_selections, products                                                                     | orders, order_items, order_item_selections, products(재고), user_coupons               |
+| `POST /partner`                             | —                                                                                                                        | partner_inquiries                                                                      |
+| `/admin/**` (관리자 API)                    | users(role), products, orders, order_items, partner_inquiries, admin_audit_logs                                          | products(정보·재고), stock_adjustments, partner_inquiries(상태·메모), admin_audit_logs |
+| ~~`/cart`~~                                 | 범위 제외                                                                                                                | 범위 제외                                                                              |
 
 ## 5. 설계 결정
 
