@@ -17,6 +17,10 @@ export function Partner() {
     e.preventDefault();
     setError("");
     const form = e.currentTarget;
+    form.querySelectorAll('[aria-invalid="true"]').forEach((element) => {
+      element.removeAttribute("aria-invalid");
+      element.removeAttribute("aria-describedby");
+    });
     const invalid = [
       ...form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
         "input:not([type=hidden]),textarea",

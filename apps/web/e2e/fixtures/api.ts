@@ -3,7 +3,8 @@ import { cart, member, originalRecipe, resumedDraft, savedRecipe } from "./data"
 import { CART_STORAGE_KEY } from "@/features/cart/storage/cart-storage";
 
 export async function seedApi(page: Page, data: Record<string, unknown>) {
-  const response = await page.request.post("http://127.0.0.1:4000/__test__/seed", { data });
+  const port = process.env.AURA_E2E_MOCK_PORT ?? "4000";
+  const response = await page.request.post(`http://127.0.0.1:${port}/__test__/seed`, { data });
   if (!response.ok()) {
     throw new Error(`Mock API fixture failed: ${await response.text()}`);
   }

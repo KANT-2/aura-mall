@@ -138,6 +138,8 @@ npm run test:e2e
 
 Playwright는 포트 4000의 메모리 Mock API와 포트 3100의 프로덕션 Next BFF 서버를 자동 시작·종료합니다. 기본 검증은 데스크톱·모바일 조작, 로그인·로그아웃 후 로컬 장바구니 유지, 새로고침·탭 간 동기화·저장 실패, 검색 URL 동기화, 조향 초안 복원·초기화, 혼합·센서 권한 정리를 포함합니다. 실제 iPhone Safari의 센서·권한 동작은 기기 검증이 필요합니다.
 
+개발 서버를 켜 둔 채 검증하려면 `AURA_E2E_MOCK_PORT=4100 npm run test:e2e`로 테스트 Mock 포트를 분리합니다. 반응형 회귀 검증에는 320px 가로 넘침, 상품 사진과 제목의 겹침, Gift Set 선택·축소 이미지, 조향 결과 버튼 배치, 컬렉션 설명 정렬도 포함합니다.
+
 테스트 선택자는 화면 문구·CSS 클래스와 분리합니다. 역할은 `getByRole`, 특정 조작은 `src/lib/test-ids.ts`의 식별자를 사용합니다. 선택자와 반복 조작은 `e2e/pages`, 데이터와 API 시드는 `e2e/fixtures`, 명세는 사용자 시나리오와 독립적인 기대 결과를 담당합니다. [Playwright Best Practices](https://playwright.dev/docs/best-practices)와 [Page Object Models](https://playwright.dev/docs/pom)를 기준으로 합니다.
 
 스크린샷 기준 `e2e/snapshots/`는 Git에서 제외합니다. 기본 E2E는 이미지 비교를 제외하므로 새 체크아웃에서도 실행됩니다. 로컬 기준 파일이 있으면 다음 명령으로 데스크톱·태블릿·모바일 화면을 비교합니다.
