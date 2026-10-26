@@ -30,15 +30,14 @@ CREATE TABLE refresh_tokens (
     expires_at timestamptz NOT NULL,
     consumed_at timestamptz,
     revoked_at timestamptz,
+    access_jti uuid NOT NULL UNIQUE,
+    access_expires_at timestamptz NOT NULL,
     FOREIGN KEY (family_id, user_id) REFERENCES auth_token_families(id, user_id),
-    CHECK (expires_at > created_at)
+    CHECK (expires_at > created_at),
+    CHECK (access_expires_at > created_at)
 );
 CREATE INDEX refresh_family_test ON refresh_tokens(family_id);
 CREATE INDEX refresh_expiry_test ON refresh_tokens(expires_at);
-CREATE TABLE auth_access_tokens (
-    jti uuid PRIMARY KEY,
-    family_id uuid NOT NULL REFERENCES auth_token_families(id),
-    expires_at timestamptz NOT NULL
-);
-CREATE INDEX access_family_test ON auth_access_tokens(family_id);
-CREATE INDEX access_expiry_test ON auth_access_tokens(expires_at);
+CREATE INDEX access_expiry_test ON refresh_tokens(access_expires_at);
+CREATE UNIQUE INDEX refresh_one_unused_per_family_test ON refresh_tokens(family_id)
+    WHERE consumed_at IS NULL AND revoked_at IS NULL;

@@ -64,6 +64,12 @@ def extension_metadata():
             "expression": None,
             "key_count": 1,
         },
+        {
+            "table_name": "refresh_tokens",
+            "columns": ["access_jti"],
+            "expression": None,
+            "key_count": 1,
+        },
     ]
     return columns, constraints, indexes
 
@@ -109,8 +115,9 @@ def pr33_metadata():
 def test_merged_base_is_compatible_but_required_extension_is_missing():
     gaps = contract_gaps(*pr33_metadata(), "public")
     assert "users.is_active: missing column" in gaps
-    for table in ("refresh_tokens", "auth_token_families", "auth_access_tokens"):
+    for table in ("refresh_tokens", "auth_token_families"):
         assert f"{table}: missing table" in gaps
+    assert not any("auth_access_tokens" in gap for gap in gaps)
     assert not any(
         gap.startswith("revoked_tokens:") or gap.startswith("revoked_tokens.") for gap in gaps
     )
@@ -119,6 +126,37 @@ def test_merged_base_is_compatible_but_required_extension_is_missing():
 
 def test_pending_extension_passes_structural_guard_without_assuming_approval():
     assert contract_gaps(*extension_metadata(), "public") == []
+
+
+@pytest.mark.parametrize("column", ["access_jti", "access_expires_at"])
+@pytest.mark.parametrize("mutation", ["missing", "nullable", "type"])
+def test_access_metadata_is_required_on_refresh_rows(column, mutation):
+    columns, constraints, indexes = extension_metadata()
+    row = next(row for row in columns if row["column_name"] == column)
+    if mutation == "missing":
+        columns.remove(row)
+    elif mutation == "nullable":
+        row["is_nullable"] = "YES"
+    else:
+        row["udt_name"] = "varchar"
+    assert any(
+        gap.startswith(f"refresh_tokens.{column}:")
+        for gap in contract_gaps(columns, constraints, indexes, "public")
+    )
+
+
+@pytest.mark.parametrize("replacement", [None, ["access_jti", "family_id"]])
+def test_access_jti_requires_its_own_unconditional_unique_index(replacement):
+    columns, constraints, indexes = extension_metadata()
+    index = next(row for row in indexes if row["columns"] == ["access_jti"])
+    if replacement is None:
+        indexes.remove(index)
+    else:
+        index["columns"] = replacement
+        index["key_count"] = 2
+    assert "refresh_tokens.access_jti: missing unconditional unique index" in contract_gaps(
+        columns, constraints, indexes, "public"
+    )
 
 
 @pytest.mark.parametrize(
@@ -139,7 +177,7 @@ def test_incomplete_or_incompatible_extension_is_rejected(mutation):
     elif mutation == "foreign":
         constraints = [row for row in constraints if row["kind"] != "f"]
     elif mutation == "hash-unique":
-        indexes = indexes[:1]
+        indexes = [row for row in indexes if row["columns"] != ["token_hash"]]
     else:
         indexes = indexes[1:]
     assert contract_gaps(columns, constraints, indexes, "public")

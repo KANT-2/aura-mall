@@ -26,20 +26,19 @@ REQUIRED_COLUMNS = {
         "expires_at": "timestamptz!",
         "consumed_at": "timestamptz?",
         "revoked_at": "timestamptz?",
+        "access_jti": "uuid!",
+        "access_expires_at": "timestamptz!",
     },
-    "auth_access_tokens": {"jti": "uuid!", "family_id": "uuid!", "expires_at": "timestamptz!"},
 }
 PRIMARY_KEYS = {
     "users": ("id",),
     "revoked_tokens": ("jti",),
     "auth_token_families": ("id",),
     "refresh_tokens": ("id",),
-    "auth_access_tokens": ("jti",),
 }
 FOREIGN_KEYS = (
     ("auth_token_families", ("user_id",), "users", ("id",)),
     ("refresh_tokens", ("family_id", "user_id"), "auth_token_families", ("id", "user_id")),
-    ("auth_access_tokens", ("family_id",), "auth_token_families", ("id",)),
 )
 
 
@@ -94,6 +93,8 @@ def contract_gaps(
     unique = {(row["table_name"], tuple(row["columns"])) for row in indexes}
     if ("refresh_tokens", ("token_hash",)) not in unique:
         gaps.append("refresh_tokens.token_hash: missing unconditional unique index")
+    if ("refresh_tokens", ("access_jti",)) not in unique:
+        gaps.append("refresh_tokens.access_jti: missing unconditional unique index")
     if not any(
         row["table_name"] == "users"
         and row["key_count"] == 1
