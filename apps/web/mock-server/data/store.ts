@@ -21,7 +21,6 @@ export type Order = {
 export type Database = {
   accounts: Record<string, Account>;
   sessions: Record<string, MockSession>;
-  carts: Record<string, CartItem[]>;
   recipes: Record<string, Recipe[]>;
   drafts: Record<string, AtelierDraft>;
   orders: Order[];
@@ -30,7 +29,6 @@ export type Database = {
 const empty = (): Database => ({
   accounts: {},
   sessions: {},
-  carts: {},
   recipes: {},
   drafts: {},
   orders: [],
@@ -40,6 +38,8 @@ export function createDatabase(filename?: string) {
   let state = empty();
   if (filename && existsSync(filename)) {
     state = JSON.parse(readFileSync(filename, "utf8")) as Database;
+    // Carts moved to browser storage; do not persist legacy server carts again.
+    Reflect.deleteProperty(state, "carts");
   }
 
   return {

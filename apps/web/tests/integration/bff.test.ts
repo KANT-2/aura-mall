@@ -6,7 +6,8 @@ vi.mock("server-only", () => ({}));
 import { GET as catalog } from "@/app/api/catalog/route";
 import { GET as session } from "@/app/api/session/route";
 import { POST as login } from "@/app/api/auth/login/route";
-import { PATCH as quantity } from "@/app/api/cart/items/[key]/route";
+import { PUT as saveDraft } from "@/app/api/atelier/draft/route";
+import { DELETE as removeRecipe } from "@/app/api/recipes/[id]/route";
 import { DELETE as removeDraft } from "@/app/api/atelier/draft/route";
 import { createBffHandler } from "@/server/bff/handler";
 import { serverRequest } from "@/lib/api/server";
@@ -95,9 +96,9 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
   });
 
   it("forwards only the session and owner headers and creates its own request ID", async () => {
-    const response = await quantity(
-      request("/api/cart/items/product", {
-        method: "PATCH",
+    const response = await saveDraft(
+      request("/api/atelier/draft", {
+        method: "PUT",
         headers: {
           Cookie: "analytics=secret; aura_session=session-token; other=value",
           Authorization: "Bearer secret",
@@ -106,9 +107,8 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
           "X-Request-ID": "untrusted",
           "X-User-ID": "admin",
         },
-        body: JSON.stringify({ quantity: 2 }),
+        body: JSON.stringify({ counts: { rose: 2 }, name: "초안", label: "paper", step: "select" }),
       }),
-      { params: Promise.resolve({ key: "fresh-gift-set:fresh-candle,fresh-hand-cream" }) },
     );
     expect(response.status).toBe(200);
     expect(calls[0].headers.cookie).toBe("aura_session=session-token");
@@ -117,9 +117,18 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
     expect(calls[0].headers["x-user-id"]).toBeUndefined();
     expect(calls[0].headers["x-request-id"]).toBe(response.headers.get("x-request-id"));
     expect(calls[0].headers["x-request-id"]).not.toBe("untrusted");
-    expect(calls[0].url).toBe("/api/cart/items/fresh-gift-set%3Afresh-candle%2Cfresh-hand-cream");
-    expect(JSON.parse(calls[0].body)).toEqual({ quantity: 2 });
+    expect(calls[0].url).toBe("/api/atelier/draft");
+    expect(JSON.parse(calls[0].body)).toEqual({
+      counts: { rose: 2 },
+      name: "초안",
+      label: "paper",
+      step: "select",
+    });
     expect(response.headers.get("vary")).toBe("Cookie");
+    await removeRecipe(request("/api/recipes/recipe", { method: "DELETE" }), {
+      params: Promise.resolve({ id: "recipe:1,2" }),
+    });
+    expect(calls[1].url).toBe("/api/recipes/recipe%3A1%2C2");
   });
 
   it("binds allowed response cookies to the BFF host, preserves expiry, and supports deletion", async () => {
@@ -294,8 +303,8 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
     for (const key of ["../auth", "..", "\\\\evil", "id?url=evil"]) {
       expect(
         (
-          await quantity(request("/api/cart/items/id", { method: "PATCH" }), {
-            params: Promise.resolve({ key }),
+          await removeRecipe(request("/api/recipes/id", { method: "DELETE" }), {
+            params: Promise.resolve({ id: key }),
           })
         ).status,
       ).toBe(400);

@@ -126,11 +126,11 @@ export function ProductDetail({ product: p }: { product: Product }) {
           <div className="purchase-row">
             <Quantity max={MAX_QUANTITY} n={n} set={setN} />
             <button
+              data-testid={testIds.catalog.addToCart}
               className="button"
               disabled={gift && selection.length !== 3}
-              onClick={() => {
-                add(p, n, selection);
-                setAdded(true);
+              onClick={async () => {
+                setAdded(await add(p, n, selection));
               }}
             >
               장바구니 담기 <Arrow />

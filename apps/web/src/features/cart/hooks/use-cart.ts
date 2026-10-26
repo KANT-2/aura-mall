@@ -1,39 +1,28 @@
 "use client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "@/features/account/hooks/use-session";
+import { useMemo, useSyncExternalStore } from "react";
 import { useNotify } from "@/components/feedback/notification-provider";
 import type { Product } from "@/features/catalog/model/catalog";
 import type { CustomRecipeItem } from "@/features/cart/model/cart";
-import { cartKey, getCart, mutateCart, type CartCommand } from "@/features/cart/api/cart";
+import { useCatalog } from "@/features/catalog/hooks/use-catalog";
+import { applyCartCommand, type CartCommand } from "@/features/cart/model/cart-commands";
+import {
+  cartSnapshot,
+  serverCartSnapshot,
+  subscribeCart,
+  restoreStoredCart,
+  writeCart,
+} from "@/features/cart/storage/cart-storage";
 
 export function useCart() {
-  const { owner, ready: sessionReady } = useSession();
-  const client = useQueryClient();
+  const catalog = useCatalog();
   const notify = useNotify();
-  const key = cartKey(owner);
-  const query = useQuery({
-    queryKey: key,
-    queryFn: ({ signal }) => getCart(signal),
-    enabled: sessionReady,
-    throwOnError: true,
-  });
-  const mutation = useMutation({
-    mutationFn: ({ command, owner }: { command: CartCommand; owner: string }) =>
-      mutateCart(command, owner),
-    scope: { id: `cart:${owner}` },
-    async onSuccess(items, variables) {
-      const queryKey = cartKey(variables.owner);
-      await client.cancelQueries({ queryKey });
-      client.setQueryData(queryKey, items);
-    },
-  });
+  const snapshot = useSyncExternalStore(subscribeCart, cartSnapshot, serverCartSnapshot);
+  const cart = useMemo(() => restoreStoredCart(snapshot, catalog), [snapshot, catalog]);
   async function execute(command: CartCommand, message?: string) {
-    if (!sessionReady || !owner) {
-      return false;
-    }
-
     try {
-      await mutation.mutateAsync({ command, owner });
+      // Read at command time so multiple components do not overwrite one another's updates.
+      const current = restoreStoredCart(cartSnapshot(), catalog);
+      writeCart(applyCartCommand(current, command, catalog));
       if (message) {
         notify(message);
       }
@@ -45,10 +34,9 @@ export function useCart() {
     }
   }
   return {
-    cart: query.data ?? [],
-    ready: sessionReady && query.isSuccess,
-    pending: mutation.isPending,
-    error: query.error,
+    cart,
+    ready: snapshot !== undefined,
+    pending: false,
     add: (product: Product, quantity: number, selection: string[] = []) =>
       execute({ type: "add", productId: product.id, quantity, selection }, "장바구니에 담았어요."),
     addCustom: (custom: CustomRecipeItem) =>

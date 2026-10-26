@@ -49,8 +49,6 @@ describe("Mock API data ownership and validation", () => {
   it.each([
     ["/api/auth/register", "POST"],
     ["/api/auth/login", "POST"],
-    ["/api/cart/items", "POST"],
-    ["/api/cart/items/missing", "PATCH"],
     ["/api/recipes", "POST"],
     ["/api/atelier/draft", "PUT"],
     ["/api/orders", "POST"],
@@ -111,108 +109,13 @@ describe("Mock API data ownership and validation", () => {
       expect((await api(`/api/catalog/products/${id}`)).status).toBe(404);
     }
   });
-  it("keeps guest and member carts separate, including after logout", async () => {
+  it("does not expose server cart endpoints", async () => {
     const api = client();
-    expect(
-      (await api("/api/cart/items", "POST", { productId: "fresh-hand-cream", quantity: 2 })).status,
-    ).toBe(201);
-    const registered = await api("/api/auth/register", "POST", credentials("cart-owner"));
-    expect(registered.status).toBe(201);
-    expect(registered.body.user.passwordHash).toBeUndefined();
-    expect((await api("/api/cart")).body).toEqual([]);
-    await api("/api/cart/items", "POST", { productId: "soft-candle", quantity: 1 });
-    await api("/api/auth/logout", "POST");
-    expect((await api("/api/cart")).body[0].product.id).toBe("fresh-hand-cream");
-    await api("/api/auth/login", "POST", credentials("cart-owner"));
-    expect((await api("/api/cart")).body[0].product.id).toBe("soft-candle");
-  });
-  it("rebuilds prices on the server and rejects invalid gift selections and quantities", async () => {
-    const api = client();
-    const added = await api("/api/cart/items", "POST", {
-      productId: "fresh-hand-cream",
-      quantity: 1,
-      product: { price: 1 },
-      price: 1,
-    });
-    expect(added.body[0].product.price).toBe(28000);
-    expect(added.body[0].unitPrice).toBe(28000);
-    expect(
-      (await api("/api/cart/items", "POST", { productId: "fresh-hand-cream", quantity: -1 }))
-        .status,
-    ).toBe(400);
-    expect(
-      (
-        await api("/api/cart/items", "POST", {
-          productId: "fresh-gift-set",
-          selection: ["fresh-candle", "fresh-candle", "soft-candle"],
-        })
-      ).status,
-    ).toBe(400);
-    const gift = await api("/api/cart/items", "POST", {
-      productId: "fresh-gift-set",
-      selection: ["fresh-hand-cream", "fresh-candle", "fresh-hand-wash"],
-    });
-    expect(gift.status).toBe(201);
-  });
-  it("requires exactly one product or custom composition and derives custom colors", async () => {
-    const api = client();
-    const custom = { name: "내 향", counts: { rose: 2 }, label: "paper", color: "#000000" };
-    for (const input of [
-      {},
-      { productId: "fresh-hand-cream", custom },
-      { custom: null },
-      { custom: "invalid" },
-      { custom: { ...custom, counts: { rose: 1.5 } } },
-      { custom: { ...custom, counts: { rose: 21 } } },
-      { custom: { ...custom, productType: "candle" } },
-    ]) {
-      expect((await api("/api/cart/items", "POST", { ...input, quantity: 1 })).status).toBe(400);
-    }
-
-    expect((await api("/api/cart")).body).toEqual([]);
-    const result = await api("/api/cart/items", "POST", { custom, quantity: 1 });
-    expect(result.status).toBe(201);
-    const catalog = (await api("/api/catalog")).body;
-    expect(result.body[0].custom.color).toBe(
-      catalog.ingredients.find((ingredient: { id: string }) => ingredient.id === "rose").color,
-    );
-    expect(result.body[0].unitPrice).toBe(98000);
-  });
-  it("rejects cumulative quantity overflow instead of silently clamping the cart", async () => {
-    const api = client();
-    const added = await api("/api/cart/items", "POST", {
-      productId: "fresh-hand-cream",
-      quantity: 15,
-    });
-    expect(added.status).toBe(201);
+    expect((await api("/api/cart")).status).toBe(404);
     expect(
       (await api("/api/cart/items", "POST", { productId: "fresh-hand-cream", quantity: 1 })).status,
-    ).toBe(400);
-    expect((await api("/api/cart")).body).toEqual(added.body);
-    const key = encodeURIComponent(added.body[0].key);
-    expect((await api(`/api/cart/items/${key}`, "PATCH", { quantity: 0 })).body).toEqual([]);
-  });
-  it("checks stock across single products and all gift selections before saving", async () => {
-    const api = client();
-    const selection = ["fresh-hand-cream", "fresh-candle", "fresh-hand-wash"];
-    const gift = await api("/api/cart/items", "POST", {
-      productId: "fresh-gift-set",
-      selection,
-      quantity: 10,
-    });
-    expect(gift.status).toBe(201);
-    expect(
-      (await api("/api/cart/items", "POST", { productId: "fresh-hand-cream", quantity: 6 })).status,
-    ).toBe(400);
-    const single = await api("/api/cart/items", "POST", {
-      productId: "fresh-hand-cream",
-      quantity: 5,
-    });
-    expect(single.status).toBe(201);
-    const giftKey = encodeURIComponent(gift.body[0].key);
-    expect((await api(`/api/cart/items/${giftKey}`, "PATCH", { quantity: 11 })).status).toBe(400);
-    expect((await api("/api/cart")).body).toEqual(single.body);
-    expect((await api(`/api/cart/items/${giftKey}`, "PATCH", { quantity: 9 })).status).toBe(200);
+    ).toBe(404);
+    expect((await api("/api/cart/items/key", "PATCH", { quantity: 2 })).status).toBe(404);
   });
   it("does not create an account when the session owner check rejects registration", async () => {
     const api = client();
@@ -284,41 +187,84 @@ describe("Mock API data ownership and validation", () => {
   it("calculates mock orders from server prices and consumes eligible coupons", async () => {
     const api = client();
     await api("/api/auth/register", "POST", credentials("order-owner"));
-    await api("/api/cart/items", "POST", { productId: "fresh-hand-cream", quantity: 1 });
     const order = await api("/api/orders", "POST", {
       recipient: "AURA",
       address: "서울",
       coupon: true,
       total: 1,
+      items: [{ productId: "fresh-hand-cream", quantity: 1, unitPrice: 1, product: { price: 1 } }],
     });
     expect(order.status).toBe(201);
     expect(order.body.total).toBe(28000);
     expect(order.body.items[0].unitPrice).toBe(28000);
-    expect((await api("/api/cart")).body).toEqual([]);
     expect((await api("/api/orders")).body).toEqual([order.body]);
     expect((await api("/api/session")).body.user.coupon).toBe(false);
   });
-  it("rechecks stock at checkout and leaves the cart and coupon intact on failure", async () => {
+  it("rechecks order stock and leaves orders and coupons intact on failure", async () => {
     const api = client();
     await api("/api/auth/register", "POST", credentials("stock-order-owner"));
-    await api("/__test__/seed", "POST", {
-      cart: [
+    const invalidItems = [
+      undefined,
+      [],
+      [{ productId: "fresh-hand-cream", quantity: 16 }],
+      [
+        { productId: "fresh-hand-cream", quantity: 10 },
+        { productId: "fresh-hand-cream", quantity: 6 },
+      ],
+      [
         {
-          product: { id: "fresh-gift-set" },
+          productId: "fresh-hand-cream",
+          quantity: 1,
+          custom: { name: "invalid", counts: { rose: 2 } },
+        },
+      ],
+      [
+        {
+          productId: "fresh-gift-set",
           selection: ["fresh-hand-cream", "fresh-candle", "fresh-hand-wash"],
           quantity: 10,
         },
-        { product: { id: "fresh-hand-cream" }, quantity: 6 },
+        { productId: "fresh-hand-cream", quantity: 6 },
       ],
-    });
-    const cart = (await api("/api/cart")).body;
-    expect(
-      (await api("/api/orders", "POST", { recipient: "AURA", address: "서울", coupon: true }))
-        .status,
-    ).toBe(400);
-    expect((await api("/api/cart")).body).toEqual(cart);
+    ];
+    for (const items of invalidItems) {
+      expect(
+        (
+          await api("/api/orders", "POST", {
+            recipient: "AURA",
+            address: "서울",
+            coupon: true,
+            items,
+          })
+        ).status,
+      ).toBe(400);
+    }
+
     expect((await api("/api/orders")).body).toEqual([]);
     expect((await api("/api/session")).body.user.coupon).toBe(true);
+  });
+  it("rebuilds custom order items from compositions and isolates order history", async () => {
+    const first = client(),
+      second = client();
+    await first("/api/auth/register", "POST", credentials("custom-order-owner"));
+    const result = await first("/api/orders", "POST", {
+      recipient: "AURA",
+      address: "서울",
+      items: [
+        {
+          custom: { name: "내 향", counts: { rose: 2 }, label: "paper", color: "#000000" },
+          quantity: 1,
+          unitPrice: 1,
+        },
+      ],
+    });
+    expect(result.status).toBe(201);
+    expect(result.body.total).toBe(98000);
+    expect(result.body.items[0].unitPrice).toBe(98000);
+    expect(result.body.items[0].custom.color).not.toBe("#000000");
+    await second("/api/auth/register", "POST", credentials("other-order-owner"));
+    expect((await second("/api/orders")).body).toEqual([]);
+    expect((await first("/api/orders")).body).toEqual([result.body]);
   });
   it("stores validated partner inquiries and does not report invalid input as successful", async () => {
     const api = client();
@@ -370,18 +316,13 @@ it("prototype-like cookies never become sessions", async () => {
   }
 });
 
-it("rejects cart and recipe commands captured before an account change", async () => {
+it("rejects recipe commands captured before an account change", async () => {
   const api = client();
   const guest = await api("/api/session");
   await api("/api/auth/register", "POST", credentials("scope-owner"));
   const headers = { "X-Session-Owner": guest.body.guestId };
   expect(
-    (await api("/api/cart/items", "POST", { productId: "fresh-hand-cream", quantity: 1 }, headers))
-      .status,
-  ).toBe(409);
-  expect(
     (await api("/api/recipes", "POST", { name: "Stale", counts: { rose: 1 } }, headers)).status,
   ).toBe(409);
-  expect((await api("/api/cart")).body).toEqual([]);
   expect((await api("/api/recipes")).body).toEqual([]);
 });

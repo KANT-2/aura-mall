@@ -2,13 +2,11 @@ import express, { type ErrorRequestHandler } from "express";
 import { randomBytes, randomUUID, scryptSync } from "node:crypto";
 import { createDatabase, catalog, type MockDatabase } from "./data/store";
 import { accountRoutes } from "./routes/account";
-import { cartRoutes } from "./routes/cart";
 import { atelierRoutes } from "./routes/atelier";
 import { checkoutRoutes } from "./routes/checkout";
 import { resolveSession, ownerOf } from "./session";
 import { HttpError, requireJsonBody } from "./http";
 import { isRecord } from "@/lib/validation";
-import { restoreCart } from "@/features/cart/model/cart";
 import { restoreDraft, restoreRecipes } from "@/features/atelier/model/recipes";
 
 export function createMockApp({
@@ -37,13 +35,7 @@ export function createMockApp({
 
     res.json(product);
   });
-  app.use(
-    "/api",
-    accountRoutes(database),
-    cartRoutes(database),
-    atelierRoutes(database),
-    checkoutRoutes(database),
-  );
+  app.use("/api", accountRoutes(database), atelierRoutes(database), checkoutRoutes(database));
   if (testMode) {
     app.post("/__test__/seed", requireJsonBody, (req, res) => {
       const { session } = resolveSession(req, res, database);
@@ -59,10 +51,6 @@ export function createMockApp({
       }
 
       const owner = ownerOf(session);
-      if (req.body.cart) {
-        database.state.carts[owner] = restoreCart(req.body.cart, catalog);
-      }
-
       if (req.body.recipes) {
         database.state.recipes[owner] = restoreRecipes(req.body.recipes, catalog.ingredients);
       }
