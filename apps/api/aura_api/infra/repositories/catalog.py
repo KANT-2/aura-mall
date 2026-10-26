@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aura_api.domain import catalog as domain
 from aura_api.infra.models import (
     Collection,
     Ingredient,
@@ -61,3 +62,28 @@ async def find_product(session: AsyncSession, product_id: str) -> tuple[Product,
         )
     ).first()
     return None if row is None else (row[0], row[1])
+
+
+async def load_rule_catalog(session: AsyncSession) -> domain.Catalog:
+    """Products and ingredients as the domain rules see them (catalog order kept)."""
+    products = await session.scalars(select(Product).order_by(Product.sort_order))
+    ingredients = await session.scalars(select(Ingredient).order_by(Ingredient.sort_order))
+    return domain.Catalog(
+        products={
+            item.id: domain.Product(
+                id=item.id,
+                collection=item.collection_id,
+                type=item.type_id,
+                name=item.name,
+                price=item.price,
+                stock=item.stock,
+            )
+            for item in products
+        },
+        ingredients={
+            item.id: domain.Ingredient(
+                id=item.id, name=item.name, stage=item.stage, color=item.color
+            )
+            for item in ingredients
+        },
+    )
