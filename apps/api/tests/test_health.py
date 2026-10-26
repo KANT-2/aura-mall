@@ -25,7 +25,11 @@ def test_openapi_exposes_versioned_routes(client):
     schema = client.get("/openapi.json").json()
 
     assert schema["info"]["title"] == "AURA test API"
-    assert set(schema["paths"]) == {"/api/v1/health"}
+    assert set(schema["paths"]) == {
+        "/api/v1/health",
+        "/api/v1/catalog",
+        "/api/v1/catalog/products/{product_id}",
+    }
 
 
 def test_api_prefix_is_configurable():

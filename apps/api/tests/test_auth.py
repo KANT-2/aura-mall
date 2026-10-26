@@ -393,7 +393,11 @@ def test_production_app_has_no_test_or_issuance_routes():
     app = create_app(Settings(_env_file=None))
     assert app.dependency_overrides == {}
     with TestClient(app) as client:
-        assert set(client.get("/openapi.json").json()["paths"]) == {"/api/v1/health"}
+        assert set(client.get("/openapi.json").json()["paths"]) == {
+            "/api/v1/health",
+            "/api/v1/catalog",
+            "/api/v1/catalog/products/{product_id}",
+        }
         assert client.get("/test/me").status_code == 404
 
 
