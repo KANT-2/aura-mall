@@ -1,0 +1,226 @@
+:global([data-atelier]) .beaker {
+  width: min(66%, 255px);
+  height: 260px;
+  display: grid;
+  place-items: center;
+  align-self: end;
+  filter: drop-shadow(0 18px 16px #03060499);
+}
+
+:global([data-atelier]) .beaker :global(.beaker) {
+  width: 100%;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier]) .beaker {
+    width: 210px;
+    height: 230px;
+  }
+}
+
+:global([data-atelier]) :global([data-atelier-part="blend"]) .beaker :global(.beaker) {
+  width: 100%;
+}
+
+:global([data-atelier]) :global([data-atelier-part="blend-surface"]).dragging {
+  cursor: grabbing;
+}
+
+:global([data-atelier]) :global([data-atelier-part="blend"]) .beaker {
+  position: relative;
+  outline: none;
+}
+
+:global([data-atelier]) :global([data-atelier-part="blend"]) .beaker::after {
+  content: "";
+  position: absolute;
+  inset: 4% 6% 5%;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.82;
+  background: conic-gradient(#dab77a var(--stir-progress), #d2b77a12 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+}
+
+:global([data-atelier]) :global([data-atelier-part="blend"]) .beaker:focus-visible::after {
+  box-shadow: 0 0 0 3px #f1d2a5;
+  opacity: 1;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker {
+  -webkit-user-select: none;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker :global(.beaker) {
+  pointer-events: none;
+}
+
+:global([data-atelier]) .beaker :global(.live-vessel) {
+  will-change: transform;
+}
+
+:global([data-atelier]) .beaker.dragging :global(.liquid-ripple) {
+  animation-duration: 1.4s;
+}
+
+:global([data-atelier]) .beaker.settling :global(.liquid-ripple) {
+  animation-duration: 3.5s;
+  opacity: 0.38;
+  transition: opacity 0.95s ease-out;
+}
+
+.beaker {
+  position: relative;
+  cursor: crosshair;
+  touch-action: none;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.beaker svg {
+  pointer-events: none;
+}
+
+.light {
+  position: absolute;
+  bottom: 2%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 45%;
+  height: 8px;
+  filter: blur(10px);
+  background: rgba(226, 190, 131, 0.13);
+  pointer-events: none;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker {
+  isolation: isolate;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker :global(.beaker) {
+  filter: none;
+  transform: none !important;
+  animation: none !important;
+}
+
+:global([data-atelier][data-atelier-step]) .rodLayer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 9;
+}
+
+:global([data-atelier][data-atelier-step]) .ripple {
+  transition:
+    opacity 0.5s ease,
+    rx 0.24s ease;
+}
+
+:global([data-atelier][data-atelier-step]) .beaker :global(.live-vessel) {
+  transform: none !important;
+  animation: none !important;
+}
+
+:global([data-atelier][data-atelier-step]) .beaker :global(.liquid-ripple) {
+  animation: none !important;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker {
+  cursor: grab !important;
+  touch-action: none !important;
+  user-select: none;
+  width: min(86%, 295px) !important;
+  height: min(43vh, 300px) !important;
+  max-width: 295px;
+  min-height: 205px;
+  overflow: visible !important;
+  margin-inline: auto;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker.dragging {
+  cursor: grabbing !important;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker * {
+  cursor: inherit !important;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker:focus-visible {
+  outline: 2px solid #d1b68d;
+  outline-offset: 5px;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker :global(.liquid-ripple) {
+  animation: none !important;
+}
+
+@media (max-width: 680px) {
+  :global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker {
+    width: min(78vw, 265px) !important;
+    height: min(32vh, 265px) !important;
+    min-height: 175px !important;
+  }
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker.shake {
+  cursor: default !important;
+  touch-action: auto !important;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker.shake :global(.beaker) {
+  transform: rotate(var(--shake-tilt, 0deg)) !important;
+  transform-origin: 50% 73%;
+  transition: transform 115ms ease-out !important;
+  animation: none !important;
+  will-change: transform;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker.shake .rodLayer {
+  display: none !important;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker :global(.live-vessel) {
+  width: 100%;
+  height: 100%;
+  image-rendering: auto;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker:not(.shake) .rodLayer {
+  display: block !important;
+}
+
+:global([data-atelier][data-atelier-step]) .rod {
+  transition: transform 90ms ease-out !important;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .light {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .beaker.shake :global(.beaker) {
+    transition: none !important;
+  }
+
+  :global([data-atelier][data-atelier-step]) .rod {
+    transition: none !important;
+  }
+}
+
+:global([data-atelier][data-atelier-step])
+  :global([data-atelier-part="blend"])
+  :global([data-atelier-part="blend-stage"])
+  .beaker {
+  position: relative !important;
+  inset: auto !important;
+  margin: 0 auto !important;
+  flex: 0 0 auto !important;
+  order: 1 !important;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="blend"]) .light {
+  display: none !important;
+}

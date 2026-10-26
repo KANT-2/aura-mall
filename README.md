@@ -1,97 +1,61 @@
-> **AURA V3 2026-10-13:** 전체 소스 수정 버전. 적용 전 [`START_HERE_KO.md`](./START_HERE_KO.md) 를 먼저 확인하세요.
-
 # AURA — From Scent to Identity
 
-최신 UI/UX 업데이트: `docs/UIUX_UPDATE_20261013.md`. 조향 화면은 한 작업 화면과 혼합·시향 모달로 구성했습니다.
+향을 발견하고 나만의 취향을 기록하는 프래그런스 커머스와 퍼스널 아틀리에입니다. Next.js 웹 앱과 Python FastAPI를 함께 관리합니다.
 
-향을 발견하고, 나만의 취향을 기록하는 프래그런스 커머스와 퍼스널 아틀리에.
+## 구조와 현재 구현
 
-Next.js App Router · React · TypeScript · Tailwind CSS. 최신 통합 PRD v1.0(2026-10-12)을 기준으로 전면 정리한 프론트엔드 소스입니다.
+```text
+apps/
+  web/                 # Next.js 스토어프런트·BFF·개발용 Mock·웹 테스트
+  api/                 # FastAPI 앱·설정·라우터·Python 테스트
+docs/
+  README.md            # 문서 목록
+  FASTAPI_BFF.md       # 웹과 백엔드 사이의 API 계약
+  product/             # 제품 기획
+  assets/              # 자산 안내·미리보기
+  archive/             # 과거 구현·QA 기록
+```
 
-## 실행
+웹은 상품·장바구니·회원·조향·주문·문의 흐름을 Mock API로 제공합니다. FastAPI에는 헬스 체크·환경 설정·라우터·테스트 골격이 준비되어 있습니다. 업무 API 구현은 [BFF 계약](docs/FASTAPI_BFF.md)에 따라 진행합니다.
 
-Node.js 20.9 이상을 사용합니다. 프로젝트 폴더에서 실행하세요.
+Node 의존성은 npm workspaces와 루트 `package-lock.json`, Python 의존성은 `apps/api/pyproject.toml`과 `apps/api/uv.lock`으로 관리합니다. 공통 포맷 설정은 루트, 앱 전용 설정과 생성 파일은 각 앱 디렉터리에 둡니다.
 
-```powershell
+## 웹 실행
+
+Node.js 22.12 이상과 npm이 필요합니다. 아래 명령은 모두 저장소 루트에서 실행합니다.
+
+```sh
 npm ci
 npm run dev
 ```
 
-브라우저에서 `http://localhost:3000`으로 접속합니다.
+Next.js는 `http://localhost:3000`, Mock API는 `http://127.0.0.1:4000`에서 함께 실행됩니다. 웹 설정 파일은 `apps/web/.env.local`이며, 필요하면 [예제](apps/web/.env.example)를 복사합니다. 상세 구조·Mock·E2E·CSS 기준은 [웹 개발 안내](apps/web/README.md)에 있습니다.
 
-```powershell
-npm run lint
-npx tsc --noEmit
-npm run build
+## FastAPI 실행
+
+Python 3.12 이상과 [uv](https://docs.astral.sh/uv/getting-started/installation/)가 필요합니다. 웹과 별도 터미널에서 실행합니다.
+
+```sh
+npm run setup:api
+cp apps/api/.env.example apps/api/.env
+npm run dev:api
 ```
 
-## 기존 프로젝트 전체 반영
+FastAPI는 `http://127.0.0.1:8000`에서 실행되며 `/health`, `/api/v1/health`, `/docs`, `/openapi.json`을 제공합니다. 현재 웹의 기본 백엔드는 Mock이며, 업무 API가 구현된 뒤 FastAPI로 연결합니다. 설정·라우터 추가·연결 방법은 [API 개발 안내](apps/api/README.md)에 있습니다.
 
-ZIP을 **기존 `C:\dev\aura-mall` 바깥의 별도 폴더**에 압축 해제하세요. 실행 중인 개발 서버를 종료한 뒤, 압축 해제한 새 소스 폴더에서:
+## 검증과 빌드
 
-```powershell
-python APPLY_TO_LOCAL.py --target "C:\dev\aura-mall"
-python APPLY_TO_LOCAL.py --target "C:\dev\aura-mall" --apply
-cd C:\dev\aura-mall
-npm ci
-npm run dev
-```
+| 명령                 | 범위                                |
+| -------------------- | ----------------------------------- |
+| `npm run check:web`  | 웹 ESLint·CSS·TypeScript·Vitest     |
+| `npm run check:api`  | Python Ruff 린트·포맷·pytest        |
+| `npm run check`      | 공통 문서·코드 포맷과 두 앱 검사    |
+| `npm run build`      | Next.js 프로덕션 빌드               |
+| `npm run start:mock` | 프로덕션 웹과 Mock 동시 실행        |
+| `npm run format`     | 공통 Prettier·Python Ruff 포맷 적용 |
 
-첫 명령은 변경 예정 경로만 확인합니다. 두 번째 명령은 교체할 기존 소스를 옆 폴더에 자동 백업한 후 전체 반영합니다. `.git`, 루트 `.env*`, `node_modules`, 무관한 루트 파일은 보존합니다. 이전 `data`·`types`·UI 폴더는 백업 후 최신 소스로 대체되므로, 폴더만 겹쳐 복사해서 오래된 기능이 남는 문제를 피합니다. Git 커밋·push·merge는 실행하지 않습니다.
+전체 검증과 공통 포맷 적용에는 Node·Python·uv가 모두 필요합니다. 웹 빌드는 Google Fonts에 접근할 수 있어야 합니다. 브라우저 검증 명령은 [웹 검증 안내](apps/web/README.md#검증)를 참고하세요.
 
-사용자의 아직 push하지 않은 로컬 변경은 이 제작 환경에서 확인할 수 없었습니다. 자동 백업에는 대상 폴더의 현재 작업을 그대로 보존하며, 제공 소스는 GitHub `develop` 복제본에서 최신 기획을 반영한 전체 교체본입니다.
+## 문서
 
-캐시 문제가 있으면 개발 서버 종료 후 `.next`만 삭제하고 다시 실행하세요.
-
-## 구현 범위
-
-- 홈 6개 섹션, 자연 스크롤, 컬렉션 원형 카드, 소식 캐러셀, 상품 캐러셀, Atelier 스크롤 장면
-- FRESH / SOFT / WARM × 10개 상품, 30개 상세 화면
-- 상품 검색, 컬렉션·유형 필터, 원화 가격 정렬
-- 같은 컬렉션의 서로 다른 단품 3개를 고르는 Gift Set
-- 장바구니 수량·구성·새로고침 유지, 주문 정보 화면
-- 회원가입·로그인·로그아웃, 신규 회원 배송비 쿠폰 표시
-- 향료 24개, 반복 투입, 최대 20회, 선택 비중·블렌딩 색·비커 높이 연동
-- PC 원형 드래그, 모바일 흔들기 요청 및 버튼 대체 조작
-- 디지털 시향, 이름·라벨 선택, 레시피 저장·다시 만들기·버전 관리
-- 마이페이지의 저장한 향·쿠폰·주문·계정 영역
-- 입점 문의 폼과 필수값 검증, 미연동 상태 안내
-- 투명 벡터 59개, 제품 목업 WebP 27장, 로컬 Pretendard
-
-## 구조
-
-| 경로 | 역할 |
-|---|---|
-| `app/` | App Router 화면, 전체 디자인 CSS, 문의 API |
-| `components/editorial/Shared.tsx` | 공통 버튼 보조·타이포·제품 비주얼·비커·데이터 타입 |
-| `components/editorial/Provider.tsx` | 장바구니·회원·레시피 공유 상태 |
-| `components/editorial/Shell.tsx` | GNB·메가메뉴·검색·Footer |
-| `components/editorial/Home.tsx` | 홈 섹션·스크롤 연출 |
-| `components/editorial/Commerce.tsx` | 상품 카드·목록·상세·Gift Set·장바구니·주문 |
-| `components/editorial/Atelier.tsx` | 조향 단계와 인터랙션 |
-| `components/editorial/Account.tsx` | 회원 화면과 마이페이지 |
-| `components/editorial/Partner.tsx` | 입점 문의 |
-| `components/editorial/catalog.json` | 30개 상품과 3개 컬렉션 |
-| `components/editorial/ingredients.json` | 향료 후보 24개 |
-| `public/assets/products/` | 27개 단품 목업 |
-| `public/assets/editorial/` | 그룹별로 분리한 투명 SVG |
-| `docs/` | 기준 PRD·에셋 목록·검수 기록·적용 제한 |
-
-대표 경로: `/`, `/shop`, `/shop/[id]`, `/atelier`, `/login`, `/register`, `/cart`, `/checkout`, `/mypage`, `/partner`.
-
-기존 `/products`, `/custom`, `/signup` 경로는 호환됩니다. 이전 `/cards`는 `/shop`으로 이동합니다. 카드·등급·포인트·Pickup 기능은 활성 소스에서 제외했습니다.
-
-## 운영 연결 및 미확정 정보
-
-현재 저장소와 프로젝트 발제의 프론트엔드 범위에 맞게 브라우저 저장소를 사용합니다. **상용 서버 인증·DB·PG·실제 주문 생성·문의 접수 서버는 연결되지 않았습니다.**
-
-- 비밀번호는 salt + PBKDF2 검증값으로 저장하지만, 브라우저 저장소는 서버 인증을 대체하지 않습니다. HTTPS 또는 localhost가 필요합니다. 기기 간 동기화·이메일 복구·실주문 이력은 제공하지 않습니다.
-- 향수 기존 가격을 FRESH 38,000원 / SOFT 42,000원 / WARM 46,000원으로 유지했습니다. 새 유형·Gift Set은 확인된 기존 가격이 없어 `price: null`과 `가격 확인 중`을 사용합니다. 임의 판매가를 추가하지 않았습니다.
-- 쿠폰의 유효기간·최소 주문금액·복원 정책은 미확정입니다. 주문 화면의 쿠폰 적용은 금액 확인 UI이며 실제 사용 처리나 주문을 생성하지 않습니다.
-- Custom의 제조 가능 범위와 가격이 미확정이므로 구매를 연결하지 않습니다. 조향 비중·액체 색은 개념적인 UX 표현입니다.
-- 문의 API는 입력 검증 후 HTTP 503을 반환합니다. 실제 접수 없이 완료를 표시하지 않습니다.
-- Gift Set 대표 비주얼은 복구한 같은 컬렉션 단품 사진 3장으로 만든 **실제 HTML/CSS 구성**입니다. 최종 선물 포장 목업은 미확정입니다.
-- 목업의 인쇄된 향 노트·효능·전성분은 제조 검증 자료가 아닙니다. 컬렉션 노트·용량·재고 등 운영 데이터는 실제 판매 전 최종 대조가 필요합니다.
-- SVG는 레퍼런스 기반으로 새로 그린 편집 가능한 벡터이며, 레퍼런스 사진을 SVG로 감싼 파일이 아닙니다. 원본과 픽셀 단위로 동일한 질감은 아닙니다.
-
-최신 기준 원문은 `PRD.md`에, 검사 결과는 `docs/QA_REPORT.md`에 있습니다.
+[문서 목록](docs/README.md)에서 제품 기획, 앱별 개발 안내, API 계약, 에셋과 과거 검수 기록을 찾을 수 있습니다. 작업 지침은 [AGENTS.md](AGENTS.md)와 [웹 전용 지침](apps/web/AGENTS.md)에 있습니다.

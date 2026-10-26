@@ -1,0 +1,293 @@
+.labelStyles {
+  border: 0;
+  padding: 0;
+  display: flex;
+  gap: 18px;
+  margin: 20px 0;
+}
+
+.labelStyles legend {
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.labelStyles label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.labelStyles input {
+  width: 15px;
+  min-height: 15px;
+  accent-color: var(--accent);
+}
+
+@media (max-width: 560px) {
+  .labelStyles input {
+    min-height: 15px;
+  }
+}
+
+:global([data-atelier-part="result"]) label:not(.labelStyles label) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+:global([data-atelier-part="result"]) .labelStyles label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #ddd0bb;
+  border-radius: 5px;
+  padding: 10px 12px;
+  min-height: 44px;
+  font-size: 12px;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier-part="result"]) .labelStyles {
+    flex-wrap: wrap;
+  }
+
+  :global([data-atelier-part="result"]) .labelStyles label {
+    padding: 9px 10px;
+  }
+}
+
+:global([data-atelier-part="result"]) .labelStyles input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  margin: 0;
+  border-radius: 50%;
+  padding: 0;
+}
+
+:global([data-atelier]) :global([data-atelier-part="result"]) .labelStyles label {
+  background: #2c312b;
+  border-color: #555c50;
+  color: #e9dfcf;
+}
+
+:global([data-atelier]) :global([data-atelier-part="result"]) .labelStyles label {
+  margin: 0;
+}
+
+:global([data-atelier]) :global([data-atelier-part="result"]) .labelStyles label:has(input:checked) {
+  background: #665846;
+  border-color: #d9b986;
+}
+
+@media (max-width: 360px) {
+  :global([data-atelier]) :global([data-atelier-part="result"]) .labelStyles {
+    flex-wrap: wrap;
+  }
+}
+
+:global([data-atelier]) :global([data-atelier-part="result"]) .labelStyles label:has(input:checked) {
+  outline: 1px solid #cfae7e;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="result"]) .nameField {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #ede4d4;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="result"]) .nameField input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 16px;
+  min-height: 51px;
+}
+
+:global([data-atelier][data-atelier-step]) .suggestions {
+  margin: 17px 0 20px;
+  min-width: 0;
+}
+
+:global([data-atelier][data-atelier-step]) .suggestionHeading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  margin-bottom: 10px;
+}
+
+:global([data-atelier][data-atelier-step]) .suggestionHeading strong {
+  font-size: 13px;
+  color: #f4e9d6;
+  font-weight: 500;
+}
+
+:global([data-atelier][data-atelier-step]) .suggestionHeading small {
+  font-size: 11px;
+  color: #adaca2;
+}
+
+:global([data-atelier][data-atelier-step]) .suggestionList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+:global([data-atelier][data-atelier-step]) .suggestionList button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  min-height: 36px;
+  border-radius: 4px;
+  border: 1px solid #646554;
+  color: #e0d4be;
+  background: #2d352e;
+  font-size: 12px;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+:global([data-atelier][data-atelier-step]) .suggestionList button:hover {
+  border-color: #d8b886;
+  background: #554b38;
+  color: #fff3e0;
+}
+
+:global([data-atelier][data-atelier-step]) .suggestionList button[aria-pressed="true"] {
+  border-color: #d8b886;
+  background: #554b38;
+  color: #fff3e0;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="result"]) .labelStyles {
+  margin: 16px 0 22px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="result"]) .labelStyles legend {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 11px;
+  color: #e9ddca;
+}
+
+:global([data-atelier][data-atelier-step]) .labelStyles legend small {
+  display: inline-block;
+  font-weight: 400;
+  color: #a9a89c;
+  font-size: 11px;
+  margin-left: 9px;
+}
+
+:global([data-atelier][data-atelier-step]) :global([data-atelier-part="result"]) .labelStyles .swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  position: relative;
+  gap: 3px;
+  min-height: 68px;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid #545c50;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #2e352f;
+  color: #efdfc7;
+}
+
+:global([data-atelier][data-atelier-step]) .swatch input {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 15px;
+  height: 15px;
+  min-width: 15px;
+  min-height: 15px;
+  accent-color: #deb982;
+  margin: 0;
+}
+
+:global([data-atelier][data-atelier-step]) .swatch span {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding-right: 9px;
+}
+
+:global([data-atelier][data-atelier-step]) .swatch strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+:global([data-atelier][data-atelier-step]) .swatch small {
+  font-size: 10px;
+  color: #b9b5a9;
+  word-break: keep-all;
+}
+
+:global([data-atelier][data-atelier-step])
+  :global([data-atelier-part="result"])
+  .labelStyles
+  .swatch:has(input:checked) {
+  border-color: #dcbb89;
+  background: #534b3d;
+  box-shadow: inset 0 0 0 1px #dcbb8970;
+}
+
+:global([data-atelier][data-atelier-step]) .suggestionList button:focus-visible {
+  outline: 2px solid #e5c493;
+  outline-offset: 2px;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier][data-atelier-step]) :global([data-atelier-part="result"]) .labelStyles {
+    gap: 6px;
+  }
+
+  :global([data-atelier][data-atelier-step]) :global([data-atelier-part="result"]) .labelStyles .swatch {
+    min-height: 67px;
+    padding: 10px 7px;
+  }
+
+  :global([data-atelier][data-atelier-step]) .swatch strong {
+    font-size: 12px;
+  }
+
+  :global([data-atelier][data-atelier-step]) .swatch small {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 360px) {
+  :global([data-atelier][data-atelier-step]) :global([data-atelier-part="result"]) .labelStyles .swatch {
+    padding: 8px 5px;
+  }
+}
+
+:global([data-atelier][data-atelier-step]) .nameField input {
+  min-height: 48px;
+  font-size: 16px !important;
+  color: #f4eddf;
+  background: #252925;
+  border: 1px solid #7a715e;
+  box-sizing: border-box;
+}
+
+:global([data-atelier][data-atelier-step]) .nameField input::placeholder {
+  color: #bcb1a1;
+}

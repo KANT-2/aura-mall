@@ -1,0 +1,380 @@
+.entry {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  align-items: center;
+  padding-top: 60px;
+}
+
+.visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.visual > :global(.beaker) {
+  width: 280px;
+}
+
+.visual > img {
+  position: absolute;
+  width: 135px;
+  top: 20px;
+  right: 15px;
+}
+
+.families {
+  margin-bottom: 25px;
+}
+
+.families img {
+  width: 100%;
+}
+
+.families strong {
+  font: 16px var(--serif);
+  letter-spacing: 1px;
+}
+
+.families span {
+  font-size: 12px;
+  display: block;
+  margin-top: 8px;
+}
+
+@media (max-width: 560px) {
+  .entry {
+    grid-template-columns: 1fr;
+    padding-top: 25px;
+  }
+
+  .visual > :global(.beaker) {
+    width: 220px;
+  }
+
+  .visual > img {
+    width: 110px;
+    right: 15%;
+    top: 0;
+  }
+
+  .families strong {
+    font-size: 13px;
+  }
+
+  .families span {
+    font-size: 12px;
+  }
+}
+
+.entry {
+  padding: 36px 4%;
+  max-width: 1240px;
+  min-height: 0;
+}
+
+.entry h2 {
+  margin: 12px 0;
+}
+
+.entry .families {
+  margin: 24px 0;
+}
+
+.entry .families img {
+  height: 110px;
+  object-fit: contain;
+}
+
+.entry .visual > :global(.beaker) {
+  width: 270px;
+}
+
+.entry .visual > img {
+  width: 60px;
+}
+
+@media (max-width: 700px) {
+  .entry {
+    padding: 20px;
+  }
+
+  .entry .visual {
+    display: none;
+  }
+
+  .entry .families img {
+    height: 85px;
+  }
+
+  .entry .families button {
+    padding: 12px 7px;
+  }
+
+  .entry :global(.button) {
+    width: 100%;
+  }
+}
+
+:global([data-atelier]) .entry {
+  gap: clamp(25px, 4vw, 52px);
+  padding-block: 35px 54px;
+}
+
+:global([data-atelier]) .visual {
+  background: radial-gradient(circle at 52% 50%, #6969593d 0%, #31372f 46%, #242923 100%);
+  min-height: 350px;
+  border: 1px solid #494d40;
+  border-radius: 5px;
+}
+
+:global([data-atelier]) .visual > :global(.beaker) {
+  filter: drop-shadow(0 15px 22px #02030275);
+}
+
+:global([data-atelier]) .entry h2 {
+  color: #f4eee1;
+  line-height: 1.45;
+}
+
+:global([data-atelier]) .entry p:not(:global(.eyebrow)) {
+  color: #c4c3b4;
+}
+
+:global([data-atelier]) .families button {
+  border: 1px solid #d5c5a7;
+  color: #392f26;
+  transition:
+    transform 0.2s,
+    border-color 0.2s;
+}
+
+:global([data-atelier]) .families button:hover {
+  transform: translateY(-3px);
+  border-color: #a47b46;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier]) .entry {
+    padding: 28px 18px 42px;
+  }
+
+  :global([data-atelier]) .entry .visual {
+    display: flex;
+  }
+
+  :global([data-atelier]) .entry .visual > :global(.beaker) {
+    width: 155px;
+  }
+
+  :global([data-atelier]) .entry .visual > img {
+    display: block;
+    width: 48px;
+    top: 12px;
+    right: 24%;
+  }
+}
+
+:global([data-atelier]) .entry h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(28px, 3vw, 44px);
+}
+
+:global([data-atelier]) .entry p:not(:global(.eyebrow)) {
+  max-width: 490px;
+  line-height: 1.85;
+}
+
+:global([data-atelier]) .entry .families button {
+  background: #e7dfd0 !important;
+}
+
+:global([data-atelier]) .families {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 22px 0 17px;
+}
+
+:global([data-atelier]) .families button {
+  min-height: 156px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 10px;
+  gap: 5px;
+  border-radius: 6px;
+  min-width: 0;
+}
+
+:global([data-atelier]) .families button img {
+  width: 79px;
+  height: 77px;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 8px #00000018);
+}
+
+:global([data-atelier]) .families button strong {
+  font-size: 15px;
+  letter-spacing: -0.03em;
+}
+
+:global([data-atelier]) .families button span {
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.5;
+  max-width: 145px;
+}
+
+:global([data-atelier]) .resume {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  background: #eee0c726;
+  border: 1px solid #ad937860;
+  padding: 16px 18px;
+  border-radius: 6px;
+  margin: 15px 0;
+}
+
+:global([data-atelier]) .resume strong {
+  font-size: 15px;
+  color: #f1e3d0;
+}
+
+:global([data-atelier]) .resume p {
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+:global([data-atelier]) .resume button {
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-height: 42px;
+  font-size: 12px;
+}
+
+:global([data-atelier]) .start {
+  margin-top: 3px;
+}
+
+@media (max-width: 790px) {
+  :global([data-atelier]) .families {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  :global([data-atelier]) .resume {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  :global([data-atelier]) .resume button {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 375px) {
+  :global([data-atelier]) .families button {
+    min-height: 143px;
+    padding: 11px 7px;
+  }
+
+  :global([data-atelier]) .families button img {
+    height: 64px;
+    width: 65px;
+  }
+
+  :global([data-atelier]) .families button span {
+    font-size: 10px;
+  }
+}
+
+:global([data-atelier][data-atelier-step]) .entry .visual {
+  overflow: hidden;
+  position: relative;
+  min-height: 360px;
+  background: #2d332c;
+  border: 1px solid #4c5146;
+  border-radius: 4px;
+  padding: 0;
+}
+
+:global([data-atelier][data-atelier-step]) .entry .visual .photo {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  position: absolute;
+  inset: 0;
+  object-fit: cover;
+  filter: saturate(0.84) brightness(0.74);
+}
+
+:global([data-atelier][data-atelier-step]) .entry .visual:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, #111611ad, transparent 45%);
+  pointer-events: none;
+}
+
+:global([data-atelier][data-atelier-step]) .entry .visual .caption {
+  position: absolute;
+  z-index: 2;
+  bottom: 18px;
+  left: 21px;
+  color: #f7e8ca;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+:global([data-atelier][data-atelier-step]) .entry .visual > :global(.beaker) {
+  display: none !important;
+}
+
+@media (max-width: 790px) {
+  :global([data-atelier][data-atelier-step]) .entry .visual {
+    min-height: 0;
+    display: none;
+  }
+}
+
+:global([data-atelier][data-atelier-step]) .start {
+  touch-action: manipulation;
+}
+
+:global([data-atelier][data-atelier-step]) .families button {
+  touch-action: manipulation;
+}
+
+:global([data-atelier][data-atelier-step]) .entry .families {
+  position: relative !important;
+  z-index: 3 !important;
+  pointer-events: auto !important;
+}
+
+:global([data-atelier][data-atelier-step]) .entry .families button {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+  cursor: pointer;
+  min-width: 0;
+}
+
+:global([data-atelier][data-atelier-step]) .entry .families button * {
+  pointer-events: none !important;
+}
+
+:global([data-atelier][data-atelier-step]) .entry .families button:active {
+  opacity: 0.85;
+}
+
+@media (max-width: 700px) {
+  :global([data-atelier][data-atelier-step]) .entry .families button {
+    min-height: 130px !important;
+    touch-action: manipulation !important;
+  }
+}
