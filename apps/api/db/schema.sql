@@ -7,7 +7,8 @@
 BEGIN;
 
 -- ---------------------------------------------------------------------------
--- Identity: members, coupons, logout blacklist (authentication is JWT)
+-- Identity: customers, coupons, logout blacklist (authentication is JWT)
+-- Admin accounts live in their own table (admins) with separate login APIs.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE users (
@@ -16,9 +17,7 @@ CREATE TABLE users (
     name          VARCHAR(100) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     marketing     BOOLEAN      NOT NULL DEFAULT false,
-    role          VARCHAR(20)  NOT NULL DEFAULT 'member',
-    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    CONSTRAINT users_role_check CHECK (role IN ('member', 'admin'))
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 -- Emails are stored lower-cased; the index also blocks case-only duplicates.
 CREATE UNIQUE INDEX users_email_lower_key ON users (lower(email));
@@ -36,7 +35,21 @@ CREATE TABLE user_coupons (
     CONSTRAINT user_coupons_user_type_key UNIQUE (user_id, type)
 );
 
--- jti of tokens signed out before they expired; rows past expires_at can be deleted.
+-- Operator accounts, separate from customers: own login/registration APIs and tokens.
+CREATE TABLE admins (
+    id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    email         VARCHAR(254) NOT NULL,
+    name          VARCHAR(100) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    status        VARCHAR(20)  NOT NULL DEFAULT 'active',
+    created_by    UUID         REFERENCES admins (id),   -- NULL for the first admin
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    last_login_at TIMESTAMPTZ,
+    CONSTRAINT admins_status_check CHECK (status IN ('active', 'disabled'))
+);
+CREATE UNIQUE INDEX admins_email_lower_key ON admins (lower(email));
+
+-- jti of customer or admin tokens signed out before they expired; prune past expires_at.
 CREATE TABLE revoked_tokens (
     jti        VARCHAR(64) PRIMARY KEY,
     expires_at TIMESTAMPTZ NOT NULL
@@ -271,7 +284,7 @@ CREATE TABLE stock_adjustments (
     stock_after  INTEGER      NOT NULL,
     reason       VARCHAR(200) NOT NULL,
     request_key  VARCHAR(64)  NOT NULL,   -- idempotency key from the admin screen
-    actor_id     UUID         NOT NULL REFERENCES users (id),
+    actor_id     UUID         NOT NULL REFERENCES admins (id),
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT stock_adjustments_delta_check CHECK (delta <> 0),
     CONSTRAINT stock_adjustments_after_check
@@ -284,7 +297,7 @@ CREATE INDEX stock_adjustments_product_created_idx
 
 CREATE TABLE admin_audit_logs (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    actor_id    UUID        NOT NULL REFERENCES users (id),
+    actor_id    UUID        NOT NULL REFERENCES admins (id),
     action      VARCHAR(40) NOT NULL,
     target_type VARCHAR(20) NOT NULL,
     target_id   VARCHAR(64) NOT NULL,
@@ -292,8 +305,8 @@ CREATE TABLE admin_audit_logs (
     reason      VARCHAR(200),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT admin_audit_logs_action_check
-        CHECK (action IN ('product.update', 'product.stock', 'inquiry.update')),
-    CONSTRAINT admin_audit_logs_target_check CHECK (target_type IN ('product', 'inquiry'))
+        CHECK (action IN ('product.update', 'product.stock', 'inquiry.update', 'admin.create')),
+    CONSTRAINT admin_audit_logs_target_check CHECK (target_type IN ('product', 'inquiry', 'admin'))
 );
 CREATE INDEX admin_audit_logs_target_idx
     ON admin_audit_logs (target_type, target_id, created_at DESC);
