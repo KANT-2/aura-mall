@@ -168,7 +168,20 @@ def test_plain_html_text_is_escaped_only_at_output(client):
 
 
 @pytest.mark.parametrize(
-    "url", ["https://example.com/a?b=1", "http://localhost:3000/a", "/shop/item"]
+    "url",
+    [
+        "https://example.com/a?b=1",
+        "http://localhost:3000/a",
+        "/shop/item",
+        "/상품",
+        "https://example.com/상품",
+        "https://example.com/a#section",
+        "/상품#상세",
+        "https://example.com/상품?이름=향수#상세",
+        "/%EC%83%81%ED%92%88",
+        "https://example.com/%EC%83%81%ED%92%88#section",
+        "/discount/100%25",
+    ],
 )
 def test_public_urls_allow_only_supported_destinations(url):
     assert validate_public_url(url) == url
@@ -188,6 +201,27 @@ def test_public_urls_allow_only_supported_destinations(url):
         "java\nscript:x",
         "https://user:password@example.com",
         "https://example.com:99999",
+        "%6aavascript%3Aalert(1)",
+        "java%73cript:alert(1)",
+        "data%3Atext/html,script",
+        "vbscript%3Ax",
+        "%2f%2fevil.test",
+        "/%2Fevil.test",
+        "/%252fevil.test",
+        "/%5cevil.test",
+        "/%255cevil.test",
+        "/%0a/evil.test",
+        "/path%00",
+        "/path%7f",
+        "/path%C2%85",
+        "/path\x7f",
+        "/path\u200b",
+        "https://user%40example.com@evil.test/상품",
+        "https://example.com%2fevil.test/상품",
+        "https://example.com/%5cfoo",
+        "https://example.com/a#%0asection",
+        "/%ff",
+        "/%" + "25" * 8 + "2fevil.test",
         "",
     ],
 )
