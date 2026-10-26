@@ -14,7 +14,9 @@ export function PromotionCarousel() {
   const promos = user ? home.memberPromotions : home.guestPromotions;
   const p = promos[promo % promos.length];
 
-  if (!p) return null;
+  if (!p) {
+    return null;
+  }
   return (
     <section
       className="promotion reveal"
@@ -22,7 +24,9 @@ export function PromotionCarousel() {
       aria-label="AURA 소식"
       tabIndex={0}
       onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) return;
+        if (event.target !== event.currentTarget) {
+          return;
+        }
         if (event.key === "ArrowRight") {
           event.preventDefault();
           setPromo((i) => (i + 1) % promos.length);
@@ -39,12 +43,15 @@ export function PromotionCarousel() {
       onTouchEnd={(event) => {
         const start = promoTouch.current;
         promoTouch.current = null;
-        if (!start) return;
+        if (!start) {
+          return;
+        }
         const t = event.changedTouches[0];
         const dx = t.clientX - start.x;
         const dy = t.clientY - start.y;
-        if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.2)
+        if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.2) {
           setPromo((i) => (i + (dx < 0 ? 1 : promos.length - 1)) % promos.length);
+        }
       }}
     >
       <div className="promo-copy" key={p.title}>

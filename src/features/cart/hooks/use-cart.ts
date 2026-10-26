@@ -28,10 +28,14 @@ export function useCart() {
     },
   });
   async function execute(command: CartCommand, message?: string) {
-    if (!sessionReady || !owner) return false;
+    if (!sessionReady || !owner) {
+      return false;
+    }
     try {
       await mutation.mutateAsync({ command, owner });
-      if (message) notify(message);
+      if (message) {
+        notify(message);
+      }
       return true;
     } catch (error) {
       notify(error instanceof Error ? error.message : "장바구니를 변경하지 못했어요.");

@@ -72,7 +72,9 @@ export function AtelierEditor({
   const { progress } = blend.snapshot;
 
   useEffect(() => {
-    if (step !== "select") return;
+    if (step !== "select") {
+      return;
+    }
     const frame = requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: "instant" });
       ingredientPanelRef.current?.scrollTo({ top: 0, behavior: "instant" });
@@ -137,7 +139,9 @@ export function AtelierEditor({
     composition.select(family ? [...family.notes] : []);
   }
   function startBlend() {
-    if (!total) return;
+    if (!total) {
+      return;
+    }
     blend.reset();
     setOverlay("blend");
   }
@@ -174,11 +178,15 @@ export function AtelierEditor({
     try {
       await navigator.share({ title: `AURA | ${name || "나의 향"}`, text: recipeText() });
     } catch (e) {
-      if ((e as Error)?.name !== "AbortError") notify("공유를 완료하지 못했어요.");
+      if ((e as Error)?.name !== "AbortError") {
+        notify("공유를 완료하지 못했어요.");
+      }
     }
   }
   function enterResult() {
-    if (!blend.snapshot.complete) return;
+    if (!blend.snapshot.complete) {
+      return;
+    }
     closeOverlay();
     composition.finish(blend.snapshot.complete);
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" }));
@@ -199,7 +207,9 @@ export function AtelierEditor({
       label,
       counts: { ...counts },
     });
-    if (didSave) composition.markSaved(revision);
+    if (didSave) {
+      composition.markSaved(revision);
+    }
   }
 
   async function putInCart() {
@@ -220,7 +230,9 @@ export function AtelierEditor({
       recipeKey: parent?.id || undefined,
       productType: "eau-de-parfum",
     });
-    if (added) composition.markCartAdded(revision);
+    if (added) {
+      composition.markCartAdded(revision);
+    }
   }
   const recipeList = (
     <RecipeList

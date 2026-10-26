@@ -34,8 +34,11 @@ export function useProductFilters(
     const timer = setTimeout(() => {
       const next = new URLSearchParams(parameters.toString());
       const normalized = query.trim();
-      if (normalized) next.set("q", normalized);
-      else next.delete("q");
+      if (normalized) {
+        next.set("q", normalized);
+      } else {
+        next.delete("q");
+      }
       if (normalized !== initialQuery) {
         setDraft((current) => ({ ...current, submitted: normalized }));
         router.replace(`/shop${next.size ? `?${next}` : ""}`, { scroll: false });
@@ -44,18 +47,30 @@ export function useProductFilters(
     return () => clearTimeout(timer);
   }, [query, initialQuery, router, parameters]);
   useEffect(() => {
-    if (collectionId === initialCollection && typeId === initialType) return;
+    if (collectionId === initialCollection && typeId === initialType) {
+      return;
+    }
     const next = new URLSearchParams(parameters.toString());
-    if (collectionId !== initialCollection) next.delete("collection");
-    if (typeId !== initialType) next.delete("type");
+    if (collectionId !== initialCollection) {
+      next.delete("collection");
+    }
+    if (typeId !== initialType) {
+      next.delete("type");
+    }
     router.replace(`/shop${next.size ? `?${next}` : ""}`, { scroll: false });
   }, [collectionId, typeId, initialCollection, initialType, parameters, router]);
   function select(collection: string, type: string, search = query) {
     setDraft((current) => ({ ...current, submitted: search.trim(), value: search }));
     const next = new URLSearchParams();
-    if (collection) next.set("collection", collection);
-    if (type) next.set("type", type);
-    if (search.trim()) next.set("q", search.trim());
+    if (collection) {
+      next.set("collection", collection);
+    }
+    if (type) {
+      next.set("type", type);
+    }
+    if (search.trim()) {
+      next.set("q", search.trim());
+    }
     router.replace(`/shop${next.size ? `?${next}` : ""}`, { scroll: false });
   }
   return {

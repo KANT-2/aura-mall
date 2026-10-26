@@ -38,11 +38,17 @@ export function ProductDetailContentDock({
   const activeTab = `${tabsId}-${tab}`;
   const onTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, current: number) => {
     let next = current;
-    if (event.key === "ArrowRight") next = (current + 1) % TABS.length;
-    else if (event.key === "ArrowLeft") next = (current + TABS.length - 1) % TABS.length;
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = TABS.length - 1;
-    else return;
+    if (event.key === "ArrowRight") {
+      next = (current + 1) % TABS.length;
+    } else if (event.key === "ArrowLeft") {
+      next = (current + TABS.length - 1) % TABS.length;
+    } else if (event.key === "Home") {
+      next = 0;
+    } else if (event.key === "End") {
+      next = TABS.length - 1;
+    } else {
+      return;
+    }
     event.preventDefault();
     setTab(TABS[next].id);
     document.getElementById(`${tabsId}-${TABS[next].id}`)?.focus();

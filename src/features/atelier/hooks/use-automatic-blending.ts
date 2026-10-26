@@ -8,7 +8,9 @@ export function useAutomaticBlending(
   onRod: (pose: StirPose) => void,
 ) {
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      return;
+    }
     let frame = 0;
     let last = 0;
     const start = performance.now();

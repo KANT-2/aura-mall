@@ -33,10 +33,13 @@ test("screen animations still refer to defined keyframes after CSS Module scopin
       const defined = new Set<string>();
       function visit(rules: CSSRuleList) {
         for (const rule of rules) {
-          if (rule instanceof CSSKeyframesRule) defined.add(rule.name);
-          else if (rule instanceof CSSImportRule && rule.styleSheet)
+          if (rule instanceof CSSKeyframesRule) {
+            defined.add(rule.name);
+          } else if (rule instanceof CSSImportRule && rule.styleSheet) {
             visit(rule.styleSheet.cssRules);
-          else if ("cssRules" in rule) visit((rule as CSSGroupingRule).cssRules);
+          } else if ("cssRules" in rule) {
+            visit((rule as CSSGroupingRule).cssRules);
+          }
         }
       }
       for (const sheet of document.styleSheets) {

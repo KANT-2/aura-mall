@@ -5,7 +5,9 @@ const NotificationContext = createContext<((message: string) => void) | null>(nu
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [message, notify] = useState("");
   useEffect(() => {
-    if (!message) return;
+    if (!message) {
+      return;
+    }
     const timer = setTimeout(() => notify(""), 3200);
     return () => clearTimeout(timer);
   }, [message]);
@@ -20,6 +22,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 }
 export function useNotify() {
   const notify = useContext(NotificationContext);
-  if (!notify) throw new Error("NotificationProvider is required");
+  if (!notify) {
+    throw new Error("NotificationProvider is required");
+  }
   return notify;
 }

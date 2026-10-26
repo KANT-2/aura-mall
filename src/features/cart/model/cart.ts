@@ -70,20 +70,28 @@ export function restoreCart(
   raw: unknown,
   catalog: Pick<Catalog, "products" | "ingredients">,
 ): CartItem[] {
-  if (!Array.isArray(raw)) return [];
+  if (!Array.isArray(raw)) {
+    return [];
+  }
   const { products, ingredients } = catalog;
   const merged = new Map<string, CartItem>();
   for (const i of raw) {
-    if (!isRecord(i) || !isRecord(i.product)) continue;
+    if (!isRecord(i) || !isRecord(i.product)) {
+      continue;
+    }
     const stored = i.product,
       id = stored.id;
-    if (typeof id !== "string") continue;
+    if (typeof id !== "string") {
+      continue;
+    }
     const quantity = clampQuantity(i.quantity);
     let item: CartItem;
     if (id === "custom-atelier") {
       const c = i.custom;
       const counts = isRecord(c) ? validCounts(c.counts, ingredients) : null;
-      if (!isRecord(c) || typeof c.name !== "string" || !c.name.trim() || !counts) continue;
+      if (!isRecord(c) || typeof c.name !== "string" || !c.name.trim() || !counts) {
+        continue;
+      }
       const custom: CustomRecipeItem = {
         name: c.name.trim(),
         label: recipeLabel(c.label),
@@ -106,13 +114,17 @@ export function restoreCart(
       };
     } else {
       const product = products.find((p) => p.id === id);
-      if (!product) continue;
+      if (!product) {
+        continue;
+      }
       const gift = product.type === "gift-set";
       const selection =
         gift && Array.isArray(i.selection)
           ? i.selection.filter((s): s is string => typeof s === "string")
           : [];
-      if (gift && !isGiftSelectionValid(product, selection, products)) continue;
+      if (gift && !isGiftSelectionValid(product, selection, products)) {
+        continue;
+      }
       item = { key: productKey(product.id, selection), product, quantity, selection };
     }
     const existing = merged.get(item.key);

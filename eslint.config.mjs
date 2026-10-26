@@ -18,6 +18,9 @@ export default defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    rules: { curly: ["error", "all"] },
+  },
+  {
     files: ["mock-server/**/*.ts"],
     rules: { "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }] },
   },

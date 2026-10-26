@@ -17,13 +17,16 @@ export function AtelierScreen({
   const recipes = useRecipes();
   const draft = useDraft();
   const error = session.error ?? recipes.error ?? draft.error;
-  if (error) throw error;
-  if (!recipes.ready || !draft.ready)
+  if (error) {
+    throw error;
+  }
+  if (!recipes.ready || !draft.ready) {
     return (
       <main className="page-width" aria-busy="true">
         <p role="status">조향 정보를 불러오고 있어요.</p>
       </main>
     );
+  }
   return (
     <AtelierEditor
       key={`${session.owner}:${recipeId ?? ""}:${resume}`}

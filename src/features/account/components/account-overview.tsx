@@ -22,13 +22,14 @@ export function MyPage() {
     [tab, setTab] = useState("scents"),
     [filter, setFilter] = useState("all");
   const orders = useOrders(tab === "orders");
-  if (!ready || !recipesReady)
+  if (!ready || !recipesReady) {
     return (
       <main className={styles.root + " page-width"} aria-busy="true">
         <p>내 정보를 불러오고 있어요.</p>
       </main>
     );
-  if (!user)
+  }
+  if (!user) {
     return (
       <main className={styles.root + " page-width"}>
         <div className="empty">
@@ -41,6 +42,7 @@ export function MyPage() {
         </div>
       </main>
     );
+  }
   return (
     <main data-testid={testIds.account.overview} className={styles.root + " page-width mypage"}>
       <div className="heading-row">

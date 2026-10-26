@@ -14,8 +14,9 @@ test("BFF exposes the storefront contract and keeps backend-only endpoints priva
   expect(session.headers()["set-cookie"]).toMatch(/HttpOnly/i);
   expect(session.headers()["set-cookie"]).not.toMatch(/Domain=/i);
   expect((await request.get("/api/auth/login")).status()).toBe(405);
-  for (const path of ["/api/__test__/seed", "/api/openapi.json", "/api/docs"])
+  for (const path of ["/api/__test__/seed", "/api/openapi.json", "/api/docs"]) {
     expect((await request.get(path)).status()).toBe(404);
+  }
 });
 
 test("BFF rejects foreign origins and invalid JSON before authentication", async ({ request }) => {

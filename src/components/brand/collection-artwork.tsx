@@ -20,7 +20,9 @@ export function AuraCollectionArtwork({
   collection: string;
   className?: string;
 }) {
-  if (!(collection in variants)) return null;
+  if (!(collection in variants)) {
+    return null;
+  }
   const key = collection as CollectionId;
   const images = variants[key];
   return (

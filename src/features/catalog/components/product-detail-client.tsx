@@ -29,9 +29,13 @@ export function ProductDetail({ product: p }: { product: Product }) {
     gift = p.type === "gift-set";
   const eligible = products.filter((x) => x.collection === p.collection && x.type !== "gift-set");
   function toggle(id: string) {
-    if (selection.includes(id)) setSelection(selection.filter((x) => x !== id));
-    else if (selection.length < 3) setSelection([...selection, id]);
-    else notify("제품은 3개까지 선택할 수 있어요.");
+    if (selection.includes(id)) {
+      setSelection(selection.filter((x) => x !== id));
+    } else if (selection.length < 3) {
+      setSelection([...selection, id]);
+    } else {
+      notify("제품은 3개까지 선택할 수 있어요.");
+    }
   }
   return (
     <main className={styles.root + " detail page-width"}>
@@ -178,7 +182,9 @@ export function ProductDetail({ product: p }: { product: Product }) {
         className="aura-image-preview"
         aria-label={p.name + " 제품 이미지 미리보기"}
         onClick={(event) => {
-          if (event.target === event.currentTarget) preview.current?.close();
+          if (event.target === event.currentTarget) {
+            preview.current?.close();
+          }
         }}
       >
         <button

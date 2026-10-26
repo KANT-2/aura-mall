@@ -124,8 +124,9 @@ test("cart restoration rebuilds product data from the catalog and merges bounded
   assert.deepEqual(rows[0].product, product);
   assert.equal(rows[0].quantity, MAX_QUANTITY);
   assert.deepEqual(rows[0].selection, []);
-  for (const quantity of [NaN, Infinity, "invalid", -3, 0])
+  for (const quantity of [NaN, Infinity, "invalid", -3, 0]) {
     assert.equal(clampQuantity(quantity), 1);
+  }
   assert.equal(clampQuantity(2.9), 2);
 });
 

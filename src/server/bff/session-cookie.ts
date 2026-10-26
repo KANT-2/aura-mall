@@ -12,7 +12,9 @@ export function requestSessionCookie(cookie: string | null, name: string) {
 export function responseSessionCookies(values: string[], name: string, secure: boolean) {
   return values.flatMap((value) => {
     const [pair, ...attributes] = value.split(";").map((part) => part.trim());
-    if (!pair.startsWith(`${name}=`)) return [];
+    if (!pair.startsWith(`${name}=`)) {
+      return [];
+    }
     const expiry = attributes.filter((attribute) => /^expires=|^max-age=/i.test(attribute));
     return [
       [pair, "Path=/", "HttpOnly", "SameSite=Lax", ...(secure ? ["Secure"] : []), ...expiry].join(

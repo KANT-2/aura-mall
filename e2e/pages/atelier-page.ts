@@ -58,7 +58,9 @@ export class AtelierPage {
     await expect(this.dialog).toBeVisible();
   }
   async finishByKeyboard() {
-    for (let index = 0; index < 13; index++) await this.slider.press("ArrowRight");
+    for (let index = 0; index < 13; index++) {
+      await this.slider.press("ArrowRight");
+    }
     await expect(this.slider).toHaveAttribute("aria-valuenow", "100");
     await this.finish.click();
   }

@@ -8,7 +8,9 @@ test("rapid selection enforces the drop limit and clearing resets the compositio
 }) => {
   await atelier.openWorkspace();
   await atelier.ingredient().evaluate((button) => {
-    for (let index = 0; index < 40; index++) (button as HTMLButtonElement).click();
+    for (let index = 0; index < 40; index++) {
+      (button as HTMLButtonElement).click();
+    }
   });
   await atelier.expectDropCount(20);
   await expect(atelier.ingredient()).toBeDisabled();

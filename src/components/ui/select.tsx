@@ -23,7 +23,9 @@ export function StyledSelect({ label, value, onChange, name, options, testId }: 
 
   useEffect(() => {
     const close = (event: PointerEvent) => {
-      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+      if (!ref.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
     };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
@@ -68,10 +70,15 @@ export function StyledSelect({ label, value, onChange, name, options, testId }: 
     }
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      if (open) choose(active);
-      else setOpen(true);
+      if (open) {
+        choose(active);
+      } else {
+        setOpen(true);
+      }
     }
-    if (event.key === "Tab") setOpen(false);
+    if (event.key === "Tab") {
+      setOpen(false);
+    }
   }
 
   return (
@@ -79,7 +86,9 @@ export function StyledSelect({ label, value, onChange, name, options, testId }: 
       className="a-select"
       ref={ref}
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setOpen(false);
+        }
       }}
     >
       {name && <input type="hidden" name={name} value={current} />}

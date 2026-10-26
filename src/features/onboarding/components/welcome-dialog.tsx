@@ -56,21 +56,33 @@ export function WelcomeJourney() {
     };
     window.addEventListener("aura:welcome", onWelcome);
     try {
-      if (sessionStorage.getItem(KEY) === "1") onWelcome();
+      if (sessionStorage.getItem(KEY) === "1") {
+        onWelcome();
+      }
     } catch {}
     return () => window.removeEventListener("aura:welcome", onWelcome);
   }, []);
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
     // Same focus handling as AtelierModal: move in, keep Tab inside, restore on close.
     const before = document.activeElement as HTMLElement | null;
     dialog.current?.focus();
     const keyboard = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-      if (e.key === "ArrowRight") setPage((p) => Math.min(4, p + 1));
-      if (e.key === "ArrowLeft") setPage((p) => Math.max(0, p - 1));
+      if (e.key === "Escape") {
+        close();
+      }
+      if (e.key === "ArrowRight") {
+        setPage((p) => Math.min(4, p + 1));
+      }
+      if (e.key === "ArrowLeft") {
+        setPage((p) => Math.max(0, p - 1));
+      }
       const root = dialog.current;
-      if (e.key !== "Tab" || !root) return;
+      if (e.key !== "Tab" || !root) {
+        return;
+      }
       const items = [
         ...root.querySelectorAll<HTMLElement>(
           'button:not(:disabled),a[href],input:not(:disabled),[tabindex="0"]',
@@ -102,22 +114,32 @@ export function WelcomeJourney() {
     return () => {
       window.removeEventListener("keydown", keyboard);
       document.body.style.overflow = old;
-      if (before?.isConnected) before.focus();
+      if (before?.isConnected) {
+        before.focus();
+      }
     };
   }, [open]);
   const onPointerUp = (e: PointerEvent<HTMLElement>) => {
-    if (start.current === null) return;
+    if (start.current === null) {
+      return;
+    }
     const dx = e.clientX - start.current;
     start.current = null;
-    if (Math.abs(dx) > 55) setPage((p) => Math.max(0, Math.min(4, p + (dx < 0 ? 1 : -1))));
+    if (Math.abs(dx) > 55) {
+      setPage((p) => Math.max(0, Math.min(4, p + (dx < 0 ? 1 : -1))));
+    }
   };
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
   return (
     <div
       className="a-welcome-overlay"
       role="presentation"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) close();
+        if (e.target === e.currentTarget) {
+          close();
+        }
       }}
     >
       <section
@@ -221,7 +243,9 @@ export function WelcomeJourney() {
                 if (page === 4) {
                   close();
                   router.push("/atelier");
-                } else setPage((p) => p + 1);
+                } else {
+                  setPage((p) => p + 1);
+                }
               }}
             >
               {page === 4 ? "나만의 향 만들기" : "다음 →"}
