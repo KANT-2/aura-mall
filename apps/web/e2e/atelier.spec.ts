@@ -21,6 +21,7 @@ test("rapid selection enforces the drop limit and clearing resets the compositio
 
 test("keyboard blending reaches a named result and edits invalidate cart confirmation", async ({
   atelier,
+  page,
 }) => {
   await atelier.openWorkspace();
   await atelier.openBlend();
@@ -33,6 +34,10 @@ test("keyboard blending reaches a named result and edits invalidate cart confirm
   await atelier.edit.click();
   await atelier.expectStep("select");
   await atelier.expectDropCount(1);
+  await page.goto("/cart");
+  await expect(page.getByRole("heading", { name: composition.name, exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: composition.name, exact: true })).toBeVisible();
 });
 
 test("server autosave survives reload and clearing the last ingredient discards the draft", async ({

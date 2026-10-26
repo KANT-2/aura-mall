@@ -29,11 +29,10 @@ export function useAuth() {
     },
     async onSuccess(session: Session) {
       await client.cancelQueries({
-        predicate: (query) =>
-          ["session", "cart", "recipes", "orders"].includes(String(query.queryKey[0])),
+        predicate: (query) => ["session", "recipes", "orders"].includes(String(query.queryKey[0])),
       });
       client.removeQueries({
-        predicate: (query) => ["cart", "recipes", "orders"].includes(String(query.queryKey[0])),
+        predicate: (query) => ["recipes", "orders"].includes(String(query.queryKey[0])),
       });
       client.setQueryData(sessionKey, session);
     },
