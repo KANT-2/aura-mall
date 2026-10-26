@@ -9,7 +9,7 @@ import { Providers } from "@/app/providers";
 import { SiteHeader } from "@/app/_components/site-header";
 import { WelcomeJourney } from "@/features/onboarding/components/welcome-dialog";
 import { Footer } from "@/components/layout/site-footer";
-import "./globals.css";
+import "@/app/globals.css";
 
 const cormorant = Cormorant_Garamond({
   weight: ["400", "500", "600"],

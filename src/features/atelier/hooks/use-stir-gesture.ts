@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
   type PointerEvent,
 } from "react";
-import { manualStir, type BlendMode, type StirPose } from "../model/blending";
+import { manualStir, type BlendMode, type StirPose } from "@/features/atelier/model/blending";
 
 const restingRod: StirPose = { x: 50, y: 50, energy: 0 };
 const bound = (value: number) => Math.max(12, Math.min(88, value));

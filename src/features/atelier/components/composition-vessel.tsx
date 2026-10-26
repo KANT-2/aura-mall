@@ -6,8 +6,8 @@ import { testIds } from "@/lib/test-ids";
 import { Beaker } from "@/components/illustrations/beaker";
 import { UtilityIcon } from "@/components/ui/utility-icon";
 import { noteEnglish } from "@/features/atelier/lib/content";
-import vesselStyles from "./composition-vessel.module.css";
-import modalStyles from "./atelier-dialog.module.css";
+import vesselStyles from "@/features/atelier/components/composition-vessel.module.css";
+import modalStyles from "@/features/atelier/components/atelier-dialog.module.css";
 
 type CompositionVesselProps = {
   counts: Record<string, number>;

@@ -1,6 +1,6 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
-import { sessionQueryOptions } from "../api/session";
+import { sessionQueryOptions } from "@/features/account/api/session";
 
 export function useSession() {
   const query = useQuery({ ...sessionQueryOptions, throwOnError: true });

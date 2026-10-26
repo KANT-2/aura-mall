@@ -2,7 +2,7 @@
 import { useOrders } from "@/features/checkout/hooks/use-orders";
 import { money } from "@/lib/format";
 import { testIds } from "@/lib/test-ids";
-import styles from "./account.module.css";
+import styles from "@/features/account/components/account.module.css";
 import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "@/features/account/hooks/use-auth";

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { HttpError } from "./http";
 import type { Request, Response } from "express";
-import type { Member } from "../src/features/account/model/account";
+import type { Member } from "@/features/account/model/account";
 import type { Account, MockDatabase, MockSession } from "./data/store";
 
 export const SESSION_COOKIE = "aura_mock_session";

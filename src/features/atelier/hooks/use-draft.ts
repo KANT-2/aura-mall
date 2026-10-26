@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNotify } from "@/components/feedback/notification-provider";
 import { useSession } from "@/features/account/hooks/use-session";
-import { draftKey, getDraft, saveDraft } from "../api/draft";
+import { draftKey, getDraft, saveDraft } from "@/features/atelier/api/draft";
 export function useDraft() {
   const { guestId, ready } = useSession();
   const client = useQueryClient();

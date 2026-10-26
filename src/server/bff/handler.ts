@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto";
 import { ApiError } from "@/lib/api/errors";
 import { backendConfig } from "@/server/backend/config";
 import { backendRequest, backendError } from "@/server/backend/transport";
-import { requestSessionCookie, responseSessionCookies } from "./session-cookie";
-import { jsonRequestBody } from "./request-body";
+import { requestSessionCookie, responseSessionCookies } from "@/server/bff/session-cookie";
+import { jsonRequestBody } from "@/server/bff/request-body";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type Params = Record<string, string>;

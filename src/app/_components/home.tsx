@@ -8,7 +8,7 @@ import { getServerCatalog } from "@/features/catalog/api/server";
 import { PromotionCarousel } from "@/app/_components/promotion-carousel";
 import { ProductRail } from "@/app/_components/product-rail";
 import { HomeReveal } from "@/app/_components/home-reveal";
-import styles from "./home.module.css";
+import styles from "@/app/_components/home.module.css";
 
 export async function Home() {
   const { products, collections, home } = await getServerCatalog();

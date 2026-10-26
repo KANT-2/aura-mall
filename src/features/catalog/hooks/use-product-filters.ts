@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { Collection, ProductType } from "../model/catalog";
+import type { Collection, ProductType } from "@/features/catalog/model/catalog";
 
 type InitialFilters = { initialCollection?: string; initialType?: string; initialQuery?: string };
 export function useProductFilters(

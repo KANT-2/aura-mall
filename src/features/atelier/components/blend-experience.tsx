@@ -1,7 +1,7 @@
 "use client";
 import { testIds } from "@/lib/test-ids";
-import blendStyles from "./blend-experience.module.css";
-import mixingVesselStyles from "./mixing-vessel.module.css";
+import blendStyles from "@/features/atelier/components/blend-experience.module.css";
+import mixingVesselStyles from "@/features/atelier/components/mixing-vessel.module.css";
 import type { CSSProperties, HTMLAttributes } from "react";
 import type { Ingredient } from "@/features/catalog/model/catalog";
 import { MAX_DROPS } from "@/features/atelier/model/recipes";

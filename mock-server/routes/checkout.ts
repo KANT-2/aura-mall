@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
-import { restoreCart } from "../../src/features/cart/model/cart";
-import { itemPrice, shippingFee } from "../../src/features/cart/model/pricing";
+import { restoreCart } from "@/features/cart/model/cart";
+import { itemPrice, shippingFee } from "@/features/cart/model/pricing";
 import { catalog, type MockDatabase } from "../data/store";
 import { resolveSession } from "../session";
 import { HttpError, requireString } from "../http";

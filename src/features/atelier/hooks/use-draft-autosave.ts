@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { totalCount, type AtelierDraft } from "../model/recipes";
-import type { AtelierState } from "../model/composition";
+import { totalCount, type AtelierDraft } from "@/features/atelier/model/recipes";
+import type { AtelierState } from "@/features/atelier/model/composition";
 
 /** Debounce user edits; flush navigation and explicitly discard before deleting a draft. */
 export function useDraftAutosave(

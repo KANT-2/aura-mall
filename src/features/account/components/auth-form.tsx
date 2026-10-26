@@ -1,7 +1,7 @@
 "use client";
 import { testIds } from "@/lib/test-ids";
 /* eslint-disable @next/next/no-img-element */
-import styles from "./account.module.css";
+import styles from "@/features/account/components/account.module.css";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";

@@ -33,7 +33,7 @@ for (const file of allFiles.filter((file) => /\.[jt]sx?$/.test(file))) {
     if (!reference.endsWith(".css")) continue;
     if (!reference.endsWith(".module.css")) {
       assert.equal(file, "src/app/layout.tsx", `${file}: only the root layout imports global CSS.`);
-      assert.equal(reference, "./globals.css", "Use a single global CSS entry.");
+      assert.equal(reference, "@/app/globals.css", "Use a single global CSS entry.");
       continue;
     }
     const stylesheet = reference.startsWith("@/")
