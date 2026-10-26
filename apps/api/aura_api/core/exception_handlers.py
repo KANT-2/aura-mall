@@ -7,6 +7,7 @@ from starlette.responses import JSONResponse
 
 from aura_api.core.errors import error_body
 from aura_api.core.middleware import UUID_PATTERN
+from aura_api.core.security import apply_security_headers
 
 # Exception headers are server-authored protocol metadata, not arbitrary output.
 PUBLIC_EXCEPTION_HEADERS = {"allow", "www-authenticate", "retry-after"}
@@ -44,11 +45,13 @@ async def server_exception_handler(request: Request, exc: Exception) -> JSONResp
             else str(uuid4())
         )
 
-    return JSONResponse(
+    response = JSONResponse(
         error_body(500),
         status_code=500,
         headers={"X-Request-ID": request_id},
     )
+    apply_security_headers(response.headers)
+    return response
 
 
 def register_exception_handlers(app: FastAPI) -> None:

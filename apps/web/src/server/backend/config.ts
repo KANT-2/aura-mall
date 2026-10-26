@@ -9,6 +9,7 @@ export function backendConfig() {
     const sessionCookie = process.env.API_SESSION_COOKIE ?? "aura_mock_session";
     const timeoutMs = Number(process.env.API_TIMEOUT_MS ?? 10000);
     const appOrigin = process.env.APP_ORIGIN ? new URL(process.env.APP_ORIGIN).origin : undefined;
+    const bffSharedKey = process.env.API_BFF_SHARED_KEY || undefined;
     if (
       !["http:", "https:"].includes(baseUrl.protocol) ||
       baseUrl.username ||
@@ -20,13 +21,20 @@ export function backendConfig() {
       !Number.isInteger(timeoutMs) ||
       timeoutMs < 1 ||
       timeoutMs > 60000 ||
-      (appOrigin !== undefined && !/^https?:\/\//.test(appOrigin))
+      (appOrigin !== undefined && !/^https?:\/\//.test(appOrigin)) ||
+      (bffSharedKey !== undefined && !/^[A-Za-z0-9_-]{32,128}$/.test(bffSharedKey))
     ) {
       throw new Error("Invalid backend configuration");
     }
 
     const base = baseUrl.href.replace(/\/$/, "");
-    return { apiUrl: `${base}${prefix.replace(/\/$/, "")}`, sessionCookie, timeoutMs, appOrigin };
+    return {
+      apiUrl: `${base}${prefix.replace(/\/$/, "")}`,
+      sessionCookie,
+      timeoutMs,
+      appOrigin,
+      bffSharedKey,
+    };
   } catch {
     throw new ApiError(500, "API 서버 설정을 확인해 주세요.", "CONFIGURATION_ERROR");
   }

@@ -20,7 +20,7 @@ class PrivateInput(BaseModel):
 
 @pytest.fixture
 def client():
-    app = create_app(Settings(_env_file=None))
+    app = create_app(Settings(_env_file=None, csrf_allowed_origins=["http://mall.test"]))
 
     @app.get("/test/request-id")
     async def request_id(request: Request):
@@ -58,7 +58,9 @@ def client():
     async def invalid_response():
         return {"password": SECRETS}
 
-    with TestClient(app, raise_server_exceptions=False) as test_client:
+    with TestClient(
+        app, raise_server_exceptions=False, headers={"Origin": "http://mall.test"}
+    ) as test_client:
         yield test_client
 
 
@@ -133,6 +135,8 @@ def test_status_error_shape_and_request_id(
 
     assert response.status_code == status
     assert response.headers["content-type"] == "application/json"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "no-referrer"
     assert len(response.headers.get_list("x-request-id")) == 1
     assert UUID(response.headers["x-request-id"])
     if supplied:
@@ -221,6 +225,7 @@ def test_500_before_request_id_middleware_is_safe(request_id):
         "error": {"code": "INTERNAL_ERROR", "message": "요청을 처리하지 못했어요."}
     }
     actual_id = response.headers["x-request-id"]
+    assert response.headers["x-content-type-options"] == "nosniff"
     assert UUID(actual_id)
     if request_id and request_id != "invalid-request-id":
         assert actual_id == request_id
