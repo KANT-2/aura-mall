@@ -28,11 +28,15 @@ export function backendSegment(value: string) {
 
 export function backendError(status: number, data: unknown) {
   let message = "요청을 처리하지 못했어요.";
+  let code = `HTTP_${status}`;
   if (status === 422) {
     message = "입력 항목을 확인해 주세요.";
   } else if (isRecord(data)) {
     if (isRecord(data.error) && typeof data.error.message === "string") {
       message = data.error.message;
+      if (typeof data.error.code === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(data.error.code)) {
+        code = data.error.code;
+      }
     } else if (typeof data.detail === "string") {
       message = data.detail;
     } else if (isRecord(data.detail) && typeof data.detail.message === "string") {
@@ -41,7 +45,7 @@ export function backendError(status: number, data: unknown) {
   }
 
   // FastAPI validation details can contain submitted passwords and other private input.
-  return new ApiError(status, message, status === 422 ? "VALIDATION_ERROR" : `HTTP_${status}`);
+  return new ApiError(status, message, status === 422 ? "VALIDATION_ERROR" : code);
 }
 
 /** Both RSC and BFF use this transport; RSC never calls the public Next API over HTTP. */

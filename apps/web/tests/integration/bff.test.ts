@@ -4,6 +4,9 @@ import { once } from "node:events";
 
 vi.mock("server-only", () => ({}));
 import { GET as catalog } from "@/app/api/catalog/route";
+import { GET as product } from "@/app/api/catalog/products/[id]/route";
+import { POST as inquiry } from "@/app/api/partner/route";
+import { POST as saveRecipe } from "@/app/api/recipes/route";
 import { GET as session } from "@/app/api/session/route";
 import { POST as login } from "@/app/api/auth/login/route";
 import { POST as logout } from "@/app/api/auth/logout/route";
@@ -15,6 +18,8 @@ import { GET as adminProducts } from "@/app/api/admin/products/route";
 import { PATCH as updateAdminInquiry } from "@/app/api/admin/inquiries/[id]/route";
 import { createBffHandler } from "@/server/bff/handler";
 import { serverRequest } from "@/lib/api/server";
+import { catalogResponse } from "@/server/backend/storefront";
+import fixtureCatalog from "../../mock-server/fixtures/catalog.json";
 
 type Call = { url?: string; method?: string; headers: IncomingMessage["headers"]; body: string };
 let calls: Call[] = [];
@@ -62,7 +67,7 @@ beforeEach(() => {
   vi.stubEnv("APP_ORIGIN", "");
   vi.stubEnv("API_BFF_SHARED_KEY", "");
   calls = [];
-  respond = (res) => json(res, { ok: true });
+  respond = (res) => json(res, calls.at(-1)?.url?.includes("/catalog") ? fixtureCatalog : []);
 });
 
 describe("JWT cookie to Bearer adapter", () => {
@@ -77,7 +82,8 @@ describe("JWT cookie to Bearer adapter", () => {
   const publicData = { user: member, guestId: "guest-1" };
   beforeEach(() => {
     vi.stubEnv("API_AUTH_MODE", "jwt");
-    respond = (res) => json(res, publicData);
+    respond = (res) =>
+      json(res, calls.at(-1)?.url?.includes("/catalog") ? fixtureCatalog : publicData);
   });
 
   it("uses only the allow-listed cookie for Bearer and preserves owner/request IDs", async () => {
@@ -250,6 +256,115 @@ afterAll(async () => {
   );
 });
 
+describe("storefront resource contract", () => {
+  const recipe = {
+    id: "server-recipe",
+    name: "향",
+    label: "paper",
+    counts: { bergamot: 3 },
+    version: 1,
+    color: "#e8d36b",
+    created: "2026-10-26T00:00:00Z",
+  };
+
+  it("sends only recipe inputs and returns the server's public recipe", async () => {
+    respond = (res) => json(res, { ...recipe, ownerId: "private", token: "private" }, 201);
+    const input = { name: "향", label: "paper", counts: { bergamot: 3 }, parent: "parent-1" };
+    const response = await saveRecipe(
+      request("/api/recipes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Session-Owner": "member-1" },
+        body: JSON.stringify({
+          ...input,
+          id: "client-id",
+          userId: "other-member",
+          version: 999,
+          color: "#000000",
+          created: "private",
+        }),
+      }),
+    );
+    expect(response.status).toBe(201);
+    expect(JSON.parse(calls[0].body)).toEqual(input);
+    expect(calls[0].headers["x-session-owner"]).toBe("member-1");
+    expect(await response.json()).toEqual(recipe);
+  });
+
+  it("keeps inquiry status and private fields out of the public request and response", async () => {
+    respond = (res) => json(res, { id: "inquiry-1", email: "private", memo: "private" }, 201);
+    const input = {
+      brand: "AURA",
+      name: "담당자",
+      email: "a@example.com",
+      introduction: "소개",
+      message: "문의",
+      type: "향수",
+      consent: "on",
+      website: "",
+    };
+    const response = await inquiry(
+      request("/api/partner", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "aura_session=private",
+          Authorization: "Bearer private",
+        },
+        body: JSON.stringify({
+          ...input,
+          userId: "admin",
+          status: "done",
+          memo: "private",
+          id: "client-id",
+        }),
+      }),
+    );
+    expect(response.status).toBe(201);
+    expect(JSON.parse(calls[0].body)).toEqual(input);
+    expect(calls[0].headers.cookie).toBeUndefined();
+    expect(calls[0].headers.authorization).toBeUndefined();
+    expect(await response.json()).toEqual({ id: "inquiry-1" });
+  });
+
+  it("preserves FastAPI domain codes and never exposes their private details", async () => {
+    respond = (res) =>
+      json(
+        res,
+        {
+          error: {
+            code: "PRODUCT_NOT_FOUND",
+            message: "상품을 찾을 수 없어요.",
+            details: "private",
+          },
+        },
+        404,
+      );
+    const response = await product(request("/api/catalog/products/missing"), {
+      params: Promise.resolve({ id: "missing" }),
+    });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      error: { code: "PRODUCT_NOT_FOUND", message: "상품을 찾을 수 없어요." },
+    });
+  });
+
+  it("uses the same catalog validation for BFF and direct RSC requests", async () => {
+    respond = (res) => json(res, { ...fixtureCatalog, secret: "private", products: [] });
+    const response = await catalog(request("/api/catalog"));
+    expect(await response.json()).toEqual({ ...fixtureCatalog, products: [] });
+    await expect(serverRequest("/catalog", catalogResponse)).resolves.toEqual({
+      ...fixtureCatalog,
+      products: [],
+    });
+    respond = (res) => json(res, { products: "private" });
+    expect((await catalog(request("/api/catalog"))).status).toBe(502);
+    await expect(serverRequest("/catalog", catalogResponse)).rejects.toMatchObject({
+      status: 502,
+      code: "INVALID_BACKEND_RESPONSE",
+    });
+  });
+});
+
 describe("Next BFF to FastAPI HTTP boundary", () => {
   it("adds only the configured server key to originless backend mutations", async () => {
     const key = "test-only-server-key-0123456789abcdef";
@@ -304,12 +419,12 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
       }),
     );
     expect(result.status).toBe(200);
-    expect(await result.json()).toEqual({ ok: true });
+    expect(await result.json()).toEqual(fixtureCatalog);
     expect(calls[0].url).toBe("/api/v1/catalog");
     expect(calls[0].headers.cookie).toBeUndefined();
     expect(calls[0].headers.authorization).toBeUndefined();
     expect(result.headers.get("cache-control")).toContain("no-store");
-    await expect(serverRequest("/catalog")).resolves.toEqual({ ok: true });
+    await expect(serverRequest("/catalog")).resolves.toEqual(fixtureCatalog);
     expect(calls[1].url).toBe("/api/v1/catalog");
     expect(calls[1].headers.cookie).toBeUndefined();
   });
@@ -516,7 +631,7 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
     expect(deleted.status).toBe(204);
     expect(await deleted.text()).toBe("");
     expect(calls[0].method).toBe("DELETE");
-    respond = (res) => json(res, { ok: true });
+    respond = (res) => json(res, fixtureCatalog);
     expect((await catalog(request("/api/catalog", { method: "HEAD" }))).status).toBe(200);
     expect(calls[1].method).toBe("GET");
   });
@@ -591,7 +706,7 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
   it("keeps public endpoints from propagating upstream cookies", async () => {
     respond = (res) => {
       res.setHeader("Set-Cookie", "aura_session=unwanted; Path=/");
-      json(res, { ok: true });
+      json(res, fixtureCatalog);
     };
     expect((await catalog(request("/api/catalog"))).headers.getSetCookie()).toEqual([]);
     const result = await createBffHandler("GET", "/catalog", { session: false })(

@@ -16,7 +16,13 @@ import { publicSession } from "@/server/bff/session-response";
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type Params = Record<string, string>;
 type BackendPath = string | ((params: Params) => string);
-type HandlerOptions = { session?: boolean; query?: readonly string[]; sessionResponse?: boolean };
+type HandlerOptions = {
+  session?: boolean;
+  query?: readonly string[];
+  sessionResponse?: boolean;
+  bodyFields?: readonly string[];
+  responseBody?: (data: unknown) => unknown;
+};
 
 /** Forward only allow-listed, single-valued query parameters. */
 export function allowedQuery(url: string, names: readonly string[] = []) {
@@ -36,7 +42,7 @@ export function allowedQuery(url: string, names: readonly string[] = []) {
 export function createBffHandler(
   method: Method,
   path: BackendPath,
-  { session = true, query, sessionResponse = false }: HandlerOptions = {},
+  { session = true, query, sessionResponse = false, bodyFields, responseBody }: HandlerOptions = {},
 ) {
   return async function handle(request: Request, context?: { params: Promise<Params> }) {
     const requestId = randomUUID();
@@ -68,7 +74,18 @@ export function createBffHandler(
         throw new ApiError(403, "허용되지 않은 출처의 요청이에요.", "INVALID_ORIGIN");
       }
 
-      const body = mutation ? await jsonRequestBody(request) : undefined;
+      let body = mutation ? await jsonRequestBody(request) : undefined;
+      if (body !== undefined && bodyFields) {
+        const input = JSON.parse(body) as Record<string, unknown>;
+        body = JSON.stringify(
+          Object.fromEntries(
+            bodyFields
+              .filter((name) => Object.hasOwn(input, name))
+              .map((name) => [name, input[name]]),
+          ),
+        );
+      }
+
       const backendPath = typeof path === "string" ? path : path(await context!.params);
       const response = await backendRequest(backendPath, {
         method,
@@ -87,10 +104,15 @@ export function createBffHandler(
         throw backendError(response.status, response.data);
       }
 
-      const data =
-        jwt && sessionResponse && response.status < 400
-          ? publicSession(response.data)
-          : response.data;
+      let data = response.data;
+      if (response.status < 400) {
+        if (jwt && sessionResponse) {
+          data = publicSession(data);
+        } else if (responseBody) {
+          data = responseBody(data);
+        }
+      }
+
       if (session) {
         for (const cookie of responseSessionCookies(
           response.cookies,
