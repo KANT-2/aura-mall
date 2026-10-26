@@ -54,20 +54,27 @@ export function MyPage() {
           <h1>{user.name}님의 취향 기록</h1>
           <p>만든 향과 좋아하는 순간을 오래도록.</p>
         </div>
-        <button
-          data-testid={testIds.account.logout}
-          className="text-link"
-          onClick={async () => {
-            try {
-              await signOut();
-              notify("로그아웃했어요.");
-            } catch (error) {
-              notify(error instanceof Error ? error.message : "로그아웃하지 못했어요.");
-            }
-          }}
-        >
-          로그아웃
-        </button>
+        <div className="actions">
+          {user.role === "admin" ? (
+            <Link className="text-link" href="/admin">
+              관리자 페이지
+            </Link>
+          ) : null}
+          <button
+            data-testid={testIds.account.logout}
+            className="text-link"
+            onClick={async () => {
+              try {
+                await signOut();
+                notify("로그아웃했어요.");
+              } catch (error) {
+                notify(error instanceof Error ? error.message : "로그아웃하지 못했어요.");
+              }
+            }}
+          >
+            로그아웃
+          </button>
+        </div>
       </div>
       <div className="tabs">
         {[

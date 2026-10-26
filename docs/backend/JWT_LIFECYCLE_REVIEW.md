@@ -3,7 +3,26 @@
 검토일: 2026-10-26. 브랜치: `feature/backend-jwt-lifecycle-yejin`.
 **코드·오프라인 테스트 준비와 실제 DB·BFF 연계 완료를 구분합니다. 현재 배포 준비 완료 상태는 아닙니다.**
 
-## 1. 기준과 변경 보존
+## 진행 중인 develop 병합 보완 (2026-10-26)
+
+- JWT 작업 커밋 `1a7980b`와 병합 대상 `a69c330`을 보존합니다. 사용자가 시작한 병합의 충돌을 해결하며 최종 병합 커밋은 만들지 않습니다.
+- `main.py`는 JWT 검증기·저장소·서비스와 SQLAlchemy 세션 팩토리를 함께 초기화합니다. lifespan(라이프스팬, 앱 실행 수명)의 finally에서 엔진을 정리합니다.
+- 자동 병합된 config의 중복 DB 설정·검증기를 제거했습니다. `postgres://`, `postgresql://`, `postgresql+asyncpg://`를 검증하고 SQLAlchemy에는 asyncpg 드라이버 URL, JWT psycopg 저장소에는 PostgreSQL URL을 전달합니다. 비밀번호를 로그로 출력하지 않습니다.
+- SQLAlchemy의 요청별 세션은 기존 `get_session`이 종료합니다. JWT 저장소는 별도 psycopg 연결·트랜잭션을 유지합니다. 두 방식이 하나의 트랜잭션을 공유하는 것은 아니며 향후 도메인 연계 시 정리가 필요합니다. 드라이버별 query 옵션(예: SSL)의 배포 호환성은 실제 연결 환경에서 추가 확인해야 합니다.
+- Alembic·asyncpg·SQLAlchemy와 Argon2id·PyJWT·psycopg 의존성을 함께 유지하고 `uv lock`으로 재생성했습니다.
+- BFF의 쿠키→Bearer·401 처리 구현은 보존합니다. BFF 기대 계약은 Session+쿠키, 백엔드는 TokenPair JSON·로그아웃 204이므로 응답 어댑터가 필요합니다. 백엔드 Refresh는 구현됐으나 BFF 자동 갱신은 미구현입니다.
+- BFF 테스트 전용 앱의 로그인·로그아웃이 새 운영 경로보다 먼저 선택되도록 테스트 앱 안에서만 등록 순서를 조정했습니다. 운영 라우팅·BFF 소스는 변경하지 않았습니다.
+- 최신 SQL·ORM에도 `users.is_active`, `refresh_tokens`, `auth_token_families`, `auth_access_tokens`가 없습니다. 스키마·마이그레이션은 변경하지 않았습니다. 기존 가드와 기본 거부 정책을 유지합니다.
+- 이하 PR #33 시점 기록은 과거 검토 이력이며 현재 병합·BFF 현황과 구분합니다.
+
+### 병합 검증 기록
+
+- API 린트·포맷 통과, **396개 통과 / 30개 건너뜀 / 0개 실패**. 앱 조합·종료 및 BFF 테스트 경로 회귀 6개를 추가했습니다.
+- `AURA_TEST_DATABASE_URL`을 검사 프로세스에서 제거하고 DB 테스트 허용을 비활성화했습니다. DB 전용 4개와 기존 생명주기 건너뜀 26개는 실제 PostgreSQL 검증 완료를 뜻하지 않습니다.
+- `npm run build` 통과. 전체 `npm run check`는 이번 보완에서 수정하지 않은 파일 245개의 포맷 경고로 중단됐습니다. 해당 파일은 일괄 변경하지 않았습니다.
+- `npm run check:web` 통과: 웹 린트·CSS·타입 검사와 테스트 106개 통과. JWT BFF E2E 3개도 통과했습니다. E2E는 테스트 전용 FastAPI 앱을 사용하며 실제 PostgreSQL 생명주기·Refresh API 연동 검증은 아닙니다.
+
+## 1. 기준과 변경 보존 (병합 전 기록)
 
 - 기존 미커밋 변경을 보존했습니다. fetch만 수행했고 stash·reset·merge·commit·push는 하지 않았습니다.
 - 확인한 원격은 `origin/develop`의 `3d71af9bacf4c242d18bac17d175426ab77bbf1a`, PR #33입니다.

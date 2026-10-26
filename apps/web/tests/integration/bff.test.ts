@@ -6,9 +6,13 @@ vi.mock("server-only", () => ({}));
 import { GET as catalog } from "@/app/api/catalog/route";
 import { GET as session } from "@/app/api/session/route";
 import { POST as login } from "@/app/api/auth/login/route";
+import { POST as logout } from "@/app/api/auth/logout/route";
+import { POST as register } from "@/app/api/auth/register/route";
 import { PUT as saveDraft } from "@/app/api/atelier/draft/route";
 import { DELETE as removeRecipe } from "@/app/api/recipes/[id]/route";
 import { DELETE as removeDraft } from "@/app/api/atelier/draft/route";
+import { GET as adminProducts } from "@/app/api/admin/products/route";
+import { PATCH as updateAdminInquiry } from "@/app/api/admin/inquiries/[id]/route";
 import { createBffHandler } from "@/server/bff/handler";
 import { serverRequest } from "@/lib/api/server";
 
@@ -53,11 +57,183 @@ beforeEach(() => {
   vi.stubEnv("API_URL", base);
   vi.stubEnv("API_PREFIX", "/api");
   vi.stubEnv("API_SESSION_COOKIE", "aura_session");
+  vi.stubEnv("API_AUTH_MODE", "cookie");
   vi.stubEnv("API_TIMEOUT_MS", "1000");
   vi.stubEnv("APP_ORIGIN", "");
   vi.stubEnv("API_BFF_SHARED_KEY", "");
   calls = [];
   respond = (res) => json(res, { ok: true });
+});
+
+describe("JWT cookie to Bearer adapter", () => {
+  const token = "header.payload.signature";
+  const member = {
+    id: "member-1",
+    name: "회원",
+    email: "member@example.com",
+    coupon: true,
+    role: "member",
+  };
+  const publicData = { user: member, guestId: "guest-1" };
+  beforeEach(() => {
+    vi.stubEnv("API_AUTH_MODE", "jwt");
+    respond = (res) => json(res, publicData);
+  });
+
+  it("uses only the allow-listed cookie for Bearer and preserves owner/request IDs", async () => {
+    const response = await saveDraft(
+      request("/api/atelier/draft", {
+        method: "PUT",
+        headers: {
+          Cookie: `analytics=private; aura_session=${token}`,
+          Authorization: "Bearer attacker",
+          "X-User-ID": "admin",
+          "X-Session-Owner": "member-1",
+          "X-Request-ID": "attacker",
+        },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(calls[0].headers.authorization).toBe(`Bearer ${token}`);
+    expect(calls[0].headers.cookie).toBeUndefined();
+    expect(calls[0].headers["x-user-id"]).toBeUndefined();
+    expect(calls[0].headers["x-session-owner"]).toBe("member-1");
+    expect(calls[0].headers["x-request-id"]).toBe(response.headers.get("x-request-id"));
+    expect(await response.text()).not.toContain(token);
+  });
+
+  it("keeps catalog and RSC public, and never uses browser Authorization as fallback", async () => {
+    await catalog(request("/api/catalog", { headers: { Cookie: `aura_session=${token}` } }));
+    await serverRequest("/catalog");
+    await session(request("/api/session", { headers: { Authorization: `Bearer ${token}` } }));
+    for (const call of calls) {
+      expect(call.headers.authorization).toBeUndefined();
+      expect(call.headers.cookie).toBeUndefined();
+    }
+  });
+
+  it("binds issued/rotated JWTs to the public host and strips private auth fields", async () => {
+    vi.stubEnv("APP_ORIGIN", "https://mall.test");
+    respond = (res) => {
+      res.setHeader("Set-Cookie", [
+        `aura_session=${token}; Domain=backend.internal; Path=/api/v1; Max-Age=900`,
+        "refresh=private; Path=/",
+      ]);
+      json(res, {
+        ...publicData,
+        accessToken: token,
+        refreshToken: "private",
+        user: { ...member, passwordHash: "private" },
+      });
+    };
+    for (const handler of [login, register, session, logout]) {
+      const response = await handler(
+        request("/api/auth", { method: handler === session ? "GET" : "POST" }),
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(publicData);
+      expect(response.headers.getSetCookie()).toEqual([
+        `aura_session=${token}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=900`,
+      ]);
+    }
+  });
+
+  it("clears rejected credentials on backend 401 and returns a fixed Bearer challenge", async () => {
+    vi.stubEnv("APP_ORIGIN", "https://mall.test");
+    respond = (res) => {
+      res.setHeader("WWW-Authenticate", 'Bearer error_description="private"');
+      res.setHeader("Set-Cookie", `aura_session=${token}; Path=/`);
+      json(res, { detail: "인증이 필요합니다." }, 401);
+    };
+    const response = await session(
+      request("/api/session", { headers: { Cookie: `aura_session=${token}` } }),
+    );
+    expect(response.status).toBe(401);
+    expect(response.headers.get("www-authenticate")).toBe("Bearer");
+    expect(response.headers.getSetCookie()).toEqual([
+      "aura_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure",
+    ]);
+    expect(await response.text()).not.toContain("private");
+  });
+
+  it("rejects malformed, oversized and duplicate token cookies before HTTP", async () => {
+    for (const cookie of [
+      "aura_session=",
+      "aura_session=opaque",
+      "aura_session=a.b.c%20",
+      `aura_session=${"a".repeat(3800)}.b.c`,
+      `aura_session=${token}; aura_session=${token}`,
+    ]) {
+      const response = await session(request("/api/session", { headers: { Cookie: cookie } }));
+      expect(response.status).toBe(401);
+      expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
+      expect(response.headers.get("www-authenticate")).toBe("Bearer");
+    }
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it("preserves credentials on forbidden/conflict and failed logout, without accepting error cookies", async () => {
+    for (const status of [403, 409, 500]) {
+      respond = (res) => {
+        res.setHeader("Set-Cookie", `aura_session=${token}; Max-Age=0`);
+        json(res, { detail: "Denied" }, status);
+      };
+      const response = await logout(
+        request("/api/auth/logout", {
+          method: "POST",
+          headers: { Cookie: `aura_session=${token}` },
+        }),
+      );
+      expect(response.status).toBe(status === 500 ? 502 : status);
+      expect(response.headers.getSetCookie()).toEqual([]);
+      expect(calls.at(-1)?.headers.authorization).toBe(`Bearer ${token}`);
+    }
+  });
+
+  it("rejects invalid auth responses before setting a new cookie", async () => {
+    for (const data of [
+      { accessToken: token },
+      { ...publicData, user: { ...member, role: "superadmin" } },
+    ]) {
+      respond = (res) => {
+        res.setHeader("Set-Cookie", `aura_session=${token}`);
+        json(res, data);
+      };
+      const response = await login(request("/api/auth/login", { method: "POST" }));
+      expect(response.status).toBe(502);
+      expect(response.headers.getSetCookie()).toEqual([]);
+      expect(await response.text()).not.toContain(token);
+    }
+
+    respond = (res) => {
+      res.setHeader("Set-Cookie", "aura_session=not-a-jwt");
+      json(res, publicData);
+    };
+    expect((await login(request("/api/auth/login", { method: "POST" }))).status).toBe(502);
+  });
+
+  it("preserves backend expiry/deletion and never retries writes", async () => {
+    respond = (res) => {
+      res.setHeader(
+        "Set-Cookie",
+        "aura_session=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+      );
+      json(res, { user: null, guestId: "guest-1" });
+    };
+    const response = await logout(
+      request("/api/auth/logout", { method: "POST", headers: { Cookie: `aura_session=${token}` } }),
+    );
+    expect(response.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=0; Expires=Thu, 01 Jan 1970");
+  });
+
+  it("rejects invalid authentication mode configuration", async () => {
+    vi.stubEnv("API_AUTH_MODE", "bearer-from-browser");
+    expect((await session(request("/api/session"))).status).toBe(500);
+    expect(calls).toHaveLength(0);
+  });
 });
 afterEach(() => {
   for (const timer of timers) {
@@ -136,6 +312,42 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
     await expect(serverRequest("/catalog")).resolves.toEqual({ ok: true });
     expect(calls[1].url).toBe("/api/v1/catalog");
     expect(calls[1].headers.cookie).toBeUndefined();
+  });
+
+  it("forwards only allow-listed admin query parameters and keeps admin errors", async () => {
+    await adminProducts(
+      request(
+        "/api/admin/products?q=%20hand%20&collection=fresh&collection=warm&page=2&role=admin" +
+          "&url=https://attacker.test&stock=" +
+          "x".repeat(101),
+        { headers: { Cookie: "aura_session=admin-session" } },
+      ),
+    );
+    expect(calls[0].url).toBe("/api/admin/products?q=hand&collection=fresh&page=2");
+    expect(calls[0].headers.cookie).toBe("aura_session=admin-session");
+    respond = (res) => json(res, { detail: "관리자 권한이 필요해요." }, 403);
+    const denied = await updateAdminInquiry(
+      request("/api/admin/inquiries/a", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Origin: "http://mall.test" },
+        body: JSON.stringify({ version: 1, status: "done" }),
+      }),
+      { params: Promise.resolve({ id: "../orders" }) },
+    );
+    expect(denied.status).toBe(400);
+    const forbidden = await updateAdminInquiry(
+      request("/api/admin/inquiries/a", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Origin: "http://mall.test" },
+        body: JSON.stringify({ version: 1, status: "done" }),
+      }),
+      { params: Promise.resolve({ id: "a" }) },
+    );
+    expect(forbidden.status).toBe(403);
+    expect(await forbidden.json()).toEqual({
+      error: { code: "HTTP_403", message: "관리자 권한이 필요해요." },
+    });
+    expect(calls.at(-1)?.url).toBe("/api/admin/inquiries/a");
   });
 
   it("forwards only the session and owner headers and creates its own request ID", async () => {
