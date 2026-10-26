@@ -105,6 +105,17 @@ JWT·OAuth를 선택할 경우에는 토큰 발급·갱신·폐기와 서버 세
 
 ## 오류·전송 계약
 
+### FastAPI 직접 호출의 공통 보안
+
+FastAPI는 변경 요청에서 서버 설정의 허용 Origin·Referer를 검사하고, cross-site 요청을
+거절합니다. 출처 없는 내부 요청은 기본 차단하며, BFF가 서버 전용 `API_BFF_SHARED_KEY`를
+설정한 경우에만 `X-Aura-BFF-Key`를 추가합니다. FastAPI의 `AURA_BFF_SHARED_KEY`에 같은 값을
+설정해야 합니다. 브라우저가 보낸 키는 전달하지 않습니다. 이 값은 사용자 인증이나 세션
+CSRF 토큰이 아니며 공개 API 계약은 유지합니다. 기존 Mock 개발에는 설정이 필요 없습니다.
+설정·방어 범위·후속 협의 사항은 [CSRF·XSS 공통 보안](backend/SECURITY_CSRF_XSS.md)을 참고합니다.
+
+### 오류 응답과 전송
+
 BFF는 성공 시 기존 DTO를 유지하고 오류를 다음 형태로 반환합니다.
 
 ```json

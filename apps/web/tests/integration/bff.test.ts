@@ -55,6 +55,7 @@ beforeEach(() => {
   vi.stubEnv("API_SESSION_COOKIE", "aura_session");
   vi.stubEnv("API_TIMEOUT_MS", "1000");
   vi.stubEnv("APP_ORIGIN", "");
+  vi.stubEnv("API_BFF_SHARED_KEY", "");
   calls = [];
   respond = (res) => json(res, { ok: true });
 });
@@ -74,6 +75,48 @@ afterAll(async () => {
 });
 
 describe("Next BFF to FastAPI HTTP boundary", () => {
+  it("adds only the configured server key to originless backend mutations", async () => {
+    const key = "test-only-server-key-0123456789abcdef";
+    vi.stubEnv("API_BFF_SHARED_KEY", key);
+    const response = await login(
+      request("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "http://mall.test",
+          "X-Aura-BFF-Key": "attacker",
+        },
+        body: credentials,
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(calls[0].headers["x-aura-bff-key"]).toBe(key);
+    expect(calls[0].headers.origin).toBeUndefined();
+    expect(response.headers.get("x-aura-bff-key")).toBeNull();
+    expect(await response.text()).not.toContain(key);
+    await catalog(request("/api/catalog"));
+    expect(calls[1].headers["x-aura-bff-key"]).toBeUndefined();
+  });
+
+  it("does not forward browser-supplied server credentials when unconfigured", async () => {
+    const response = await login(
+      request("/api/auth/login", {
+        method: "POST",
+        headers: { "X-Aura-BFF-Key": "attacker" },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(calls[0].headers["x-aura-bff-key"]).toBeUndefined();
+  });
+
+  it("rejects invalid server key configuration without exposing it", async () => {
+    vi.stubEnv("API_BFF_SHARED_KEY", "private-invalid");
+    const response = await login(request("/api/auth/login", { method: "POST" }));
+    expect(response.status).toBe(500);
+    expect(await response.text()).not.toContain("private-invalid");
+    expect(calls).toHaveLength(0);
+  });
+
   it("uses runtime API configuration for BFF and RSC without a self HTTP call", async () => {
     vi.stubEnv("API_PREFIX", "/api/v1");
     const result = await catalog(
