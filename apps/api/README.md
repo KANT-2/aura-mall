@@ -49,9 +49,10 @@ aura_api/
     seed.py           # db/seed.sql 적재 명령
   core/               # 공통 모듈: 요청 ID·오류·인증·CSRF
 db/
-  schema.sql          # 테이블 21개 DDL (마이그레이션 0001이 그대로 실행)
+  schema.sql          # 최신 전체 구조, 테이블 23개 (0001 + 0002)
   seed.sql            # 상품·향료 초기 데이터 (generate_seed.py로 생성)
 migrations/           # Alembic 환경과 리비전
+  sql/                # 리비전별 고정 SQL (0001 초기 구조, 0002 Refresh Token)
 alembic.ini           # Alembic 설정 (DB 주소는 AURA_DATABASE_URL)
 tests/
   test_health.py      # 헬스 체크·OpenAPI·접두사·리다이렉트 검사
@@ -81,8 +82,8 @@ uv run --directory apps/api --locked alembic upgrade head
 uv run --directory apps/api --locked python -m aura_api.infra.seed
 ```
 
-- 마이그레이션 `0001`은 `db/schema.sql`을 그대로 실행합니다. 팀이 검토하는 SQL과 실제 적용되는 DDL이 같습니다.
-- 스키마를 바꿀 때는 `schema.sql`·ORM 모델(`aura_api/infra/models/<영역>.py`)·새 Alembic 리비전을 함께 수정합니다. `tests/db`가 모델과 실제 스키마의 차이를 검사합니다.
+- 리비전은 `migrations/sql/`의 고정 SQL을 실행합니다(`0001` 초기 21개, `0002` Refresh Token·`users.is_active`). `db/schema.sql`은 둘을 합친 최신 전체 구조입니다.
+- 스키마를 바꿀 때는 새 리비전 SQL·`schema.sql`·ORM 모델(`aura_api/infra/models/<영역>.py`)을 함께 수정하고, 이미 적용된 리비전 SQL은 고치지 않습니다. `tests/db`가 마이그레이션 결과와 `schema.sql` 결과를 각각 ORM 모델과 비교합니다.
 - DB 통합 테스트는 **지워도 되는 테스트 DB**에서만 실행합니다(모든 테이블을 삭제 후 다시 만듭니다). 설정하지 않으면 건너뜁니다.
 
 ```sh
