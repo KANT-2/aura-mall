@@ -20,11 +20,13 @@ export function useDraftAutosave(
       pending.current = undefined;
       return;
     }
+
     pending.current = totalCount(counts) > 0 ? { counts, name, label, step } : null;
     timer.current = setTimeout(() => {
       if (pending.current !== undefined) {
         persist(pending.current);
       }
+
       pending.current = undefined;
     }, 250);
     return () => clearTimeout(timer.current);
@@ -35,6 +37,7 @@ export function useDraftAutosave(
       if (pending.current !== undefined) {
         persist(pending.current);
       }
+
       pending.current = undefined;
     },
     [persist],

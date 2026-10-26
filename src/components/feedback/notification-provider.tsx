@@ -8,6 +8,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (!message) {
       return;
     }
+
     const timer = setTimeout(() => notify(""), 3200);
     return () => clearTimeout(timer);
   }, [message]);
@@ -25,5 +26,6 @@ export function useNotify() {
   if (!notify) {
     throw new Error("NotificationProvider is required");
   }
+
   return notify;
 }

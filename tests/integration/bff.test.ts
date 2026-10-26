@@ -21,6 +21,7 @@ const server = createServer(async (req, res) => {
   for await (const chunk of req) {
     chunks.push(Buffer.from(chunk));
   }
+
   calls.push({
     url: req.url,
     method: req.method,
@@ -44,6 +45,7 @@ beforeAll(async () => {
   if (!address || typeof address === "string") {
     throw new Error("No address");
   }
+
   base = `http://127.0.0.1:${address.port}`;
 });
 beforeEach(() => {
@@ -59,6 +61,7 @@ afterEach(() => {
   for (const timer of timers) {
     clearTimeout(timer);
   }
+
   timers.clear();
   vi.unstubAllEnvs();
 });
@@ -183,6 +186,7 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
         403,
       );
     }
+
     expect(calls).toHaveLength(0);
     vi.stubEnv("APP_ORIGIN", "https://mall.test");
     expect(
@@ -210,6 +214,7 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
       );
       expect(response.status).toBe(status);
     }
+
     expect(calls).toHaveLength(0);
     const valid = await login(
       request("/api/auth/login", {
@@ -258,6 +263,7 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
       expect(response.headers.get("location")).toBeNull();
       expect(await response.text()).not.toMatch(/postgres|private|attacker/);
     }
+
     expect(calls).toHaveLength(4);
   });
 
@@ -269,12 +275,14 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.write("{");
         }
+
         timers.add(setTimeout(() => res.end(startBody ? "}" : "{}"), 500));
       };
       const response = await session(request("/api/session"));
       expect(response.status).toBe(504);
       expect((await response.json()).error.code).toBe("BACKEND_TIMEOUT");
     }
+
     const controller = new AbortController();
     controller.abort();
     expect((await session(request("/api/session", { signal: controller.signal }))).status).toBe(
@@ -292,6 +300,7 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
         ).status,
       ).toBe(400);
     }
+
     expect((await catalog(request("/api/catalog", { method: "POST" }))).status).toBe(405);
     vi.stubEnv("API_URL", "file:///etc/passwd");
     expect((await catalog(request("/api/catalog"))).status).toBe(500);

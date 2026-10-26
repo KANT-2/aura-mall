@@ -12,6 +12,7 @@ beforeAll(async () => {
   if (!address || typeof address === "string") {
     throw new Error("No mock address");
   }
+
   base = `http://127.0.0.1:${address.port}`;
 });
 afterAll(
@@ -193,6 +194,7 @@ describe("Mock API data ownership and validation", () => {
       if (!address || typeof address === "string") {
         throw new Error("No address");
       }
+
       expect(
         (
           await fetch(`http://127.0.0.1:${address.port}/__test__/seed`, {

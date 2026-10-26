@@ -29,6 +29,7 @@ export function MyPage() {
       </main>
     );
   }
+
   if (!user) {
     return (
       <main className={styles.root + " page-width"}>
@@ -43,6 +44,7 @@ export function MyPage() {
       </main>
     );
   }
+
   return (
     <main data-testid={testIds.account.overview} className={styles.root + " page-width mypage"}>
       <div className="heading-row">

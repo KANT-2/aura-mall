@@ -13,10 +13,10 @@ export function PromotionCarousel() {
   const { home } = useCatalog();
   const promos = user ? home.memberPromotions : home.guestPromotions;
   const p = promos[promo % promos.length];
-
   if (!p) {
     return null;
   }
+
   return (
     <section
       className="promotion reveal"
@@ -27,10 +27,12 @@ export function PromotionCarousel() {
         if (event.target !== event.currentTarget) {
           return;
         }
+
         if (event.key === "ArrowRight") {
           event.preventDefault();
           setPromo((i) => (i + 1) % promos.length);
         }
+
         if (event.key === "ArrowLeft") {
           event.preventDefault();
           setPromo((i) => (i + promos.length - 1) % promos.length);
@@ -46,6 +48,7 @@ export function PromotionCarousel() {
         if (!start) {
           return;
         }
+
         const t = event.changedTouches[0];
         const dx = t.clientX - start.x;
         const dy = t.clientY - start.y;

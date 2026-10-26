@@ -66,6 +66,7 @@ export function WelcomeJourney() {
     if (!open) {
       return;
     }
+
     // Same focus handling as AtelierModal: move in, keep Tab inside, restore on close.
     const before = document.activeElement as HTMLElement | null;
     dialog.current?.focus();
@@ -73,16 +74,20 @@ export function WelcomeJourney() {
       if (e.key === "Escape") {
         close();
       }
+
       if (e.key === "ArrowRight") {
         setPage((p) => Math.min(4, p + 1));
       }
+
       if (e.key === "ArrowLeft") {
         setPage((p) => Math.max(0, p - 1));
       }
+
       const root = dialog.current;
       if (e.key !== "Tab" || !root) {
         return;
       }
+
       const items = [
         ...root.querySelectorAll<HTMLElement>(
           'button:not(:disabled),a[href],input:not(:disabled),[tabindex="0"]',
@@ -92,6 +97,7 @@ export function WelcomeJourney() {
         e.preventDefault();
         return;
       }
+
       const first = items[0],
         last = items[items.length - 1];
       if (e.shiftKey && (document.activeElement === first || document.activeElement === root)) {
@@ -123,6 +129,7 @@ export function WelcomeJourney() {
     if (start.current === null) {
       return;
     }
+
     const dx = e.clientX - start.current;
     start.current = null;
     if (Math.abs(dx) > 55) {
@@ -132,6 +139,7 @@ export function WelcomeJourney() {
   if (!open) {
     return null;
   }
+
   return (
     <div
       className="a-welcome-overlay"

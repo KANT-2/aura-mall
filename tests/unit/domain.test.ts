@@ -127,6 +127,7 @@ test("cart restoration rebuilds product data from the catalog and merges bounded
   for (const quantity of [NaN, Infinity, "invalid", -3, 0]) {
     assert.equal(clampQuantity(quantity), 1);
   }
+
   assert.equal(clampQuantity(2.9), 2);
 });
 
@@ -144,6 +145,7 @@ test("gift sets require three distinct products in the same collection and merge
     assert.deepEqual(restoreCart([{ product: gift, quantity: 1, selection: chosen }]), []);
     assert.equal(itemPrice({ product: gift, selection: chosen }), null);
   }
+
   const restored = restoreCart([
     { product: gift, quantity: 2, selection },
     { product: gift, quantity: 3, selection: [...selection].reverse() },

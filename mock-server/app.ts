@@ -33,6 +33,7 @@ export function createMockApp({
     if (!product) {
       throw new HttpError(404, "상품을 찾을 수 없어요.");
     }
+
     res.json(product);
   });
   app.use(
@@ -55,24 +56,30 @@ export function createMockApp({
         };
         session.userId = member.id;
       }
+
       const owner = ownerOf(session);
       if (req.body.cart) {
         database.state.carts[owner] = restoreCart(req.body.cart, catalog);
       }
+
       if (req.body.recipes) {
         database.state.recipes[owner] = restoreRecipes(req.body.recipes, catalog.ingredients);
       }
+
       if (req.body.draft) {
         const draft = restoreDraft(req.body.draft, catalog.ingredients);
         if (!draft) {
           throw new HttpError(400, "Invalid test draft");
         }
+
         database.state.drafts[session.guestId] = draft;
       }
+
       database.persist();
       res.json({ guestId: session.guestId });
     });
   }
+
   app.use((_req, res) =>
     res.status(404).json({ error: { message: "API 경로를 찾을 수 없어요." } }),
   );
@@ -82,6 +89,7 @@ export function createMockApp({
     if (status === 500) {
       console.error(error);
     }
+
     res.status(status).json({
       error: { message: status === 500 ? "서버 요청을 처리하지 못했어요." : error.message },
     });

@@ -15,6 +15,7 @@ function vector(value: Acceleration): [number, number, number] | null {
   ) {
     return null;
   }
+
   return [value.x!, value.y!, value.z!];
 }
 
@@ -28,6 +29,7 @@ export function motionSample(
   if (!components) {
     return null;
   }
+
   return {
     magnitude: direct ? Math.hypot(...direct) : Math.max(0, Math.hypot(...gravity!) - 9.81),
     x: components[0],
@@ -42,11 +44,13 @@ export function detectShake(previous: ShakeTracker, sample: MotionSample, now: n
   if (now - previous.last < 440 || (sample.magnitude < 3.8 && jerk < 3.2)) {
     return { tracker: next, progress: 0 };
   }
+
   next.peaks = now - previous.lastPeak < 1050 ? previous.peaks + 1 : 1;
   next.lastPeak = now;
   if (next.peaks < 2) {
     return { tracker: next, progress: 0 };
   }
+
   next.peaks = 0;
   next.last = now;
   return { tracker: next, progress: Math.min(9, 5 + Math.round(sample.magnitude * 0.22)) };

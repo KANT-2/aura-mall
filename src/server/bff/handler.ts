@@ -27,6 +27,7 @@ export function createBffHandler(method: Method, path: BackendPath, { session = 
       if (request.method !== method && !(method === "GET" && request.method === "HEAD")) {
         throw new ApiError(405, "지원하지 않는 요청 방식이에요.", "METHOD_NOT_ALLOWED");
       }
+
       if (
         mutation &&
         (request.headers.get("sec-fetch-site") === "cross-site" ||
@@ -34,6 +35,7 @@ export function createBffHandler(method: Method, path: BackendPath, { session = 
       ) {
         throw new ApiError(403, "허용되지 않은 출처의 요청이에요.", "INVALID_ORIGIN");
       }
+
       const body = mutation ? await jsonRequestBody(request) : undefined;
       const backendPath = typeof path === "string" ? path : path(await context!.params);
       const response = await backendRequest(backendPath, {
@@ -55,9 +57,11 @@ export function createBffHandler(method: Method, path: BackendPath, { session = 
           headers.append("Set-Cookie", cookie);
         }
       }
+
       if (response.status >= 400) {
         throw backendError(response.status, response.data);
       }
+
       return response.status === 204
         ? new Response(null, { status: 204, headers })
         : Response.json(response.data, { status: response.status, headers });

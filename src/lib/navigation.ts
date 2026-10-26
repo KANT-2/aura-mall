@@ -4,6 +4,7 @@ export function safeReturnPath(value: string | string[] | undefined, fallback = 
   if (!next?.startsWith("/")) {
     return fallback;
   }
+
   const base = "https://aura.invalid";
   try {
     const url = new URL(next, base);

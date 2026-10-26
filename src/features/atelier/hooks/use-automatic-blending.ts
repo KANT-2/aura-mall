@@ -11,6 +11,7 @@ export function useAutomaticBlending(
     if (!enabled) {
       return;
     }
+
     let frame = 0;
     let last = 0;
     const start = performance.now();
@@ -24,6 +25,7 @@ export function useAutomaticBlending(
         });
         last = now;
       }
+
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);

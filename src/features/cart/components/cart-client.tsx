@@ -32,6 +32,7 @@ export function Cart() {
       </main>
     );
   }
+
   return (
     <main className={styles.root + " page-width cart-page a86-cart"}>
       <div className="a86-cart-heading">

@@ -38,6 +38,7 @@ export function useDeviceMotion({
     if (!enabled || permission !== "active" || !available) {
       return;
     }
+
     const listener = (event: DeviceMotionEvent) => onReading(event);
     window.addEventListener("devicemotion", listener, { passive: true });
     return () => window.removeEventListener("devicemotion", listener);
@@ -51,10 +52,12 @@ export function useDeviceMotion({
     if (!enabled) {
       return false;
     }
+
     if (!supported()) {
       setPermission("unavailable");
       return false;
     }
+
     const token = ++requestId.current;
     setPermission("requesting");
     try {
@@ -66,12 +69,14 @@ export function useDeviceMotion({
       if (token !== requestId.current) {
         return false;
       }
+
       setPermission(result === "granted" ? "active" : "denied");
       return result === "granted";
     } catch {
       if (token === requestId.current) {
         setPermission("denied");
       }
+
       return false;
     }
   }

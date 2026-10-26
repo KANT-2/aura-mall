@@ -16,6 +16,7 @@ export function atelierRoutes(database: MockDatabase) {
     if (!user) {
       throw new HttpError(401, "로그인 후 향을 저장할 수 있어요.");
     }
+
     const previous = database.state.recipes[owner] ?? [];
     const parent = req.body.parent
       ? previous.find((recipe) => recipe.id === req.body.parent)
@@ -23,6 +24,7 @@ export function atelierRoutes(database: MockDatabase) {
     if (req.body.parent && !parent) {
       throw new HttpError(404, "저장한 원본 향을 찾을 수 없어요.");
     }
+
     const [recipe] = restoreRecipes(
       [
         {
@@ -37,6 +39,7 @@ export function atelierRoutes(database: MockDatabase) {
     if (!recipe) {
       throw new HttpError(400, "향 이름과 향료 조합을 확인해 주세요.");
     }
+
     recipe.color = mixColor(recipe.counts, catalog.ingredients);
     database.state.recipes[owner] = [recipe, ...previous];
     database.persist();
@@ -47,10 +50,12 @@ export function atelierRoutes(database: MockDatabase) {
     if (!user) {
       throw new HttpError(401, "로그인이 필요해요.");
     }
+
     const previous = database.state.recipes[owner] ?? [];
     if (!previous.some((recipe) => recipe.id === req.params.id)) {
       throw new HttpError(404, "저장한 향을 찾을 수 없어요.");
     }
+
     database.state.recipes[owner] = previous.filter((recipe) => recipe.id !== req.params.id);
     database.persist();
     res.json(database.state.recipes[owner]);
@@ -65,6 +70,7 @@ export function atelierRoutes(database: MockDatabase) {
     if (!draft) {
       throw new HttpError(400, "조향 초안을 확인해 주세요.");
     }
+
     database.state.drafts[session.guestId] = draft;
     database.persist();
     res.json(draft);

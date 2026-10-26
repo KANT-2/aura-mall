@@ -29,18 +29,22 @@ export function itemPrice(
   if (item.unitPrice !== undefined) {
     return item.unitPrice;
   }
+
   if (item.custom && item.product.type !== "eau-de-parfum") {
     return null;
   }
+
   if (item.product.type === "gift-set") {
     if (!isGiftSelectionValid(item.product, item.selection, products)) {
       return null;
     }
+
     const chosen = item.selection.map((id) => products.find((p) => p.id === id));
     return chosen.every(Boolean) && chosen.every((p) => p!.price !== null)
       ? chosen.reduce((sum, p) => sum + (p!.price ?? 0), 0)
       : null;
   }
+
   return item.product.price;
 }
 export const shippingFee = (subtotal: number, hasCoupon: boolean): number =>

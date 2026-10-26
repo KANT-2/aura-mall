@@ -30,6 +30,7 @@ export function validCounts(
   if (!isRecord(value)) {
     return null;
   }
+
   const ingredientIds = new Set(ingredients.map(({ id }) => id));
   const used: [string, number][] = [];
   let total = 0;
@@ -42,11 +43,13 @@ export function validCounts(
     ) {
       return null;
     }
+
     total += count;
     if (count > 0) {
       used.push([id, count]);
     }
   }
+
   return total > 0 && total <= MAX_DROPS ? Object.fromEntries(used) : null;
 }
 
@@ -60,6 +63,7 @@ export function restoreRecipes(raw: unknown, ingredients: readonly Ingredient[])
   if (!Array.isArray(raw)) {
     return [];
   }
+
   const seen = new Set<string>();
   return raw.flatMap((recipe): Recipe[] => {
     if (
@@ -72,10 +76,12 @@ export function restoreRecipes(raw: unknown, ingredients: readonly Ingredient[])
     ) {
       return [];
     }
+
     const counts = validCounts(recipe.counts, ingredients);
     if (!counts) {
       return [];
     }
+
     seen.add(recipe.id);
     return [
       {
@@ -104,10 +110,12 @@ export function restoreDraft(
   if (!isRecord(raw)) {
     return null;
   }
+
   const counts = validCounts(raw.counts, ingredients);
   if (!counts) {
     return null;
   }
+
   return {
     counts,
     name: typeof raw.name === "string" ? raw.name : "",
@@ -124,6 +132,7 @@ export function mixColor(counts: Record<string, number>, ingredients: readonly I
   if (!total) {
     return "#d5b575";
   }
+
   const sum = [0, 0, 0];
   ingredients.forEach((i) => {
     const n = counts[i.id] || 0;

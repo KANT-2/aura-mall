@@ -49,6 +49,7 @@ export function ProductDetailContentDock({
     } else {
       return;
     }
+
     event.preventDefault();
     setTab(TABS[next].id);
     document.getElementById(`${tabsId}-${TABS[next].id}`)?.focus();

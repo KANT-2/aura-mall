@@ -24,6 +24,7 @@ export function backendConfig() {
     ) {
       throw new Error("Invalid backend configuration");
     }
+
     const base = baseUrl.href.replace(/\/$/, "");
     return { apiUrl: `${base}${prefix.replace(/\/$/, "")}`, sessionCookie, timeoutMs, appOrigin };
   } catch {
