@@ -7,12 +7,9 @@ The test database is wiped: every table is dropped and recreated by the migratio
 import asyncio
 import os
 import uuid
-from pathlib import Path
 
 import pytest
-from alembic import command
 from alembic.autogenerate import compare_metadata
-from alembic.config import Config
 from alembic.migration import MigrationContext
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
@@ -31,25 +28,8 @@ from aura_api.infra.seed import load_seed
 URL = os.environ.get("AURA_TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(not URL, reason="AURA_TEST_DATABASE_URL is not set")
 
-API_DIR = Path(__file__).resolve().parents[2]
 # Expression indexes (lower(email)) are not reflected by SQLAlchemy; checked with SQL below.
 EXPRESSION_INDEXES = {"users_email_lower_key", "admins_email_lower_key"}
-
-
-def alembic_config() -> Config:
-    config = Config(str(API_DIR / "alembic.ini"))
-    config.attributes["database_url"] = URL
-    return config
-
-
-@pytest.fixture(scope="module")
-def migrated():
-    config = alembic_config()
-    command.downgrade(config, "base")
-    command.upgrade(config, "head")
-    asyncio.run(load_seed(URL))
-    yield
-    command.downgrade(config, "base")
 
 
 def run(coro_factory):

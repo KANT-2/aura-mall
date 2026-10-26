@@ -32,11 +32,14 @@ aura_api/
   api/                # 표현 계층: 라우터·요청/응답 모델
     router.py         # 업무 라우터 등록
     health.py         # 헬스 체크와 응답 모델
+    catalog.py        # GET /catalog, /catalog/products/{id}
   services/           # 서비스 계층: 유스케이스·트랜잭션
+    catalog.py        # 카탈로그 조회, 예전 상품 ID 별칭
   domain/             # 도메인 계층: 순수 Python 업무 규칙 (영역별 파일)
   infra/              # 인프라 계층
     database.py       # SQLAlchemy Base·비동기 엔진·요청별 세션
     models/           # 영역별 ORM 모델 (__init__.py가 전체 등록)
+    repositories/     # 영역별 조회·저장 (커밋하지 않음)
     seed.py           # db/seed.sql 적재 명령
   core/               # 공통 모듈: 요청 ID·오류·인증·CSRF
 db/
@@ -46,6 +49,7 @@ migrations/           # Alembic 환경과 리비전
 alembic.ini           # Alembic 설정 (DB 주소는 AURA_DATABASE_URL)
 tests/
   test_health.py      # 헬스 체크·OpenAPI·접두사·리다이렉트 검사
+  test_catalog.py     # 카탈로그 응답 형태 (DB 없이)
   domain/             # 도메인 규칙 단위 테스트 (DB 없음)
   db/                 # 실제 PostgreSQL 통합 테스트 (AURA_TEST_DATABASE_URL)
 pyproject.toml        # Python 의존성·Ruff·pytest 설정
