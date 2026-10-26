@@ -2,7 +2,7 @@
 
 [문서 목록](README.md) · [웹 개발 안내](../apps/web/README.md) · [API 개발 안내](../apps/api/README.md)
 
-장바구니는 브라우저 로컬 스토리지에 저장하며 로그인·로그아웃과 관계없이 같은 브라우저에서 유지합니다. 그 외 서버 데이터는 Next.js BFF를 통해 기본적으로 독립 Mock API에 연결됩니다. BFF에는 쿠키 모드와 FastAPI용 JWT→Bearer 어댑터가 있습니다. FastAPI 운영 앱은 헬스 체크와 공통 JWT 검증 기반을 제공하며, 업무 API·DB 어댑터·운영 토큰 발급·폐기는 아직 구현하지 않았습니다. 아래 계약은 현재 화면을 유지하면서 FastAPI로 전환하기 위한 연결 기준입니다.
+장바구니는 브라우저 로컬 스토리지에 저장하며 로그인·로그아웃과 관계없이 같은 브라우저에서 유지합니다. 그 외 서버 데이터는 Next.js BFF를 통해 기본적으로 독립 Mock API에 연결됩니다. FastAPI에는 카탈로그 조회·입점 문의·레시피 API가 구현됐으며 BFF는 이 세 리소스의 요청·응답을 기존 화면 계약으로 연결합니다. 쿠키 모드와 JWT→Bearer 전송 어댑터를 제공하지만, 회원가입·세션 조회·토큰 발급·폐기와 나머지 리소스 연결은 별도 작업입니다.
 
 ## 경계
 
@@ -26,6 +26,22 @@ flowchart LR
 장바구니 추가·수량 변경·삭제는 브라우저에서 처리하고 장바구니 API를 공개하지 않습니다. 브라우저 저장 키는 `aura_cart_v1`이며 상품 ID·수량·선택 구성만 저장합니다. 가격·상품 정보는 현재 카탈로그로 복원하고, 새로고침과 같은 출처의 다른 탭에서도 유지합니다. 기존 서버 장바구니는 자동 이전하지 않습니다.
 
 BFF는 요청 사이에 사용자 상태를 메모리로 보관하지 않습니다. 현재 응답 DTO는 프런트에 필요한 공개 필드만 담는 계약이며, FastAPI의 `response_model`에서도 이를 제한해야 합니다. 실제 API의 필드가 달라지면 BFF의 리소스별 어댑터에서 변환하고 화면·훅까지 백엔드 형식을 전파하지 않습니다.
+
+카탈로그·상품·레시피·문의 접수 응답은 [공통 리소스 어댑터](../apps/web/src/server/backend/storefront.ts)로 검증하고 공개 필드만 반환합니다. 카탈로그의 중첩 DTO, 미정 가격 `null`, 선택 필드 생략, 레시피의 `parent`·`created`를 유지합니다. 구조·타입이 계약과 다르면 내용을 노출하지 않고 502로 처리합니다. 카탈로그 RSC 조회도 같은 어댑터를 사용합니다.
+
+문의 POST는 `brand, name, email, introduction, message, type, consent, website`, 레시피 POST는 `name, label, counts, parent`만 전달합니다. 클라이언트의 소유자 ID·버전·생성 시각·계산 색·문의 처리 상태는 전달하지 않습니다. 본문 형식·크기 제한은 BFF가 검사하고 업무 검증·권한·계산은 FastAPI가 담당합니다.
+
+## 현재 FastAPI 연결 범위
+
+| 경로                                                       | 현재 상태                                                                             |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `GET /api/v1/catalog`, `GET /api/v1/catalog/products/{id}` | 실제 카탈로그 API·공개 DTO 연결                                                       |
+| `POST /api/v1/partner`                                     | 실제 서비스·도메인 검증·오류 코드 연결                                                |
+| `GET/POST /api/v1/recipes`, `DELETE /api/v1/recipes/{id}`  | 실제 레시피 API 연결. 회원 쓰기는 검증 가능한 JWT와 폐기 저장소 필요                  |
+| `/session`, `/auth/**`                                     | 기존 BFF Session 계약의 운영 API 미연결. 인증 PR의 TokenPair·Refresh 계약은 후속 조율 |
+| `/atelier/draft`, `/orders`, `/admin/**`                   | FastAPI 미구현. 기본 Mock으로 개발                                                    |
+
+`API_URL`은 한 백엔드를 선택합니다. FastAPI 오류나 미구현 경로를 Mock으로 자동 우회하지 않습니다. 전체 회원·조향 화면 개발의 기본값은 계속 Mock이며, FastAPI로 설정을 바꾸면 아직 없는 경로는 사용할 수 없습니다. 실제 DB를 마이그레이션·시드한 환경에서 공개 카탈로그·문의·익명 레시피 목록을 사용할 수 있습니다. 기본 폐기 조회 저장소는 미연결이므로 서명된 JWT도 회원 보호 API에서 거절되며, 회원 쓰기는 인증 담당자의 운영 저장소 연결 후 사용할 수 있습니다.
 
 ## 실행 환경
 
@@ -53,7 +69,9 @@ API_AUTH_MODE=jwt
 APP_ORIGIN=http://localhost:3000
 ```
 
-`npm run setup:api` 후 `npm run dev:api`로 FastAPI를 실행할 수 있습니다. 현재 제공하는 경로는 `/health`와 `/api/v1/health`이며 아래 업무 계약의 구현이 끝난 후 Next를 연결합니다. FastAPI를 실행한 뒤 `npm run dev:web`으로 Next 서버를 실행합니다. Mock을 함께 쓰는 기본 개발은 `npm run dev`입니다. 프로덕션 Next 서버만 실행하려면 `npm run build` 후 `npm start`를 사용합니다.
+`npm run setup:api` 후 [API 안내](../apps/api/README.md)에 따라 DB 마이그레이션·시드를 적용하고 `npm run dev:api`로 FastAPI를 실행합니다. 위 환경 변수로 Next를 설정하고 `npm run dev:web`으로 웹 서버를 실행합니다. 변경 요청에는 Next의 `API_BFF_SHARED_KEY`와 FastAPI의 `AURA_BFF_SHARED_KEY`에 같은 서버 비밀값이 필요합니다. Mock을 함께 쓰는 기본 개발은 `npm run dev`입니다. 프로덕션 Next 서버만 실행하려면 `npm run build` 후 `npm start`를 사용합니다.
+
+Docker Compose는 JWT 전송 모드를 사용하고 루트 `.env`의 `AURA_BFF_SHARED_KEY`를 Next·FastAPI 양쪽에 주입합니다. [환경 예제](../.env.example)의 DB 설정 외에 `openssl rand -hex 32`로 만든 공유 키와 실제 `APP_ORIGIN`을 지정해야 합니다. 기본 origin은 직접 로컬 접속용 `http://localhost:13000`이며 Caddy·HTTPS 환경에서는 공개 주소로 바꿉니다. 필수 설정이 비어 있으면 Compose가 시작을 거절합니다. 기존 Caddy 설정과 운영 인증 구현은 변경하지 않습니다.
 
 서버 설정은 요청 시점에 읽습니다. 따라서 같은 Next 빌드에 다른 백엔드 환경 변수를 주입할 수 있습니다. `.env.local` 파일 변경 후에는 Next 서버를 재시작합니다. `API_URL`에는 프로토콜·호스트 및 필요한 배포 기본 경로를, `API_PREFIX`에는 API 접두사를 둡니다. 접두사가 없다면 `/`로 설정합니다. 브라우저의 쿼리·본문·헤더로 목적지 호스트나 경로를 선택할 수 없습니다.
 
@@ -123,9 +141,9 @@ FastAPI는 서버에 명시한 HS256·키·issuer·audience로 서명과 필수 
 - `guestId`는 서명된 토큰 안에 보관하며 로그인·회전·로그아웃 때 유지합니다. 로그아웃 API는 회원 토큰을 폐기한 뒤 같은 `guestId`를 담은 익명 토큰과 `Session { user: null, guestId }`를 반환해야 합니다. 익명 토큰을 회원용 `CurrentUser`로 허용하지 않도록 업무 API에서 회원·익명을 구별해야 합니다. 익명 토큰 발급·검증 업무 구현은 후속 범위입니다.
 - Refresh Token·자동 갱신·자동 재시도는 추가하지 않습니다. 만료 시 401로 세션을 다시 확인하고 로그인합니다. 계정 변경 409와 관리자 권한 검증은 FastAPI가 담당합니다.
 
-FastAPI 운영 업무 API는 아직 없으므로 현재 설정만 바꿔 실제 가입·로그인을 사용할 수는 없습니다.
-테스트 전용 FastAPI 앱에서 실제 JWT 검증기·CSRF·오류 처리를 사용해 서명·만료·위조·폐기 후 재접근·회원 분리를 검증합니다.
-운영 DB 폐기 조회와 발급·로그아웃 API의 구현은 별도로 필요합니다.
+현재 카탈로그·문의·레시피 API만으로 실제 가입·로그인을 사용할 수는 없습니다.
+기존 JWT 테스트 앱은 JWT 전송·쿠키·폐기 경계를 검증하며, 별도의 실제 리소스 테스트 앱은 운영 카탈로그·문의·레시피 라우터·서비스·도메인과 공통 JWT 검증기·CSRF·오류 처리를 사용합니다.
+운영 DB 폐기 조회와 발급·로그아웃·Session API 연결은 별도로 필요합니다. Draft 인증 PR의 TokenPair JSON·204 로그아웃은 현재 Session·쿠키 계약과 다르므로 설정만 바꿔 연결하지 않습니다.
 구체적인 검증 정책은 [JWT 인증·인가 기반](backend/AUTHORIZATION_CORE.md)을 참고합니다.
 
 변경 요청에는 동일 출처 `Origin` 또는 출처 헤더 없는 서버 API 호출을 허용하고, 다른 `Origin`과 `Sec-Fetch-Site: cross-site`는 403으로 차단합니다. `APP_ORIGIN`을 실제 공개 주소로 설정하며 클라이언트가 보낸 forwarded host로 허용 출처를 바꾸지 않습니다.
@@ -209,6 +227,7 @@ BFF는 성공 시 기존 DTO를 유지하고 오류를 다음 형태로 반환�
 ```
 
 - FastAPI `HTTPException`의 `detail: string` 또는 `detail: { message }`와 Mock의 `error.message`는 같은 프런트 오류 형식으로 변환합니다.
+- FastAPI의 공통 `error.code`는 영문 대문자로 시작하는 64자 이하의 대문자·숫자·밑줄 형식이면 보존합니다. 예: `PRODUCT_NOT_FOUND`, `COUNTS_INVALID`, `INQUIRY_CONSENT`, `OWNER_CHANGED`. 잘못된 코드는 `HTTP_<상태>`로 대체하며, 422는 항상 `VALIDATION_ERROR`와 고정 안내입니다.
 - FastAPI 422의 `detail[]`는 입력값·비밀번호를 포함할 수 있어 브라우저로 전달하지 않습니다. `VALIDATION_ERROR`의 일반 안내를 반환합니다.
 - 백엔드 4xx의 상태는 보존합니다. 5xx·연결 실패·3xx는 502, 제한시간 초과는 504, 잘못된 JSON·비 JSON 응답은 502입니다. 내부 예외나 백엔드 HTML을 노출하지 않습니다.
 - 정상 삭제의 204를 지원합니다. 그 외 응답은 `application/json` 또는 `application/*+json`이어야 합니다.
@@ -229,8 +248,10 @@ Mock 주문의 재고 검사는 전달된 전체 주문 항목과 고정 fixture
 
 ## OpenAPI 인계
 
-FastAPI 구현 시 `/openapi.json`을 요청·응답 계약의 원본으로 확정합니다. 위 DTO와 차이가 있다면 서버 응답 모델 또는 BFF 리소스 어댑터로 맞춥니다. 확정한 스키마를 버전 관리하고 TypeScript 타입 생성·CI 계약 검사에 연결하는 것이 다음 단계입니다. 현재 FastAPI `/openapi.json`에는 헬스 체크만 포함되어 있습니다. 업무 API의 스키마와 생성된 TypeScript 타입은 계약 구현 후 추가합니다.
+FastAPI `/openapi.json`에는 현재 헬스 체크·카탈로그·문의·레시피 경로가 포함됩니다. 위 DTO와 차이가 있다면 서버 응답 모델 또는 BFF 리소스 어댑터로 맞춥니다. 스키마 버전 관리·TypeScript 타입 생성·CI 계약 자동 검사는 후속 작업입니다.
 
 BFF HTTP 통합 테스트는 실제 서버 응답으로 FastAPI 형태의 오류·쿠키·제한시간·리다이렉트·헤더 경계를 검증합니다. Playwright는 Mock 백엔드에 연결한 실제 Next 프로덕션 서버를 통해 세션·인증·장바구니·초안과 BFF 경로를 검증합니다. FastAPI가 준비되면 같은 계약 검증을 해당 서버에서도 실행하고 DB 트랜잭션·운영 인증을 추가 검증해야 합니다.
+
+`npm run build && npm run test:e2e:fastapi`는 실제 Next 서버와 [테스트 전용 리소스 앱](../apps/api/tests/fixtures/storefront_app.py)을 실행합니다. 운영 라우터·서비스·도메인을 사용하고 DB 저장소·세션과 폐기 저장소만 대체해 RSC 카탈로그·상품, 문의 검증, 레시피 저장·다시 만들기·회원 분리·409·삭제를 검증합니다. 토큰은 테스트에서만 서명하며 브라우저 로그인이나 PostgreSQL의 영속성·트랜잭션 검증을 대신하지 않습니다. 기존 `test:e2e:jwt`는 별도의 전송 경계 테스트로 유지합니다.
 
 참고: [Next.js BFF](https://nextjs.org/docs/app/guides/backend-for-frontend), [FastAPI 오류 처리](https://fastapi.tiangolo.com/tutorial/handling-errors/), [응답 쿠키](https://fastapi.tiangolo.com/advanced/response-cookies/), [프록시 뒤의 FastAPI](https://fastapi.tiangolo.com/advanced/behind-a-proxy/).
