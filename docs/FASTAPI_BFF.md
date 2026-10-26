@@ -2,7 +2,7 @@
 
 [문서 목록](README.md) · [웹 개발 안내](../apps/web/README.md) · [API 개발 안내](../apps/api/README.md)
 
-장바구니는 브라우저 로컬 스토리지에 저장하며 로그인·로그아웃과 관계없이 같은 브라우저에서 유지합니다. 그 외 서버 데이터는 Next.js BFF를 통해 독립 Mock API에 연결되어 있습니다. FastAPI 기본 앱은 `apps/api`에 있으며 현재 헬스 체크만 제공합니다. 공통 Bearer JWT 검증기는 구현했지만 업무 API·DB·운영 토큰 발급·폐기와 BFF JWT 연결은 아직 구현하지 않았습니다. 아래 계약은 현재 화면을 유지하면서 FastAPI로 전환하기 위한 연결 기준입니다.
+장바구니는 브라우저 로컬 스토리지에 저장하며 로그인·로그아웃과 관계없이 같은 브라우저에서 유지합니다. 그 외 서버 데이터는 Next.js BFF를 통해 기본적으로 독립 Mock API에 연결됩니다. BFF에는 쿠키 모드와 FastAPI용 JWT→Bearer 어댑터가 있습니다. FastAPI 운영 앱은 헬스 체크와 공통 JWT 검증 기반을 제공하며, 업무 API·DB 어댑터·운영 토큰 발급·폐기는 아직 구현하지 않았습니다. 아래 계약은 현재 화면을 유지하면서 FastAPI로 전환하기 위한 연결 기준입니다.
 
 ## 경계
 
@@ -31,13 +31,15 @@ BFF는 요청 사이에 사용자 상태를 메모리로 보관하지 않습니�
 
 모든 변수는 Next 서버 전용이며 브라우저 번들에 포함하지 않습니다.
 
-| 변수                 | 기본값                  | 용도                                                           |
-| -------------------- | ----------------------- | -------------------------------------------------------------- |
-| `API_URL`            | `http://127.0.0.1:4000` | 백엔드 주소. 내부 네트워크 주소 사용 가능                      |
-| `API_PREFIX`         | `/api`                  | 백엔드 API 접두사. FastAPI 예: `/api/v1`                       |
-| `API_TIMEOUT_MS`     | `10000`                 | 헤더 수신부터 JSON 본문 읽기까지의 제한시간. 1~60000ms         |
-| `API_SESSION_COOKIE` | `aura_mock_session`     | 전달을 허용하는 백엔드 세션 쿠키 한 개의 이름                  |
-| `APP_ORIGIN`         | 요청 URL의 origin       | 브라우저의 정식 공개 origin. 프록시·HTTPS 종료 환경에서는 명시 |
+| 변수                 | 기본값                  | 용도                                                                                 |
+| -------------------- | ----------------------- | ------------------------------------------------------------------------------------ |
+| `API_URL`            | `http://127.0.0.1:4000` | 백엔드 주소. 내부 네트워크 주소 사용 가능                                            |
+| `API_PREFIX`         | `/api`                  | 백엔드 API 접두사. FastAPI 예: `/api/v1`                                             |
+| `API_TIMEOUT_MS`     | `10000`                 | 헤더 수신부터 JSON 본문 읽기까지의 제한시간. 1~60000ms                               |
+| `API_SESSION_COOKIE` | `aura_mock_session`     | 전달을 허용하는 백엔드 세션 쿠키 한 개의 이름                                        |
+| `API_AUTH_MODE`      | `cookie`                | `cookie`: Mock 쿠키 전달, `jwt`: 허용 쿠키의 JWT를 Bearer로 변환                     |
+| `API_BFF_SHARED_KEY` | 미설정                  | FastAPI `AURA_BFF_SHARED_KEY`와 같은 서버 전용 공유 키. 변경 요청의 CSRF 경계에 사용 |
+| `APP_ORIGIN`         | 요청 URL의 origin       | 브라우저의 정식 공개 origin. 프록시·HTTPS 종료 환경에서는 명시                       |
 
 FastAPI가 아래 계약을 제공하는 경우의 `apps/web/.env.local` 예:
 
@@ -46,6 +48,8 @@ API_URL=http://127.0.0.1:8000
 API_PREFIX=/api/v1
 API_TIMEOUT_MS=10000
 API_SESSION_COOKIE=aura_session
+API_AUTH_MODE=jwt
+# API_BFF_SHARED_KEY=<FastAPI AURA_BFF_SHARED_KEY와 같은 무작위 서버 비밀값>
 APP_ORIGIN=http://localhost:3000
 ```
 
@@ -89,23 +93,20 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
 
 ## 세션
 
-### 현재 Mock·BFF 구현
+### 쿠키 모드와 공통 규칙
 
-현재 Mock과 BFF의 인증 연결은 불투명한 세션 쿠키 방식입니다. 아래 쿠키 규칙과 `Session` DTO는
-이 구현의 현황이며 FastAPI가 이미 해당 세션을 발급·검증한다는 뜻은 아닙니다.
-FastAPI 공통 인증은 Bearer JWT 검증으로 전환했으며 로그인·세션 조회·토큰 발급 업무 API는
-아직 구현하지 않았습니다. 기존 BFF 전송부는 쿠키를 전달할 뿐 Authorization을 구성하지 않아
-JWT 보호 경로와 아직 호환되지 않습니다.
+`API_AUTH_MODE=cookie`는 기존 Mock의 불투명 세션 쿠키를 그대로 전달합니다.
+FastAPI에는 `API_AUTH_MODE=jwt`를 사용합니다. 브라우저의 공개 경로·본문·`Session` DTO는 두 모드에서 같습니다.
 
-- 브라우저에서 받은 쿠키 중 `API_SESSION_COOKIE`만 백엔드에 전달합니다. 브라우저의 `Authorization`, 임의 사용자 ID, `X-Forwarded-*`는 전달하지 않습니다.
+- 브라우저에서 받은 쿠키 중 `API_SESSION_COOKIE`만 사용합니다. 쿠키 모드는 `Cookie`, JWT 모드는 `Authorization: Bearer <쿠키 값>`으로 전달합니다. 브라우저의 `Authorization`, 임의 사용자 ID, `X-Forwarded-*`는 전달하지 않습니다.
 - 응답에서도 허용한 쿠키만 전달합니다. 백엔드 `Domain`과 `Path`를 제거하고 BFF 호스트의 `Path=/`, `HttpOnly`, `SameSite=Lax`를 적용합니다. 공개 origin이 HTTPS이면 `Secure`도 적용합니다.
 - `Expires`·`Max-Age`를 보존해 회전·만료·로그아웃 삭제를 지원합니다. 401 응답에서 세션 삭제를 보내는 경우도 전달합니다.
 - 회원과 익명 방문자를 구분하고, 로그인·로그아웃 중에도 `guestId`를 유지해야 현재 방문자 조향 초안 정책을 보존할 수 있습니다.
 - `X-Session-Owner`는 계정 변경 중 시작한 레시피 요청을 거절하기 위한 보조 값입니다. 쿠키로 확인한 실제 소유자와 다르면 409를 반환합니다. 소유권을 이 헤더로 결정하면 안 됩니다.
 
-### JWT 전환 목표와 후속 BFF 작업
+### JWT 어댑터와 백엔드 발급 계약
 
-목표 흐름은 `브라우저 → Next.js BFF → Authorization: Bearer <JWT> → FastAPI`입니다.
+구현한 흐름은 `브라우저의 HttpOnly 쿠키 → Next.js BFF → Authorization: Bearer <JWT> → FastAPI`입니다.
 FastAPI는 서버에 명시한 HS256·키·issuer·audience로 서명과 필수 `sub`, `jti`, `iat`, `exp`, `iss`, `aud`를
 검증하고, 401에는 기존 오류 JSON과 `WWW-Authenticate: Bearer`를 반환합니다.
 설정이 없으면 인증을 거절하며, 쿠키나 BFF 공유 키를 사용자 인증으로 사용하지 않습니다.
@@ -113,14 +114,19 @@ FastAPI는 서버에 명시한 HS256·키·issuer·audience로 서명과 필수 
 정상 서명 JWT라도 기본적으로 인증을 거절합니다. 폐기·조회 실패·미연결은 401입니다.
 실제 로그아웃은 jti를 만료시각까지 폐기 목록에 기록해야 하며 쿠키 삭제만으로 완료할 수 없습니다.
 
-브라우저 토큰은 HttpOnly·Secure 쿠키로 보호하고 BFF 서버가 허용된 쿠키에서만 토큰을 꺼내
-Authorization을 구성하는 방식을 우선 검토합니다. 이 어댑터는 아직 구현하지 않았으며,
-브라우저 Authorization을 무조건 전달하거나 JWT를 localStorage에 저장하는 코드는 추가하지 않았습니다.
-액세스 토큰 쿠키 이름·수명, Refresh Token, 로그인·로그아웃, 토큰 폐기·회전과 401 시 쿠키 삭제,
-계정 전환 409·권한 클레임 정책은 팀 연동 합의 후 구현합니다. BFF의 기존 출처·쿠키 보안과
-요청 ID·공개 오류 형식은 유지해야 합니다. 기존 Mock의 세션 성공이 FastAPI JWT 성공을 뜻하지 않습니다.
-현재 BFF는 FastAPI의 `WWW-Authenticate` 헤더도 전달하지 않으므로 후속 어댑터에서 전달 여부를 정해야 합니다.
-구체적인 검증 정책·설정·미연결 업무 API의 제한은 [JWT 인증·인가 기반](backend/AUTHORIZATION_CORE.md)을 참고합니다.
+- FastAPI 업무 API는 `Set-Cookie: aura_session=<JWT>; Max-Age=...`처럼 설정한 이름으로 토큰을 발급·회전합니다. 본문은 기존 `Session`이며 JSON 토큰 발급 응답을 사용하는 경우에는 별도 어댑터가 필요합니다. BFF는 인증 경로의 응답을 `Session`·`Member` 공개 필드로 제한해 추가 토큰·비밀번호 필드를 제거합니다. 잘못된 DTO·JWT 쿠키는 502입니다.
+- 쿠키의 `Domain`·백엔드 `Path`를 제거하고 `Path=/; HttpOnly; SameSite=Lax`를 적용합니다. HTTPS 공개 origin에서는 `Secure`를 적용합니다. 운영에서는 `APP_ORIGIN=https://...`를 지정합니다. 수명은 발급자가 `exp`와 일치하도록 `Max-Age`/`Expires`로 정하며 BFF는 이를 보존합니다.
+- BFF는 쿠키 값의 JWT 세 부분 형식과 3,800자 상한만 검사합니다. 브라우저 쿠키 4KiB 제한에 여유를 두기 위한 전송 상한이며 FastAPI 검증기의 8,192자 상한보다 작습니다. 중복·빈 값·잘못된 형식은 백엔드를 호출하기 전에 401입니다. 서명·클레임·권한·폐기 검증이나 JWT 발급은 BFF에서 하지 않습니다. JWT 서명키를 웹 환경에 설정하지 않습니다.
+- JWT 모드에서는 백엔드에 `Cookie`를 보내지 않습니다. 토큰이 없으면 Bearer도 보내지 않으며 브라우저 `Authorization`을 대체값으로 사용하지 않습니다. 공개 카탈로그와 공용 RSC 조회는 사용자 토큰을 전달하지 않습니다.
+- 백엔드 401 또는 BFF의 잘못된 JWT 쿠키 401은 같은 호스트·경로·보안 속성의 쿠키를 `Max-Age=0`으로 삭제하고 고정 `WWW-Authenticate: Bearer`를 반환합니다. 백엔드 challenge의 임의 설명은 노출하지 않습니다. 로그인 실패의 401도 쿠키를 삭제하므로 이후 `/session`에서 익명 세션을 다시 발급해야 합니다.
+- JWT 모드의 오류 응답에 포함된 백엔드 쿠키는 적용하지 않습니다. 403·409·502·504에서는 현재 쿠키를 유지합니다. 로그아웃은 현재 JWT를 백엔드에 보내고 폐기 기록의 성공 응답을 기다립니다. BFF가 쿠키만 지우고 성공 응답을 만들지 않습니다.
+- `guestId`는 서명된 토큰 안에 보관하며 로그인·회전·로그아웃 때 유지합니다. 로그아웃 API는 회원 토큰을 폐기한 뒤 같은 `guestId`를 담은 익명 토큰과 `Session { user: null, guestId }`를 반환해야 합니다. 익명 토큰을 회원용 `CurrentUser`로 허용하지 않도록 업무 API에서 회원·익명을 구별해야 합니다. 익명 토큰 발급·검증 업무 구현은 후속 범위입니다.
+- Refresh Token·자동 갱신·자동 재시도는 추가하지 않습니다. 만료 시 401로 세션을 다시 확인하고 로그인합니다. 계정 변경 409와 관리자 권한 검증은 FastAPI가 담당합니다.
+
+FastAPI 운영 업무 API는 아직 없으므로 현재 설정만 바꿔 실제 가입·로그인을 사용할 수는 없습니다.
+테스트 전용 FastAPI 앱에서 실제 JWT 검증기·CSRF·오류 처리를 사용해 서명·만료·위조·폐기 후 재접근·회원 분리를 검증합니다.
+운영 DB 폐기 조회와 발급·로그아웃 API의 구현은 별도로 필요합니다.
+구체적인 검증 정책은 [JWT 인증·인가 기반](backend/AUTHORIZATION_CORE.md)을 참고합니다.
 
 변경 요청에는 동일 출처 `Origin` 또는 출처 헤더 없는 서버 API 호출을 허용하고, 다른 `Origin`과 `Sec-Fetch-Site: cross-site`는 403으로 차단합니다. `APP_ORIGIN`을 실제 공개 주소로 설정하며 클라이언트가 보낸 forwarded host로 허용 출처를 바꾸지 않습니다.
 

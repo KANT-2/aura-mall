@@ -11,6 +11,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:jwt": "playwright test --config playwright.jwt.config.ts",
     "test:e2e:visual": "node scripts/test-visual.mjs",
     "check": "npm run format:check && npm run lint && npm run lint:css && npm run typecheck && npm test",
     "test:watch": "vitest",

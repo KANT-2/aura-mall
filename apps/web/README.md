@@ -87,6 +87,8 @@ e2e/
 
 BFF는 요청 출처·JSON 크기·허용 쿠키·제한시간을 처리하고, FastAPI의 `detail` 및 422 오류를 공통 오류 형식으로 변환합니다. 가격·소유권·인증·트랜잭션은 백엔드에서 검증합니다. FastAPI 앱의 헬스 체크·설정·테스트 골격은 `apps/api`에 준비했으며, 업무 API는 현재 Mock으로 동작을 검증합니다.
 
+기본 `API_AUTH_MODE=cookie`는 Mock 세션 쿠키를 전달합니다. `API_AUTH_MODE=jwt`에서는 허용한 HttpOnly 쿠키의 JWT만 Bearer로 변환하고, 401이면 쿠키를 삭제합니다. 백엔드는 기존 `Session` 본문과 설정한 이름의 JWT `Set-Cookie`를 반환해야 합니다. JWT 발급·서명·폐기 검증과 로그아웃 처리는 FastAPI가 담당합니다. 운영 업무 API·DB 연결은 아직 없으며, BFF 인증 응답에서는 공개 회원 필드만 반환합니다.
+
 설정 예제, 리소스별 입력·응답 DTO, 세션·오류 계약, OpenAPI 인계 기준은 [FastAPI BFF 연결 문서](../../docs/FASTAPI_BFF.md)에 정리했습니다.
 
 ## 데이터 소유권과 Mock API
@@ -137,11 +139,14 @@ npm run check:web
 npm run build
 npm exec --workspace @aura/web -- playwright install chromium
 npm run test:e2e
+npm run test:e2e:jwt
 ```
 
 `check:web`은 ESLint·CSS 구조 검사·Next 라우트 타입 생성·TypeScript·Vitest를 실행합니다. 저장소 포맷과 Python까지 검증하려면 루트에서 `npm run check`를 사용합니다. 단위 테스트는 조향·수량·복원·내부 리다이렉트 규칙을, 통합 테스트는 실제 HTTP 요청으로 회원 간 데이터 분리·가격 변조 거절·레시피 버전·초안·모의 주문·문의·파일 영속성을 검증합니다.
 
 Playwright는 포트 4000의 메모리 Mock API와 포트 3100의 프로덕션 Next BFF 서버를 자동 시작·종료합니다. 기본 검증은 데스크톱·모바일 조작, 로그인·로그아웃 후 로컬 장바구니 유지, 새로고침·탭 간 동기화·저장 실패, 검색 URL 동기화, 조향 초안 복원·초기화, 혼합·센서 권한 정리를 포함합니다. 실제 iPhone Safari의 센서·권한 동작은 기기 검증이 필요합니다.
+
+`test:e2e:jwt`는 uv/Python 환경과 Next 빌드가 필요합니다. 포트 8100에 [테스트 전용 FastAPI 앱](../api/tests/fixtures/bff_app.py), 3200에 JWT 모드 Next 프로덕션 서버를 띄워 실제 JWT 검증기를 통한 로그인·로그아웃·폐기·위조·만료·회원 분리·출처 검사를 실행합니다. 테스트용 발급·사용자·메모리 폐기 저장소는 운영 앱에 등록하지 않습니다. HTTP 경계 테스트이므로 브라우저 설치는 필요하지 않습니다.
 
 개발 서버를 켜 둔 채 검증하려면 `AURA_E2E_MOCK_PORT=4100 npm run test:e2e`로 테스트 Mock 포트를 분리합니다. 반응형 회귀 검증에는 320px 가로 넘침, 상품 사진과 제목의 겹침, Gift Set 선택·축소 이미지, 조향 결과 버튼 배치, 컬렉션 설명 정렬도 포함합니다.
 
