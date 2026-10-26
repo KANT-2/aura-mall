@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from aura_api.api.health import router as health_router
 from aura_api.api.router import router as api_router
 from aura_api.config import Settings
+from aura_api.core.auth import JWTVerifier
 from aura_api.core.csrf import CSRFMiddleware
 from aura_api.core.exception_handlers import register_exception_handlers
 from aura_api.core.middleware import RequestIDMiddleware
@@ -11,6 +12,7 @@ from aura_api.core.middleware import RequestIDMiddleware
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     app = FastAPI(title=settings.app_name, version="0.1.0", redirect_slashes=False)
+    app.state.jwt_verifier = JWTVerifier(settings)
     app.add_middleware(
         CSRFMiddleware,
         allowed_origins=settings.csrf_allowed_origins,
