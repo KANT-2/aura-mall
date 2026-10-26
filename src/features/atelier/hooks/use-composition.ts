@@ -28,9 +28,11 @@ export function useComposition({ ingredients, draft, recipe, resume }: InitialCo
           ingredients,
         );
       }
+
       if (resume && draft) {
         return atelierReducer(empty, { type: "restore", draft }, ingredients);
       }
+
       return empty;
     },
   );

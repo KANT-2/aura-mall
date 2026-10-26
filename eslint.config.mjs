@@ -18,7 +18,14 @@ export default defineConfig([
   ...nextVitals,
   ...nextTs,
   {
-    rules: { curly: ["error", "all"] },
+    rules: {
+      curly: ["error", "all"],
+      "padding-line-between-statements": [
+        "error",
+        { blankLine: "never", prev: "*", next: ["if", "for"] },
+        { blankLine: "always", prev: ["if", "for"], next: "*" },
+      ],
+    },
   },
   {
     files: ["mock-server/**/*.ts"],

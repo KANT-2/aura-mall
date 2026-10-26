@@ -35,11 +35,13 @@ export function Partner() {
       );
       return;
     }
+
     if (!new FormData(form).get("type")) {
       setError("제품 유형을 선택해 주세요.");
       form.querySelector<HTMLButtonElement>("[role=combobox]")?.focus();
       return;
     }
+
     setBusy(true);
     const data = Object.fromEntries(new FormData(e.currentTarget));
     try {

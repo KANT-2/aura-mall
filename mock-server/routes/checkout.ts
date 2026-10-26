@@ -13,6 +13,7 @@ export function checkoutRoutes(database: MockDatabase) {
     if (!user) {
       throw new HttpError(401, "로그인이 필요해요.");
     }
+
     res.json(
       database.state.orders
         .filter((order) => order.owner === owner)
@@ -32,15 +33,18 @@ export function checkoutRoutes(database: MockDatabase) {
     if (!items.length) {
       throw new HttpError(400, "주문할 상품이 없어요.");
     }
+
     const prices = items.map((item) => itemPrice(item, catalog.products));
     if (prices.some((price) => price === null)) {
       throw new HttpError(400, "주문 금액을 확인해 주세요.");
     }
+
     const recipient = requireString(req.body.recipient, "받는 분을 입력해 주세요.", 100);
     const address = requireString(req.body.address, "주소를 입력해 주세요.", 500);
     if (req.body.coupon && !user?.coupon) {
       throw new HttpError(400, "사용할 수 없는 쿠폰이에요.");
     }
+
     const subtotal = items.reduce((sum, item, index) => sum + prices[index]! * item.quantity, 0);
     const order = {
       id: randomUUID(),
@@ -56,6 +60,7 @@ export function checkoutRoutes(database: MockDatabase) {
     if (req.body.coupon && user) {
       database.state.accounts[user.id].coupon = false;
     }
+
     database.persist();
     res.status(201).json({
       id: order.id,
@@ -74,6 +79,7 @@ export function checkoutRoutes(database: MockDatabase) {
     if (!/^\S+@\S+\.\S+$/.test(values.email) || req.body.consent !== "on") {
       throw new HttpError(400, "필수 입력 항목과 동의를 확인해 주세요.");
     }
+
     const inquiry = {
       id: randomUUID(),
       ...values,

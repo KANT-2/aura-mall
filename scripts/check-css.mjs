@@ -30,15 +30,18 @@ for (const file of allFiles.filter((file) => /\.[jt]sx?$/.test(file))) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
       continue;
     }
+
     const reference = statement.moduleSpecifier.text;
     if (!reference.endsWith(".css")) {
       continue;
     }
+
     if (!reference.endsWith(".module.css")) {
       assert.equal(file, "src/app/layout.tsx", `${file}: only the root layout imports global CSS.`);
       assert.equal(reference, "@/app/globals.css", "Use a single global CSS entry.");
       continue;
     }
+
     const stylesheet = reference.startsWith("@/")
       ? `src/${reference.slice(2)}`
       : path.posix.normalize(path.posix.join(path.posix.dirname(file), reference));
@@ -47,6 +50,7 @@ for (const file of allFiles.filter((file) => /\.[jt]sx?$/.test(file))) {
       imports.set(statement.importClause.name.text, stylesheet);
     }
   }
+
   function visit(node) {
     if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
       const stylesheet = imports.get(node.expression.text);
@@ -56,6 +60,7 @@ for (const file of allFiles.filter((file) => /\.[jt]sx?$/.test(file))) {
         uses.set(stylesheet, names);
       }
     }
+
     ts.forEachChild(node, visit);
   }
   visit(syntax);
@@ -73,6 +78,7 @@ for (const file of modules) {
   if (!file.startsWith("src/features/atelier/components/")) {
     continue;
   }
+
   assert(
     css.split("\n").length <= 800,
     `${file}: split styles by component responsibility before exceeding 800 lines.`,
@@ -92,9 +98,11 @@ for (const file of modules) {
   for (const name of referenced) {
     assert(declared.has(name), `${file}: referenced class ${name} is missing.`);
   }
+
   for (const name of declared) {
     assert(/^[a-z][a-zA-Z0-9]*$/.test(name), `${file}: use semantic camelCase class names.`);
     assert(referenced.has(name), `${file}: local class ${name} is unused.`);
   }
 }
+
 console.log(`CSS verified: ${modules.length} colocated/shared modules, one global entry.`);

@@ -15,6 +15,7 @@ export function responseSessionCookies(values: string[], name: string, secure: b
     if (!pair.startsWith(`${name}=`)) {
       return [];
     }
+
     const expiry = attributes.filter((attribute) => /^expires=|^max-age=/i.test(attribute));
     return [
       [pair, "Path=/", "HttpOnly", "SameSite=Lax", ...(secure ? ["Secure"] : []), ...expiry].join(

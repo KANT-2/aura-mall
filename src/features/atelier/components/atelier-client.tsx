@@ -75,6 +75,7 @@ export function AtelierEditor({
     if (step !== "select") {
       return;
     }
+
     const frame = requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: "instant" });
       ingredientPanelRef.current?.scrollTo({ top: 0, behavior: "instant" });
@@ -126,6 +127,7 @@ export function AtelierEditor({
       notify("한 조합에서 최대 20번까지 선택할 수 있어요.");
       return;
     }
+
     composition.add(id);
   }
   function decrease(id: string) {
@@ -142,6 +144,7 @@ export function AtelierEditor({
     if (!total) {
       return;
     }
+
     blend.reset();
     setOverlay("blend");
   }
@@ -175,6 +178,7 @@ export function AtelierEditor({
       notify("현재 기기에서 공유를 지원하지 않아요.");
       return;
     }
+
     try {
       await navigator.share({ title: `AURA | ${name || "나의 향"}`, text: recipeText() });
     } catch (e) {
@@ -187,6 +191,7 @@ export function AtelierEditor({
     if (!blend.snapshot.complete) {
       return;
     }
+
     closeOverlay();
     composition.finish(blend.snapshot.complete);
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" }));
@@ -196,10 +201,12 @@ export function AtelierEditor({
       notify("향 이름을 입력해 주세요.");
       return;
     }
+
     if (!authenticated) {
       notify("로그인 후 향을 저장할 수 있어요.");
       return;
     }
+
     const revision = state.revision;
     const didSave = await onSave({
       parent: parent?.id,
@@ -217,10 +224,12 @@ export function AtelierEditor({
       notify("향 이름을 먼저 정해 주세요.");
       return;
     }
+
     if (!total) {
       notify("향료를 선택해 주세요.");
       return;
     }
+
     const revision = state.revision;
     const added = await onAddToCart({
       color,

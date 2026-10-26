@@ -15,5 +15,6 @@ export function Asset({
       <AuraCollectionArtwork collection={id.slice("collection-".length)} className={className} />
     );
   }
+
   return <img className={className} src={asset(id, kind)} alt="" draggable={false} />;
 }

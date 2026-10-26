@@ -28,9 +28,11 @@ export function AtelierModal({
         e.preventDefault();
         close.current();
       }
+
       if (e.key !== "Tab" || !root) {
         return;
       }
+
       const items = [
         ...root.querySelectorAll<HTMLElement>(
           'button:not(:disabled),a[href],input:not(:disabled),[tabindex="0"]',
@@ -40,6 +42,7 @@ export function AtelierModal({
         e.preventDefault();
         return;
       }
+
       const first = items[0],
         last = items[items.length - 1];
       if (e.shiftKey && (document.activeElement === first || document.activeElement === root)) {

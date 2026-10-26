@@ -29,6 +29,7 @@ export function useProductFilters(
       value: initialQuery === draft.submitted ? draft.value : initialQuery,
     });
   }
+
   const query = draft.value;
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -39,6 +40,7 @@ export function useProductFilters(
       } else {
         next.delete("q");
       }
+
       if (normalized !== initialQuery) {
         setDraft((current) => ({ ...current, submitted: normalized }));
         router.replace(`/shop${next.size ? `?${next}` : ""}`, { scroll: false });
@@ -50,13 +52,16 @@ export function useProductFilters(
     if (collectionId === initialCollection && typeId === initialType) {
       return;
     }
+
     const next = new URLSearchParams(parameters.toString());
     if (collectionId !== initialCollection) {
       next.delete("collection");
     }
+
     if (typeId !== initialType) {
       next.delete("type");
     }
+
     router.replace(`/shop${next.size ? `?${next}` : ""}`, { scroll: false });
   }, [collectionId, typeId, initialCollection, initialType, parameters, router]);
   function select(collection: string, type: string, search = query) {
@@ -65,12 +70,15 @@ export function useProductFilters(
     if (collection) {
       next.set("collection", collection);
     }
+
     if (type) {
       next.set("type", type);
     }
+
     if (search.trim()) {
       next.set("q", search.trim());
     }
+
     router.replace(`/shop${next.size ? `?${next}` : ""}`, { scroll: false });
   }
   return {

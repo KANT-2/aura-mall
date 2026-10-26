@@ -29,6 +29,7 @@ test("screen animations still refer to defined keyframes after CSS Module scopin
     } else {
       await page.goto(route);
     }
+
     const result = await page.evaluate(() => {
       const defined = new Set<string>();
       function visit(rules: CSSRuleList) {
@@ -49,6 +50,7 @@ test("screen animations still refer to defined keyframes after CSS Module scopin
           /* External font stylesheets cannot be inspected. */
         }
       }
+
       const used = new Set(
         [...document.body.querySelectorAll("*")]
           .flatMap((element) =>

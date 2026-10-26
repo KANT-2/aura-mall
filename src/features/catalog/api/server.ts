@@ -12,6 +12,7 @@ export const getServerProduct = cache(async (id: string) => {
     if (error instanceof ApiError && error.status === 404) {
       return null;
     }
+
     throw error;
   }
 });

@@ -73,17 +73,20 @@ export function restoreCart(
   if (!Array.isArray(raw)) {
     return [];
   }
+
   const { products, ingredients } = catalog;
   const merged = new Map<string, CartItem>();
   for (const i of raw) {
     if (!isRecord(i) || !isRecord(i.product)) {
       continue;
     }
+
     const stored = i.product,
       id = stored.id;
     if (typeof id !== "string") {
       continue;
     }
+
     const quantity = clampQuantity(i.quantity);
     let item: CartItem;
     if (id === "custom-atelier") {
@@ -92,6 +95,7 @@ export function restoreCart(
       if (!isRecord(c) || typeof c.name !== "string" || !c.name.trim() || !counts) {
         continue;
       }
+
       const custom: CustomRecipeItem = {
         name: c.name.trim(),
         label: recipeLabel(c.label),
@@ -117,6 +121,7 @@ export function restoreCart(
       if (!product) {
         continue;
       }
+
       const gift = product.type === "gift-set";
       const selection =
         gift && Array.isArray(i.selection)
@@ -125,8 +130,10 @@ export function restoreCart(
       if (gift && !isGiftSelectionValid(product, selection, products)) {
         continue;
       }
+
       item = { key: productKey(product.id, selection), product, quantity, selection };
     }
+
     const existing = merged.get(item.key);
     merged.set(
       item.key,
@@ -135,5 +142,6 @@ export function restoreCart(
         : item,
     );
   }
+
   return [...merged.values()];
 }

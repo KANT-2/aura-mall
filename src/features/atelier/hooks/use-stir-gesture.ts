@@ -31,6 +31,7 @@ export function useStirGesture({
     if (!enabled || mode !== "manual" || rod.energy < 0.03) {
       return;
     }
+
     const timer = setTimeout(() => {
       setRod((current) => ({ ...current, energy: 0 }));
       setActive(false);
@@ -41,6 +42,7 @@ export function useStirGesture({
     if (!enabled || !settling) {
       return;
     }
+
     const timer = setTimeout(() => {
       setSettling(false);
       setRod((current) => ({ ...current, energy: 0 }));
@@ -61,6 +63,7 @@ export function useStirGesture({
     if (!enabled || mode === "auto" || mode === "shake") {
       return;
     }
+
     const rect = event.currentTarget.getBoundingClientRect();
     gesture.current = { x: event.clientX, y: event.clientY, last: performance.now() };
     onStart();
@@ -79,10 +82,12 @@ export function useStirGesture({
     if (!enabled || mode !== "manual" || !gesture.current) {
       return;
     }
+
     const now = performance.now();
     if (now - lastUpdate.current < 35) {
       return;
     }
+
     lastUpdate.current = now;
     const previous = gesture.current;
     const movement = manualStir(
@@ -93,6 +98,7 @@ export function useStirGesture({
     if (!movement) {
       return;
     }
+
     const rect = event.currentTarget.getBoundingClientRect();
     onProgress(movement.progress);
     setRod({
@@ -107,6 +113,7 @@ export function useStirGesture({
     if (!enabled || mode !== "manual") {
       return;
     }
+
     gesture.current = null;
     setActive(false);
     setSettling(true);
@@ -115,6 +122,7 @@ export function useStirGesture({
     if (event.pointerType === "mouse") {
       return;
     }
+
     leave();
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -128,6 +136,7 @@ export function useStirGesture({
     ) {
       return;
     }
+
     event.preventDefault();
     onStart();
     onProgress(8);

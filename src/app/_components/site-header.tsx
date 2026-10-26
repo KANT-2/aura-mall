@@ -91,6 +91,7 @@ function HeaderContents() {
               } else {
                 setMenu(!(menuPress.current ?? menu));
               }
+
               menuPress.current = null;
             }}
           >

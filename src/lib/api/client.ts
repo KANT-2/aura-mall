@@ -4,6 +4,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
   if (!headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
+
   const response = await fetch(`/api${path}`, {
     credentials: "same-origin",
     ...options,
@@ -17,5 +18,6 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
       body?.error?.code,
     );
   }
+
   return body as T;
 }

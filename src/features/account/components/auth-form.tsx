@@ -45,14 +45,17 @@ export function Auth({ mode, returnTo }: { mode: "login" | "register"; returnTo:
       );
       return;
     }
+
     if (signup && pw !== confirm) {
       setError("비밀번호가 일치하지 않아요.");
       return;
     }
+
     if (signup && !terms) {
       setError("필수 약관에 동의해 주세요.");
       return;
     }
+
     setBusy(true);
     try {
       await (signup
@@ -67,6 +70,7 @@ export function Auth({ mode, returnTo }: { mode: "login" | "register"; returnTo:
         sessionStorage.setItem("aura_welcome_pending_v8", "1");
         window.dispatchEvent(new Event("aura:welcome"));
       }
+
       notify(signup ? "회원가입을 환영해요." : "로그인했어요.");
       router.push(returnTo);
     } catch (e) {

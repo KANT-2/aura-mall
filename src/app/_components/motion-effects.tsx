@@ -18,6 +18,7 @@ export function AuraMotionEnhancer() {
     if (reduced) {
       return;
     }
+
     let observer: IntersectionObserver | undefined;
     const raf = window.requestAnimationFrame(() => {
       const targets = document.querySelectorAll<HTMLElement>(
@@ -51,6 +52,7 @@ export function AuraMotionEnhancer() {
             if (!entry.isIntersecting) {
               continue;
             }
+
             const target = entry.target as HTMLElement;
             target.dataset.auraEnter = "visible";
             observer?.unobserve(target);
@@ -71,6 +73,7 @@ export function AuraMotionEnhancer() {
         observer?.disconnect();
       };
     }
+
     const magnets =
       ".home .hero-copy .button,.home .a86-atelier-intro .button,.detail .purchase-row .button,[data-atelier-blend]";
     let current: HTMLElement | null = null;
@@ -80,10 +83,12 @@ export function AuraMotionEnhancer() {
         current.style.removeProperty("--aura-mx");
         current.style.removeProperty("--aura-my");
       }
+
       current = el;
       if (!el) {
         return;
       }
+
       const box = el.getBoundingClientRect();
       const dx = (event.clientX - (box.left + box.width / 2)) / Math.max(1, box.width);
       const dy = (event.clientY - (box.top + box.height / 2)) / Math.max(1, box.height);

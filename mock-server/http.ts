@@ -10,5 +10,6 @@ export function requireString(value: unknown, message: string, max = 3000): stri
   if (typeof value !== "string" || !value.trim() || value.length > max) {
     throw new HttpError(400, message);
   }
+
   return value.trim();
 }

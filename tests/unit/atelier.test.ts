@@ -31,6 +31,7 @@ test("sequential additions cannot exceed 20 drops, even when the UI batches rapi
   for (let index = 0; index < 40; index++) {
     state = atelierReducer(state, { type: "add", id: "rose" });
   }
+
   assert.equal(totalCount(state.counts), 20);
   assert.equal(state.drop, 20);
   assert.equal(atelierReducer(state, { type: "add", id: "bergamot" }), state);
@@ -126,6 +127,7 @@ test("percentages total exactly 100 with deterministic rounding and stage groupi
       100,
     );
   }
+
   assert.equal(stageRatiosForNames({ bergamot: 3 }), "fresh");
   assert.equal(stageRatiosForNames({ rose: 3 }), "soft");
   assert.equal(stageRatiosForNames({ sandalwood: 3 }), "warm");
@@ -142,6 +144,7 @@ test("blend progress only accepts the current source and finishes exactly at 100
   for (let index = 0; index < 150; index++) {
     state = blendReducer(state, { type: "advance", source: "auto", amount: 1 });
   }
+
   assert.deepEqual(state, { progress: 100, mode: "done" });
   assert.equal(blendReducer(state, { type: "mode", mode: "manual" }), state);
   assert.equal(
@@ -183,6 +186,7 @@ test("still sensor samples do not mix and shake visuals stay bounded", () => {
     assert.equal(result.progress, 0);
     tracker = result.tracker;
   }
+
   assert.deepEqual(shakePose({ magnitude: 100, x: 100, y: -100 }), {
     tilt: 12,
     wave: -14,

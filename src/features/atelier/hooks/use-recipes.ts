@@ -35,6 +35,7 @@ export function useRecipes() {
         if (!owner) {
           return false;
         }
+
         await mutation.mutateAsync({ recipe, owner });
         notify("내가 만든 향에 저장했어요.");
         return true;

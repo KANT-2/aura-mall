@@ -72,6 +72,7 @@ export function atelierReducer(
       ) {
         return state;
       }
+
       return {
         ...state,
         revision: state.revision + 1,
@@ -89,12 +90,14 @@ export function atelierReducer(
       ) {
         return state;
       }
+
       const counts = { ...state.counts };
       if (action.type === "remove" || counts[action.id] <= 1) {
         delete counts[action.id];
       } else {
         counts[action.id]--;
       }
+
       return { ...state, revision: state.revision + 1, counts, saved: false, cartAdded: false };
     }
     case "name":
@@ -118,6 +121,7 @@ export function atelierReducer(
       if (!draft) {
         return state;
       }
+
       return {
         ...initialAtelierState(),
         ...draft,
@@ -167,6 +171,7 @@ export function percentages(counts: Record<string, number>): Record<string, numb
   if (!total) {
     return {};
   }
+
   const sorted = entries.map(([id, count]) => ({
     id,
     exact: (count * 100) / total,
@@ -179,6 +184,7 @@ export function percentages(counts: Record<string, number>): Record<string, numb
       entry.value++;
     }
   }
+
   return Object.fromEntries(sorted.map(({ id, value }) => [id, value]));
 }
 

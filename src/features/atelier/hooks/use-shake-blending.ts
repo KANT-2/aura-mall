@@ -40,10 +40,12 @@ export function useShakeBlending({
       if (!listening || noSignal) {
         return;
       }
+
       const sample = motionSample(event.acceleration, event.accelerationIncludingGravity);
       if (!sample) {
         return;
       }
+
       seen.current = true;
       const now = performance.now();
       if (now - lastVisual.current > 52) {
@@ -52,6 +54,7 @@ export function useShakeBlending({
         clearTimeout(poseTimer.current);
         poseTimer.current = setTimeout(() => setPose(restingPose), 190);
       }
+
       const result = detectShake(tracker.current, sample, now);
       tracker.current = result.tracker;
       if (result.progress) {
@@ -65,6 +68,7 @@ export function useShakeBlending({
     if (!enabled || !listening || !available || access !== "active") {
       return;
     }
+
     const timer = setTimeout(() => {
       if (!seen.current) {
         setNoSignal(true);

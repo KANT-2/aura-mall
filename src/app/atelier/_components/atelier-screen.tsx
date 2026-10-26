@@ -20,6 +20,7 @@ export function AtelierScreen({
   if (error) {
     throw error;
   }
+
   if (!recipes.ready || !draft.ready) {
     return (
       <main className="page-width" aria-busy="true">
@@ -27,6 +28,7 @@ export function AtelierScreen({
       </main>
     );
   }
+
   return (
     <AtelierEditor
       key={`${session.owner}:${recipeId ?? ""}:${resume}`}

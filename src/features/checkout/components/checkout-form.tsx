@@ -24,6 +24,7 @@ export function Checkout() {
       </main>
     );
   }
+
   return (
     <main className={styles.root + " page-width checkout"}>
       <span className="eyebrow">ORDER DETAILS</span>

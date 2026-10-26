@@ -17,12 +17,15 @@ export function accountRoutes(database: MockDatabase) {
     if (typeof password !== "string" || password.length > 256) {
       throw new HttpError(400, "비밀번호를 확인해 주세요.");
     }
+
     if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 8) {
       throw new HttpError(400, "회원 정보를 확인해 주세요.");
     }
+
     if (Object.values(database.state.accounts).some((account) => account.email === email)) {
       throw new HttpError(409, "이미 가입된 이메일입니다.");
     }
+
     const salt = randomBytes(16).toString("hex");
     const account = {
       id: randomUUID(),
@@ -45,6 +48,7 @@ export function accountRoutes(database: MockDatabase) {
     if (typeof password !== "string" || !password || password.length > 256) {
       throw new HttpError(400, "비밀번호를 입력해 주세요.");
     }
+
     const account = Object.values(database.state.accounts).find((item) => item.email === email);
     if (
       !account ||
@@ -55,6 +59,7 @@ export function accountRoutes(database: MockDatabase) {
     ) {
       throw new HttpError(401, "이메일 또는 비밀번호를 확인해 주세요.");
     }
+
     const { session } = resolveSession(req, res, database);
     session.userId = account.id;
     database.persist();

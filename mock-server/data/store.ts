@@ -41,12 +41,14 @@ export function createDatabase(filename?: string) {
   if (filename && existsSync(filename)) {
     state = JSON.parse(readFileSync(filename, "utf8")) as Database;
   }
+
   return {
     state,
     persist() {
       if (!filename) {
         return;
       }
+
       mkdirSync(path.dirname(filename), { recursive: true });
       writeFileSync(filename + ".tmp", JSON.stringify(state, null, 2));
       renameSync(filename + ".tmp", filename);

@@ -15,4 +15,5 @@ const result = spawnSync(
 if (result.error) {
   console.error(result.error.message);
 }
+
 process.exitCode = result.status ?? 1;

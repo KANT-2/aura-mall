@@ -43,6 +43,7 @@ export function StyledSelect({ label, value, onChange, name, options, testId }: 
       event.preventDefault();
       setOpen(false);
     }
+
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       if (!open) {
@@ -60,14 +61,17 @@ export function StyledSelect({ label, value, onChange, name, options, testId }: 
         );
       }
     }
+
     if (event.key === "Home" && open) {
       event.preventDefault();
       setActive(0);
     }
+
     if (event.key === "End" && open) {
       event.preventDefault();
       setActive(options.length - 1);
     }
+
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       if (open) {
@@ -76,6 +80,7 @@ export function StyledSelect({ label, value, onChange, name, options, testId }: 
         setOpen(true);
       }
     }
+
     if (event.key === "Tab") {
       setOpen(false);
     }
