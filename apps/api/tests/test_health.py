@@ -30,6 +30,8 @@ def test_openapi_exposes_versioned_routes(client):
         "/api/v1/catalog",
         "/api/v1/catalog/products/{product_id}",
         "/api/v1/partner",
+        "/api/v1/recipes",
+        "/api/v1/recipes/{recipe_id}",
     }
 
 
