@@ -3,7 +3,7 @@ import pytest
 from aura_api.modules.errors import Conflict, InvalidInput
 from aura_api.modules.identity.domain import (
     Coupon,
-    SessionOwner,
+    RequestOwner,
     has_usable_coupon,
     validate_credentials,
     validate_registration,
@@ -44,9 +44,9 @@ def test_credentials_require_password():
         validate_credentials("kim@aura.com", "")
 
 
-def test_session_owner_key_and_expected_owner():
-    guest = SessionOwner(guest_id="g-1")
-    member = SessionOwner(guest_id="g-1", user_id="u-1")
+def test_request_owner_key_and_expected_owner():
+    guest = RequestOwner(guest_id="g-1")
+    member = RequestOwner(guest_id="g-1", user_id="u-1")
 
     assert guest.key == "guest:g-1"
     assert member.key == "member:u-1"

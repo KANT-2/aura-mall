@@ -29,7 +29,9 @@ ERD는 **무엇을 저장하는가**를, 도메인 규칙은 **그 데이터로 
 
 모든 오류는 `code`(기계용)와 `message`(화면에 띄울 한국어 문장)를 가진다. 메시지는 Mock API·화면 문구와 같게 맞췄다. Mock은 규칙 위반을 400으로 돌려주므로 대부분 `InvalidInput`이다.
 
-## 3. 회원 · 세션 (`identity/domain.py`)
+## 3. 회원 · 인증 (`identity/domain.py`)
+
+> **인증은 JWT 방식이다.** 서버에 로그인 상태를 저장하는 세션 테이블은 두지 않는다. BFF 계약의 쿠키 이름(`API_SESSION_COOKIE`)과 응답 DTO 이름(`Session`)에 "session"이 들어갈 뿐, 그 쿠키 값은 서버가 서명한 **JWT**(회원 ID·비회원 ID·토큰 번호 `jti`·만료 시각)다. 요청마다 서명과 만료를 확인하고, 로그아웃한 토큰은 `revoked_tokens`에 기록해 거절한다.
 
 | ID    | 규칙                                                                                                                            | 위반 코드 → 메시지                                               |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
@@ -38,7 +40,7 @@ ERD는 **무엇을 저장하는가**를, 도메인 규칙은 **그 데이터로 
 | ID-03 | 비밀번호는 8자 이상 256자 이하                                                                                                  | `PASSWORD_INVALID` / `MEMBER_INVALID`                            |
 | ID-04 | 마케팅 동의는 `true`일 때만 동의 (그 외 값은 미동의)                                                                            | —                                                                |
 | ID-05 | 로그인 시 이메일은 같은 방식으로 정규화, 비밀번호는 비어 있으면 안 됨                                                           | `PASSWORD_REQUIRED` → 비밀번호를 입력해 주세요.                  |
-| ID-06 | 요청의 주인(`SessionOwner`)은 회원이면 `member:{userId}`, 비회원이면 `guest:{guestId}`. `guestId`는 로그인·로그아웃 후에도 유지 | —                                                                |
+| ID-06 | 요청의 주인(`RequestOwner`)은 회원이면 `member:{userId}`, 비회원이면 `guest:{guestId}`. `guestId`는 로그인·로그아웃 후에도 유지 | —                                                                |
 | ID-07 | `X-Session-Owner`가 실제 주인과 다르면 거절 (계정이 바뀐 사이 시작된 요청). 소유권 판단은 이 헤더가 아니라 토큰으로             | `OWNER_CHANGED` (409) → 계정이 변경되었어요. 다시 시도해 주세요. |
 | ID-08 | 배송비 쿠폰은 `AVAILABLE`일 때만 사용할 수 있고, 사용하면 `USED`. 주문 취소 시 복원 가능                                        | `COUPON_UNAVAILABLE` → 사용할 수 없는 쿠폰이에요.                |
 | ID-09 | `Member.coupon`(쿠폰 보유)은 저장하지 않고 "사용 가능한 쿠폰이 있는가"로 계산                                                   | —                                                                |
@@ -108,7 +110,7 @@ ERD는 **무엇을 저장하는가**를, 도메인 규칙은 **그 데이터로 
 apps/api/aura_api/modules/
   errors.py              # DomainError와 kind
   catalog/domain.py      # Product, Ingredient, Catalog (규칙이 참고하는 상품·향료 사실)
-  identity/domain.py     # 가입·로그인 입력, SessionOwner, Coupon
+  identity/domain.py     # 가입·로그인 입력, RequestOwner, Coupon
   atelier/domain.py      # 향료 구성, 블렌딩 색, 레시피·초안
   ordering/domain.py     # 주문 항목 재구성, Gift Set, 재고 수요, 금액·배송비
   partner/domain.py      # 입점 문의 입력

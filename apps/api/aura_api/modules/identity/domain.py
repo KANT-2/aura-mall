@@ -1,4 +1,8 @@
-"""Identity domain: signup/login input rules, session owner, shipping coupon."""
+"""Identity domain: signup/login input rules, request owner, shipping coupon.
+
+Authentication is JWT: the cookie the BFF forwards is named "session", but its value is a
+signed JWT (member id, guest id, jti). There is no server-side session table.
+"""
 
 import re
 from dataclasses import dataclass, replace
@@ -59,7 +63,7 @@ def validate_credentials(email: object, password: object) -> Credentials:
 
 
 @dataclass(frozen=True)
-class SessionOwner:
+class RequestOwner:
     """Who a request acts for: a member, or an anonymous visitor kept across login/logout."""
 
     guest_id: str
