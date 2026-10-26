@@ -34,10 +34,13 @@ aura_api/
     health.py         # 헬스 체크와 응답 모델
     catalog.py        # GET /catalog, /catalog/products/{id}
     partner.py        # POST /partner
+    recipes.py        # GET·POST /recipes, DELETE /recipes/{id}
+    deps.py           # DB 세션, 로그인 회원 확인(토큰 sub = users.id)
     errors.py         # 도메인 규칙 위반 → 공통 오류 형식(code·message)
   services/           # 서비스 계층: 유스케이스·트랜잭션
     catalog.py        # 카탈로그 조회, 예전 상품 ID 별칭
     partner.py        # 입점 문의 검증·저장
+    recipes.py        # 레시피 저장·다시 만들기(버전 +1)·삭제
   domain/             # 도메인 계층: 순수 Python 업무 규칙 (영역별 파일)
   infra/              # 인프라 계층
     database.py       # SQLAlchemy Base·비동기 엔진·요청별 세션
@@ -54,6 +57,7 @@ tests/
   test_health.py      # 헬스 체크·OpenAPI·접두사·리다이렉트 검사
   test_catalog.py     # 카탈로그 응답 형태 (DB 없이)
   test_partner.py     # 입점 문의 규칙·오류 메시지 (DB 없이)
+  test_recipes.py     # 레시피 로그인 요구 (DB 없이)
   domain/             # 도메인 규칙 단위 테스트 (DB 없음)
   db/                 # 실제 PostgreSQL 통합 테스트 (AURA_TEST_DATABASE_URL)
 pyproject.toml        # Python 의존성·Ruff·pytest 설정
