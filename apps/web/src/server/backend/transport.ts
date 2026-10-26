@@ -9,6 +9,8 @@ type BackendOptions = {
   method?: string;
   body?: string;
   cookie?: string;
+  /** Supplied by the BFF cookie adapter, never copied from browser Authorization. */
+  token?: string;
   owner?: string;
   /** Already filtered by the route's allow-list; never a raw browser query string. */
   query?: URLSearchParams;
@@ -71,6 +73,10 @@ export async function backendRequest(
 
     if (options.cookie) {
       headers.set("Cookie", options.cookie);
+    }
+
+    if (options.token) {
+      headers.set("Authorization", `Bearer ${options.token}`);
     }
 
     if (options.owner) {
