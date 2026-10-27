@@ -43,7 +43,7 @@ BFF는 요청 사이에 사용자 상태를 메모리로 보관하지 않습니�
 | `/auth/register`, `/auth/login`, `/auth/me`, `/auth/refresh`, `/auth/logout` | JWT 인증 연결. PostgreSQL 인증 저장소 사용                    |
 | `/orders`                                                                    | 회원 주문 API·중복 방지 키·공개 DTO 연결, 웹 결제 버튼 비활성 |
 | `/admin/**`                                                                  | 별도 관리자 JWT 인증·등록·업무 API·공개 DTO 연결              |
-| `/atelier/draft`                                                             | Mock 제공, FastAPI 미구현                                     |
+| `/atelier/draft`                                                             | 방문자별 조회·전체 저장·삭제, FastAPI·공개 DTO 연결           |
 
 `API_URL`은 한 백엔드를 선택합니다. FastAPI 오류나 미구현 경로를 Mock으로 자동 우회하지 않습니다. 웹 개발의 기본값은 Mock입니다. FastAPI 사용 시 인증 DB 마이그레이션 0003까지 적용·시드를 적용하고 JWT 발급자·서명 키·DB·BFF 공유 키를 설정합니다. 미설정 저장소를 성공으로 간주하지 않습니다.
 
@@ -171,7 +171,15 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
 
 주문 BFF는 `recipient`, `address`, `coupon`, `items`만 전달하고 서버 계산 가격·스냅샷의 공개 DTO를 반환합니다. 관리자 응답도 경로별 DTO로 검증하며 잘못된 중첩 타입은 502입니다. 토큰·소유자 키·DB 내부 필드를 추가로 노출하지 않습니다. 결제·주문 접수 UI 버튼은 계속 비활성 상태입니다.
 
-## 관리자 API (1단계 제안)
+## 조향 초안
+
+`GET /api/atelier/draft`, `PUT /api/atelier/draft`, `DELETE /api/atelier/draft`는 FastAPI의 같은 경로에 연결합니다. 조회 시 없거나 삭제 후에는 200 `null`, 저장 성공 시 `{ counts, name, label, step }`을 반환합니다. BFF는 이 네 필드만 전달하고 응답을 검증합니다.
+
+BFF의 HttpOnly `aura_guest` UUID v4를 서버 전용 `X-Guest-ID`로 전달합니다. FastAPI는 누락·잘못된 값·중복 헤더를 400으로 거절합니다. 방문자별 초안은 로그인·로그아웃 후에도 유지하며 회원 데이터나 인증 정보를 저장하지 않습니다. 회원 JWT가 있으면 검증하고 관리자 JWT는 거절합니다. 방문자 ID는 회원 인증·인가 수단이 아닙니다.
+
+FastAPI는 카탈로그 향료·합계 1~20방울·이름 30자와 상태를 검증하고 기존 `atelier_drafts` 테이블에 원자적으로 저장합니다. 본문의 소유자 ID는 허용하지 않으며 추가 마이그레이션은 없습니다. API 오류를 Mock으로 우회하지 않습니다.
+
+## 관리자 API
 
 운영자가 상품·재고, 주문, 입점 문의를 관리하는 JWT 기반 계약입니다. 관리자 계정·로그인·토큰은 고객과 분리합니다. 웹 `/admin/login`에서 운영자로 로그인하고 기존 관리자 화면을 사용합니다.
 
@@ -179,12 +187,12 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
 
 - FastAPI `POST /admin/auth/login`은 `{ accessToken, tokenType: "Bearer", expiresIn, admin: { id, email, name } }`을 반환합니다. Access만 발급하며 Refresh는 발급하지 않습니다. BFF는 토큰 형식·수명·공개 프로필을 검증해 `aura_admin_access; Path=/api/admin; HttpOnly; SameSite=Lax` 쿠키에 보관합니다. HTTPS에서는 `Secure`를 적용합니다. 브라우저 JSON에는 토큰을 반환하지 않습니다.
 - 모든 BFF `/api/admin/**` 업무 경로는 관리자 쿠키만 Bearer로 변환합니다. 회원 Access·Refresh·브라우저 Authorization을 대체 인증으로 사용하지 않습니다. 관리자 JWT가 없으면 401이며 회원 쿠키는 유지합니다. 고객 API도 관리자 쿠키를 사용하지 않습니다.
-- 공개 조회 `GET /api/admin/auth/me`는 `{ admin: AdminAccount | null }`입니다. FastAPI의 JWT 조회 경로 `/admin/session`으로 연결하지만 서버 세션 ID를 만들지 않습니다. `admin_sessions`는 발급한 JWT의 jti·만료·폐기 기록입니다. 미인증·만료·폐기 시 화면에는 `admin: null`을 반환합니다.
+- 공개 조회 `GET /api/admin/auth/me`는 `{ admin: AdminAccount | null }`입니다. FastAPI의 JWT 조회 경로 `/admin/session`으로 연결하지만 서버 세션 ID를 만들지 않습니다. `admin_sessions`는 발급한 JWT의 jti·만료·폐기 기록입니다. 미인증·만료·폐기 시 화면에는 `admin: null`을 반환합니다. 조회 응답은 쿠키를 변경하지 않아 이전 요청의 늦은 401이 새 로그인 쿠키를 삭제하지 않습니다.
 - FastAPI는 관리자 principal·권한 표시·발급 jti·활성 `admins` 계정을 매 요청 확인합니다. 고객 토큰은 403, 잘못된 관리자 토큰은 401입니다. 화면의 회원 `role`은 관리자 로그인 근거로 사용하지 않습니다.
 - 관리자 API의 401에서는 회원 Refresh를 실행하지 않습니다. 관리자 조회로 인증 상태를 다시 확인해 전용 로그인 화면으로 안내합니다. 관리자 토큰 만료 시 다시 로그인하며 자동 갱신하지 않습니다.
 - 로그아웃은 관리자 JWT 폐기의 204를 확인한 뒤 관리자 쿠키만 삭제합니다. 이미 무효한 JWT의 401도 미인증 상태로 정리합니다. 5xx·연결 장애에서는 쿠키를 유지합니다. 회원 로그인·장바구니·Refresh 쿠키는 유지합니다.
 - 관리자 로그인·로그아웃의 브라우저 요청은 회원 갱신과 분리된 Web Lock을 사용하고 관리자 캐시만 취소·제거합니다. 출처 검사·본문 크기·요청 ID 경계는 동일합니다.
-- 첫 관리자는 FastAPI `python -m aura_api.infra.create_admin` 명령으로 생성합니다. 이후 등록은 인증된 관리자만 `/api/admin/admins`로 수행합니다. BFF는 이름·이메일·비밀번호만 전달하고 반환 프로필도 공개 세 필드로 제한합니다. 등록 UI는 별도입니다.
+- 첫 관리자는 FastAPI `python -m aura_api.infra.create_admin` 명령으로 생성합니다. 이후 인증된 관리자는 웹 `/admin/admins/new`에서 `/api/admin/admins`로 다른 관리자를 등록합니다. BFF는 이름·이메일·비밀번호만 전달하고 반환 프로필도 공개 세 필드로 제한합니다. 등록은 현재 로그인 계정을 바꾸지 않습니다.
 
 ### 경로
 
@@ -276,7 +284,9 @@ Mock 주문의 재고 검사는 전달된 전체 주문 항목과 고정 fixture
 
 ## OpenAPI 인계
 
-FastAPI `/openapi.json`에는 현재 헬스 체크·JWT 인증·카탈로그·문의·레시피·주문·관리자 경로가 포함됩니다. 위 DTO와 차이가 있다면 서버 응답 모델 또는 BFF 리소스 어댑터로 맞춥니다. 스키마 버전 관리·TypeScript 타입 생성·CI 계약 자동 검사는 후속 작업입니다.
+FastAPI `/openapi.json`에는 헬스 체크·JWT 인증·카탈로그·문의·레시피·초안·주문·관리자 경로가 포함됩니다. `/docs`는 회원·관리자 JWT를 분리한 Swagger 인증 입력과 실제 공통 오류 형식을 제공합니다. 사용 방법은 [API 개발 안내](../apps/api/README.md#swagger와-openapi-계약)를 참고합니다.
+
+계약 버전은 OpenAPI `info.x-contract-version`과 [작업 목록](../apps/web/contracts/operations.json)으로 관리합니다. `npm run check:contract`는 DB 연결 없이 운영 앱의 스키마를 내보내고 `openapi-typescript`로 타입을 생성한 다음, 작업 목록·버전과 [프런트 DTO 호환성](../apps/web/contracts/public-dtos.ts)을 검사합니다. 루트 `npm run check`에서도 로컬로 실행합니다. 생성 스키마·타입은 `apps/web/contracts/generated`에만 두고 커밋하지 않습니다. 파괴적 변경 시 버전과 검증 코드를 함께 검토합니다.
 
 BFF HTTP 통합 테스트는 실제 서버 응답으로 FastAPI 형태의 오류·쿠키·제한시간·리다이렉트·헤더 경계를 검증합니다. Playwright는 Mock 백엔드에 연결한 실제 Next 프로덕션 서버를 통해 JWT 인증·장바구니·초안과 BFF 경로를 검증합니다. FastAPI가 준비되면 같은 계약 검증을 해당 서버에서도 실행하고 DB 트랜잭션·운영 인증을 추가 검증해야 합니다.
 

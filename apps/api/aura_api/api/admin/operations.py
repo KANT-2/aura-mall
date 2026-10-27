@@ -3,7 +3,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from aura_api.api.admin.deps import CurrentAdmin
 from aura_api.api.admin.schemas import (
@@ -29,9 +29,18 @@ ERRORS = {code: {"model": ErrorResponse} for code in (400, 401, 403, 404, 409)}
 
 
 class InquiryUpdateIn(BaseModel):
-    version: Any = None
-    status: Any = None
-    memo: Any = None
+    model_config = ConfigDict(
+        json_schema_extra={
+            "required": ["version"],
+            "example": {"version": 1, "status": "reviewing", "memo": "담당자 확인 중"},
+        }
+    )
+    version: Any = Field(default=None, json_schema_extra={"type": "integer", "minimum": 1})
+    status: Any = Field(
+        default=None,
+        json_schema_extra={"type": "string", "enum": ["received", "reviewing", "done"]},
+    )
+    memo: Any = Field(default=None, json_schema_extra={"type": "string"})
 
 
 @router.get("/overview", response_model=AdminOverviewOut, responses=ERRORS)

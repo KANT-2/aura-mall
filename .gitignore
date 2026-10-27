@@ -41,6 +41,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+apps/web/contracts/generated/
 next-env.d.ts
 
 # Local mock database

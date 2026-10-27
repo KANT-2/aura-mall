@@ -45,7 +45,11 @@ export async function handleAdminAuth(
   );
   if (result.status >= 400) {
     if (result.status === 401 && action !== "login") {
-      clearAdminToken(headers, secure);
+      // A delayed lookup must never delete a cookie issued by a newer login in another tab.
+      if (action === "logout") {
+        clearAdminToken(headers, secure);
+      }
+
       return Response.json({ admin: null }, { headers });
     }
 

@@ -9,6 +9,7 @@
     "node": ">=22.12.0"
   },
   "scripts": {
+    "check:contract": "npm run check:contract --workspace @aura/web",
     "dev": "npm run dev --workspace @aura/web --",
     "dev:web": "npm run dev:web --workspace @aura/web --",
     "build": "npm run build --workspace @aura/web --",
@@ -35,7 +36,7 @@
     "test:api": "uv run --directory apps/api --locked pytest",
     "check:web": "npm run lint && npm run lint:css && npm run typecheck && npm test",
     "check:api": "npm run lint:api && uv run --directory apps/api --locked ruff format --check . && npm run test:api",
-    "check": "npm run format:check && npm run check:web && npm run check:api"
+    "check": "npm run format:check && npm run check:web && npm run check:api && npm run check:contract"
   },
   "devDependencies": {
     "prettier": "^3.9.10"
