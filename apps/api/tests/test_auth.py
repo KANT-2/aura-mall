@@ -401,6 +401,14 @@ def test_production_app_has_no_test_or_issuance_routes():
             "/api/v1/recipes",
             "/api/v1/recipes/{recipe_id}",
             "/api/v1/orders",
+            "/api/v1/admin/overview",
+            "/api/v1/admin/products",
+            "/api/v1/admin/products/{product_id}",
+            "/api/v1/admin/products/{product_id}/stock-adjustments",
+            "/api/v1/admin/orders",
+            "/api/v1/admin/orders/{order_id}",
+            "/api/v1/admin/inquiries",
+            "/api/v1/admin/inquiries/{inquiry_id}",
         }
         assert client.get("/test/me").status_code == 404
 
