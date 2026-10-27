@@ -8,11 +8,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aura_api.domain.catalog import CUSTOM_PRODUCT_TYPE
-from aura_api.domain.errors import Conflict
+from aura_api.domain.errors import Conflict, Unauthorized
 from aura_api.domain.ordering import OrderLine, idempotency_key, price_order
 from aura_api.infra.models import Product
 from aura_api.infra.repositories import catalog as catalog_repository
 from aura_api.infra.repositories import orders as repository
+from aura_api.infra.repositories import users
 from aura_api.infra.repositories.orders import SavedOrder
 
 
@@ -106,6 +107,8 @@ async def _place(
     session: AsyncSession, member_id: uuid.UUID, raw: Mapping[str, object], key: str | None
 ) -> tuple[SavedOrder, bool]:
     async with session.begin():
+        if not await users.lock_active_member(session, member_id):
+            raise Unauthorized("LOGIN_REQUIRED", "로그인이 필요해요.")
         if key is not None:
             earlier = await repository.order_by_key(session, member_id, key)
             if earlier is not None:

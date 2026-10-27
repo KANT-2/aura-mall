@@ -6,9 +6,10 @@ from collections.abc import Mapping
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aura_api.domain.atelier import new_recipe
-from aura_api.domain.errors import NotFound
+from aura_api.domain.errors import NotFound, Unauthorized
 from aura_api.infra.repositories import catalog as catalog_repository
 from aura_api.infra.repositories import recipes as repository
+from aura_api.infra.repositories import users
 from aura_api.infra.repositories.recipes import SavedRecipe
 
 
@@ -27,6 +28,8 @@ async def save_recipe(
     session: AsyncSession, member_id: uuid.UUID, raw: Mapping[str, object]
 ) -> SavedRecipe:
     async with session.begin():
+        if not await users.lock_active_member(session, member_id):
+            raise Unauthorized("LOGIN_REQUIRED", "로그인이 필요해요.")
         catalog = await catalog_repository.load_rule_catalog(session)
         parent = None
         if raw.get("parent"):
@@ -49,6 +52,8 @@ async def delete_recipe(
     session: AsyncSession, member_id: uuid.UUID, recipe_id: str
 ) -> list[SavedRecipe]:
     async with session.begin():
+        if not await users.lock_active_member(session, member_id):
+            raise Unauthorized("LOGIN_REQUIRED", "로그인이 필요해요.")
         target = _uuid(recipe_id)
         if target is None or not await repository.delete_recipe(session, member_id, target):
             raise NotFound("RECIPE_NOT_FOUND", "저장한 향을 찾을 수 없어요.")
