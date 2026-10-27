@@ -63,3 +63,6 @@ volumes:
 
 networks:
   aura-internal:
+    ipam:
+      config:
+        - subnet: 10.250.50.0/24
