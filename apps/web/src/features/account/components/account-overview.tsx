@@ -14,6 +14,7 @@ import { totalCount } from "@/features/atelier/model/recipes";
 import { useNotify } from "@/components/feedback/notification-provider";
 import { useRecipes } from "@/features/atelier/hooks/use-recipes";
 import { useAccount } from "@/features/account/hooks/use-account";
+import { MemberSettings } from "@/features/account/components/member-settings";
 export function MyPage() {
   const { ingredients } = useCatalog();
   const { signOut } = useAuth();
@@ -208,21 +209,9 @@ export function MyPage() {
             컬렉션 둘러보기 →
           </Link>
         </div>
-      ) : (
-        <div className="account-panel">
-          <h2>회원 정보</h2>
-          <dl>
-            <div>
-              <dt>이름</dt>
-              <dd>{user.name}</dd>
-            </div>
-            <div>
-              <dt>이메일</dt>
-              <dd>{user.email}</dd>
-            </div>
-          </dl>
-        </div>
-      )}
+      ) : user.role !== "admin" ? (
+        <MemberSettings key={`${user.id}:${user.name}:${user.marketing}`} member={user} />
+      ) : null}
     </main>
   );
 }
