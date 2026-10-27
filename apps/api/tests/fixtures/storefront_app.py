@@ -215,6 +215,7 @@ catalog.load_catalog = load_catalog
 catalog.load_rule_catalog = load_rule_catalog
 catalog.find_product = find_product
 users.member_exists = member_exists
+users.lock_active_member = member_exists
 recipes.list_recipes = list_recipes
 recipes.find_recipe = find_recipe
 recipes.add_recipe = add_recipe
