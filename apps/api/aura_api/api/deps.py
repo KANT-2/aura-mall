@@ -25,6 +25,16 @@ def bearer_claims(request: Request, verifier: JWTVerifier) -> dict | None:
     return verifier.decode_claims(values[0].partition(" ")[2])
 
 
+def is_member_principal(claims: dict | None) -> bool:
+    """Apply the member-only principal policy after JWT authentication."""
+    if claims is None:
+        return False
+    permissions = claims.get("permissions")
+    return claims.get("principal_type") in (None, "member") and not (
+        isinstance(permissions, list) and ADMIN_PERMISSION in permissions
+    )
+
+
 async def optional_member(
     request: Request,
     session: Session,
@@ -38,11 +48,7 @@ async def optional_member(
     if not request.headers.getlist("authorization"):
         return None
     user = await require_authenticated_user(request, verifier, revocations)
-    claims = bearer_claims(request, verifier) or {}
-    permissions = claims.get("permissions")
-    if claims.get("principal_type") not in (None, "member") or (
-        isinstance(permissions, list) and ADMIN_PERMISSION in permissions
-    ):
+    if not is_member_principal(bearer_claims(request, verifier)):
         # An admin token never acts as a member, even if its subject also exists in users.
         raise Unauthorized("LOGIN_REQUIRED", "로그인이 필요해요.")
     try:
