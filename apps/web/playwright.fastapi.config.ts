@@ -28,7 +28,7 @@ export default defineConfig({
         API_URL: "http://127.0.0.1:8200",
         API_PREFIX: "/api/v1",
         API_AUTH_MODE: "jwt",
-        API_SESSION_COOKIE: "aura_session",
+        API_ACCESS_COOKIE: "aura_access",
         API_TIMEOUT_MS: "10000",
         API_BFF_SHARED_KEY: "storefront-e2e-server-only-key-0123456789",
         APP_ORIGIN: "http://127.0.0.1:3300",

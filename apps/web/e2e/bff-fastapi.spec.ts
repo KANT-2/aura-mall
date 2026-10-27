@@ -10,7 +10,7 @@ function token(subject: string, expired = false) {
 
 test("production catalog API serves BFF and server-rendered product pages", async ({ request }) => {
   const response = await request.get("/api/catalog?url=https://attacker.invalid", {
-    headers: { Cookie: "aura_session=not-a-jwt", Authorization: "Bearer private" },
+    headers: { Cookie: "aura_access=not-a-jwt", Authorization: "Bearer private" },
   });
   expect(response.status()).toBe(200);
   expect(response.headers()["set-cookie"]).toBeUndefined();
@@ -84,11 +84,11 @@ test("recipe API keeps anonymous access empty and rejects forged or expired cred
   expect((await anonymous.json()).error.code).toBe("LOGIN_REQUIRED");
   for (const value of [token(randomUUID(), true), "header.payload.forged"]) {
     const response = await request.get("/api/recipes", {
-      headers: { Cookie: `aura_session=${value}` },
+      headers: { Cookie: `aura_access=${value}` },
     });
     expect(response.status()).toBe(401);
     expect(response.headers()["www-authenticate"]).toBe("Bearer");
-    expect(response.headers()["set-cookie"]).toContain("Max-Age=0");
+    expect(response.headers()["set-cookie"] ?? "").not.toContain("aura_access=;");
     expect(await response.text()).not.toContain(value);
   }
 });
@@ -101,7 +101,7 @@ test("production recipe service supports save, remake, ownership and delete thro
   const context = async (id: string) =>
     playwright.request.newContext({
       baseURL: "http://127.0.0.1:3300",
-      extraHTTPHeaders: { Cookie: `aura_session=${token(id)}`, "X-Session-Owner": id },
+      extraHTTPHeaders: { Cookie: `aura_access=${token(id)}`, "X-Account-Owner": id },
     });
   const member = await context(owner);
   const stranger = await context(other);
@@ -142,7 +142,7 @@ test("production recipe service supports save, remake, ownership and delete thro
     expect(foreignParent.status()).toBe(404);
     expect((await foreignParent.json()).error.code).toBe("RECIPE_PARENT_NOT_FOUND");
     const conflict = await member.post("/api/recipes", {
-      headers: { "X-Session-Owner": other },
+      headers: { "X-Account-Owner": other },
       data,
     });
     expect(conflict.status()).toBe(409);

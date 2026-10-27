@@ -21,9 +21,8 @@ XSS(엑스에스에스, 사이트 간 스크립팅)는 사용자 입력을 실�
 - [request-origin.ts](../../apps/web/src/server/bff/request-origin.ts)는 `APP_ORIGIN`을 우선합니다.
   개발 모드에만 로컬 주소·포트가 일치하는 Host 예외가 있습니다. 운영에서는 정식
   `APP_ORIGIN`을 설정해야 합니다. 이번 FastAPI 검사는 Host·Forwarded 헤더를 사용하지 않습니다.
-- [session-cookie.ts](../../apps/web/src/server/bff/session-cookie.ts)는 지정된 세션 쿠키만
-  전달하고 `HttpOnly`, `SameSite=Lax`, HTTPS에서 `Secure`를 적용합니다.
-- BFF는 `nosniff`, `private, no-store`, 세션 응답의 `Vary: Cookie`를 이미 적용합니다.
+- [token-cookie.ts](../../apps/web/src/server/bff/token-cookie.ts)는 지정된 토큰 쿠키만 읽어 Bearer를 구성하고 `HttpOnly`, `SameSite=Lax`, HTTPS에서 `Secure`를 적용합니다.
+- BFF는 `nosniff`, `private, no-store`, 인증 응답의 `Vary: Cookie`를 이미 적용합니다.
 - BFF가 FastAPI로 브라우저의 Origin·Referer·Fetch Metadata를 전달하지 않는 구조는 유지합니다.
 - CRA-8의 요청 ID·공통 예외 처리기는 유지하고 500 응답의 보안 헤더만 보완합니다.
 - `apps/web/src` 검색에서 `dangerouslySetInnerHTML`, `innerHTML`, `outerHTML`,
@@ -195,7 +194,7 @@ E2E는 Mock 백엔드를 사용합니다. 실제 Next와 FastAPI 간 공유 키 
   Fetch Metadata 정책은 팀장과 별도 합의가 필요합니다. 백엔드 키가 BFF의 검사를 강화하지는 않습니다.
 - 팀장: 직접 API 호출 허용 범위, 업무 출력 지점의 URL 정책 적용, 서식 HTML 도입 여부,
   Next CSP와 실제 브라우저 검증, 상태 변경 없는 GET 원칙을 확인해야 합니다.
-- 인증 담당자: 세션 쿠키와 CSRF 토큰·헤더 전달, SameSite 정책, 인증·인가 경계를 합의해야 합니다.
+- 인증 담당자: JWT 토큰 쿠키와 CSRF 토큰·헤더 전달, SameSite 정책, 인증·인가 경계를 합의해야 합니다.
 - 인프라 담당자: 허용 출처, TLS·API 외부 노출, 비밀키 생성·주입·회전·로그 마스킹,
   본문·빈도 제한을 합의해야 합니다. 이번 작업은 배포나 인프라 설정을 변경하지 않습니다.
 

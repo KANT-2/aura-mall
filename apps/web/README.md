@@ -13,7 +13,7 @@ npm run dev
 
 `dev`는 Next.js(`http://localhost:3000`)와 Mock API(`http://127.0.0.1:4000`)를 함께 실행합니다. `npm run dev:web`과 `npm run mock:dev`로 따로 실행할 수도 있습니다.
 
-설정이 필요하면 [환경 변수 예제](.env.example)를 `apps/web/.env.local`로 복사합니다. Next는 환경 파일을 `apps/web`에서 읽습니다. API 주소·접두사·세션 쿠키·제한시간은 [BFF 계약](../../docs/FASTAPI_BFF.md#실행-환경)에 정리되어 있으며, 설정 변경 후 웹 서버를 재시작합니다.
+설정이 필요하면 [환경 변수 예제](.env.example)를 `apps/web/.env.local`로 복사합니다. Next는 환경 파일을 `apps/web`에서 읽습니다. API 주소·접두사·토큰 쿠키·제한시간은 [BFF 계약](../../docs/FASTAPI_BFF.md#실행-환경)에 정리되어 있으며, 설정 변경 후 웹 서버를 재시작합니다.
 
 ```sh
 npm run build
@@ -54,7 +54,7 @@ src/
     ui/, brand/, illustrations/, layout/, feedback/
   hooks/                       # 화면 폭·공유 API·기기 센서 등 브라우저 기능
   server/
-    bff/                       # 출처·본문·세션 쿠키·브라우저 응답 경계
+    bff/                       # 출처·본문·토큰 쿠키·브라우저 응답 경계
     backend/                   # FastAPI/Mock 설정·서버 전용 HTTP 연결
   lib/api/                     # 브라우저 클라이언트·공용 오류·RSC 조회 연결
   lib/                         # 형식·입력 검증·내부 경로·테스트 식별자
@@ -87,28 +87,28 @@ e2e/
 
 BFF는 요청 출처·JSON 크기·허용 쿠키·제한시간을 처리하고, FastAPI의 `detail` 및 422 오류를 공통 오류 형식으로 변환합니다. 가격·소유권·인증·트랜잭션은 백엔드에서 검증합니다. FastAPI 업무 API는 `apps/api`에 순차적으로 구현하며 웹 개발의 기본 백엔드는 Mock입니다.
 
-카탈로그·입점 문의·레시피는 구현된 FastAPI API에 연결할 수 있습니다. BFF는 요청 필드를 허용 목록으로 제한하고 응답을 공개 DTO로 검증하며 FastAPI의 안전한 도메인 오류 코드를 보존합니다. RSC 카탈로그·상품 조회도 같은 응답 어댑터를 사용합니다. 운영 인증·세션과 초안·주문·관리자 API는 후속 연결이며 전체 화면 개발은 계속 기본 Mock을 사용합니다. FastAPI를 선택해도 실패한 요청을 Mock으로 우회하지 않습니다.
+카탈로그·입점 문의·레시피와 사용자 JWT 인증은 구현된 FastAPI API에 연결합니다. BFF는 요청 필드를 제한하고 응답을 공개 DTO로 검증합니다. FastAPI 오류를 Mock으로 우회하지 않습니다. 초안 API와 운영 관리자 토큰 발급·인증 저장소 연결은 후속 작업입니다.
 
-기본 `API_AUTH_MODE=cookie`는 Mock 세션 쿠키를 전달합니다. `API_AUTH_MODE=jwt`에서는 허용한 HttpOnly 쿠키의 JWT만 Bearer로 변환하고, 401이면 쿠키를 삭제합니다. 백엔드는 기존 `Session` 본문과 설정한 이름의 JWT `Set-Cookie`를 반환해야 합니다. JWT 발급·서명·폐기 검증과 로그아웃 처리는 FastAPI가 담당합니다. 운영 업무 API·DB 연결은 아직 없으며, BFF 인증 응답에서는 공개 회원 필드만 반환합니다.
+Mock과 FastAPI는 동일한 JWT 계약을 사용합니다. BFF는 TokenPair JSON을 `aura_access`·`aura_refresh` HttpOnly 쿠키에 보관하고 Access JWT만 Bearer로 전달합니다. 사용자 조회는 `/api/auth/me`, 갱신은 `/api/auth/refresh`입니다. 브라우저는 401에서 탭 간 Web Lock으로 갱신을 직렬화하고 한 번만 재시도합니다. 로그아웃은 백엔드의 계열 폐기 204를 확인한 뒤 쿠키를 삭제합니다. 서버 세션·`/api/session`·쿠키 인증 모드는 제거했습니다.
 
-설정 예제, 리소스별 입력·응답 DTO, 세션·오류 계약, OpenAPI 인계 기준은 [FastAPI BFF 연결 문서](../../docs/FASTAPI_BFF.md)에 정리했습니다.
+설정 예제, 리소스별 입력·응답 DTO, JWT·오류 계약, OpenAPI 인계 기준은 [FastAPI BFF 연결 문서](../../docs/FASTAPI_BFF.md)에 정리했습니다.
 
 ## 데이터 소유권과 Mock API
 
-장바구니는 브라우저 `localStorage`의 `aura_cart_v1` 키에 상품 ID·수량·선택 구성을 저장합니다. 로그인·로그아웃과 관계없이 같은 브라우저에서 유지하며, 같은 출처의 다른 탭에도 변경을 반영합니다. 컬렉션·향료·프로모션·추천 이름은 서버 fixture에서, 상품(fixture로 초기화한 뒤 관리자 수정 반영)·회원·세션·레시피·초안·주문·문의·관리자 이력은 Mock 저장소에서 관리하고 HTTP로 접근합니다. `sessionStorage`에는 가입 안내 표시 여부만 남아 있습니다.
+장바구니는 브라우저 `localStorage`의 `aura_cart_v1` 키에 상품 ID·수량·선택 구성을 저장합니다. 로그인·로그아웃과 관계없이 같은 브라우저에서 유지하며, 같은 출처의 다른 탭에도 변경을 반영합니다. 컬렉션·향료·프로모션·추천 이름은 서버 fixture에서, 상품(fixture로 초기화한 뒤 관리자 수정 반영)·회원·토큰 계열·레시피·초안·주문·문의·관리자 이력은 Mock 저장소에서 관리하고 HTTP로 접근합니다. `sessionStorage`에는 가입 안내 표시 여부만 남아 있습니다.
 
-| API                                                 | 책임                          |
-| --------------------------------------------------- | ----------------------------- |
-| `GET /api/catalog`, `GET /api/catalog/products/:id` | 공용 상품·향료·홈 데이터      |
-| `GET /api/session`                                  | 현재 회원과 익명 방문자 식별  |
-| `POST /api/auth/register`, `/login`, `/logout`      | 회원·세션 변경                |
-| `GET/POST /api/recipes`, `DELETE /api/recipes/:id`  | 회원별 레시피와 버전          |
-| `GET/PUT/DELETE /api/atelier/draft`                 | 방문자별 조향 초안            |
-| `GET/POST /api/orders`                              | 회원 주문 조회·모의 주문 생성 |
-| `POST /api/partner`                                 | 모의 입점 문의 저장           |
-| `/api/admin/**`                                     | 관리자 전용 운영 API          |
+| API                                                        | 책임                          |
+| ---------------------------------------------------------- | ----------------------------- |
+| `GET /api/catalog`, `GET /api/catalog/products/:id`        | 공용 상품·향료·홈 데이터      |
+| `GET /api/auth/me`                                         | 현재 회원과 익명 방문자 식별  |
+| `POST /api/auth/register`, `/login`, `/refresh`, `/logout` | 회원·JWT 발급·회전·폐기       |
+| `GET/POST /api/recipes`, `DELETE /api/recipes/:id`         | 회원별 레시피와 버전          |
+| `GET/PUT/DELETE /api/atelier/draft`                        | 방문자별 조향 초안            |
+| `GET/POST /api/orders`                                     | 회원 주문 조회·모의 주문 생성 |
+| `POST /api/partner`                                        | 모의 입점 문의 저장           |
+| `/api/admin/**`                                            | 관리자 전용 운영 API          |
 
-Mock 서버는 HttpOnly·SameSite 쿠키로 세션을 식별하고 비밀번호는 서버에서 scrypt 검증값으로 저장합니다. 레시피와 주문은 회원별로 분리합니다. 로컬 장바구니는 인증 변경 시에도 그대로 유지합니다. 조향 초안은 가입·로그인 이동 중에도 이어지도록 방문자에 귀속합니다. 가격·유효한 구성·레시피 ID·버전·생성 시각은 서버에서 결정합니다. 클라이언트가 보낸 가격을 주문 계산에 사용하지 않습니다.
+Mock 서버도 Bearer JWT를 검증하고 토큰 계열의 폐기 상태를 확인합니다. 비밀번호는 서버에서 scrypt 검증값으로 저장합니다. 레시피와 주문은 회원별로 분리합니다. 로컬 장바구니는 인증 변경 시에도 그대로 유지합니다. 조향 초안은 가입·로그인 이동 중에도 이어지도록 방문자에 귀속합니다. 가격·유효한 구성·레시피 ID·버전·생성 시각은 서버에서 결정합니다. 클라이언트가 보낸 가격을 주문 계산에 사용하지 않습니다.
 
 본문이 필요한 API는 JSON 객체만 받으며, 본문 누락·잘못된 JSON·배열은 400, 비 JSON 본문은 415, 32KiB 초과는 413으로 응답합니다. 파서 오류에 입력값을 포함하지 않습니다. 로그아웃과 삭제는 본문 없이 호출할 수 있습니다.
 
@@ -149,7 +149,7 @@ npm run test:e2e:fastapi
 
 Playwright는 포트 4000의 메모리 Mock API와 포트 3100의 프로덕션 Next BFF 서버를 자동 시작·종료합니다. 기본 검증은 데스크톱·모바일 조작, 로그인·로그아웃 후 로컬 장바구니 유지, 새로고침·탭 간 동기화·저장 실패, 검색 URL 동기화, 조향 초안 복원·초기화, 혼합·센서 권한 정리를 포함합니다. 실제 iPhone Safari의 센서·권한 동작은 기기 검증이 필요합니다.
 
-`test:e2e:jwt`는 uv/Python 환경과 Next 빌드가 필요합니다. 포트 8100에 [테스트 전용 FastAPI 앱](../api/tests/fixtures/bff_app.py), 3200에 JWT 모드 Next 프로덕션 서버를 띄워 실제 JWT 검증기를 통한 로그인·로그아웃·폐기·위조·만료·회원 분리·출처 검사를 실행합니다. 테스트용 발급·사용자·메모리 폐기 저장소는 운영 앱에 등록하지 않습니다. HTTP 경계 테스트이므로 브라우저 설치는 필요하지 않습니다.
+`test:e2e:jwt`는 uv/Python 환경과 Next 빌드가 필요합니다. 포트 8100에 [테스트 전용 FastAPI 앱](../api/tests/fixtures/bff_app.py), 3200에 JWT 모드 Next 프로덕션 서버를 띄워 실제 JWT 검증기를 통한 로그인·로그아웃·폐기·위조·만료·회원 분리·출처 검사를 실행합니다. 테스트용 사용자·메모리 인증 저장소는 운영 앱에 등록하지 않습니다. 탭 간 갱신 테스트에는 Playwright Chromium 설치가 필요합니다.
 
 `test:e2e:fastapi`는 포트 8200에 실제 운영 카탈로그·문의·레시피 라우터를 사용하는 테스트 앱, 3300에 Next 프로덕션 서버를 실행합니다. 저장소만 테스트 대역으로 바꾸고 실제 서비스·도메인·JWT 검증기를 통과해 상품 SSR·문의 오류·레시피 CRUD·회원 분리·409를 검증합니다. PostgreSQL 트랜잭션과 운영 로그인 검증은 포함하지 않습니다. uv/Python과 Next 빌드가 필요하며 브라우저 설치는 필요하지 않습니다.
 

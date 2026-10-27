@@ -354,7 +354,7 @@ erDiagram
 | expires_at | TIMESTAMPTZ | NOT NULL, INDEX, CHECK > issued_at     | 만료 시각 (기본 1시간) |
 | revoked_at | TIMESTAMPTZ | NULL                                   | 로그아웃 시각          |
 
-> 인증은 JWT로 결정했다(쿠키 값 = 서명된 JWT). 비회원 식별값 `guestId`는 JWT 안에 있고 별도 테이블은 두지 않는다.
+> 인증은 JWT로 결정했다(쿠키 값 = 서명된 JWT). 비회원 식별값 `guestId`는 별도 비인증 방문자 쿠키에 두며 JWT·회원 인증에 사용하지 않는다.
 > 토큰 검증기는 **발급 기록이 있는 토큰만** 통과시킨다. 회원 Access Token은 `refresh_tokens.access_jti`, 관리자 Access Token은 `admin_sessions`에 기록되고, 로그아웃한 jti는 `revoked_tokens`에 들어간다. Refresh Token은 재발급할 때마다 새것으로 바꾸고(회전), 이미 쓰인 토큰이 다시 오면 같은 계열 전체를 폐기한다. 관리자는 Refresh 없이 Access Token만 받는다.
 
 ### 3.2 상품 (공용 카탈로그)
@@ -608,7 +608,7 @@ erDiagram
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
 | `GET /catalog`                              | collections, product_types, products, ingredients, scent_families, scent_family_ingredients, suggested_names, promotions | —                                                                                                           |
 | `GET /catalog/products/{id}`                | products                                                                                                                 | —                                                                                                           |
-| `GET /session`                              | users, user_coupons, revoked_tokens                                                                                      | —                                                                                                           |
+| `GET /auth/me`                              | users, user_coupons, revoked_tokens                                                                                      | —                                                                                                           |
 | `POST /auth/register`                       | users                                                                                                                    | users, user_coupons, auth_token_families, refresh_tokens                                                    |
 | `POST /auth/login`                          | users                                                                                                                    | auth_token_families, refresh_tokens                                                                         |
 | Refresh 재발급                              | refresh_tokens, auth_token_families                                                                                      | refresh_tokens, auth_token_families(재사용 시 폐기), revoked_tokens                                         |

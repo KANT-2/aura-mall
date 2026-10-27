@@ -128,7 +128,7 @@ def test_verified_subject_cannot_be_overridden_by_headers(client, scheme):
         headers={
             "Authorization": f"{scheme} {token}",
             "X-User-ID": "alice",
-            "X-Session-Owner": "alice",
+            "X-Account-Owner": "alice",
             "X-Aura-BFF-Key": BFF_KEY,
             "X-Request-ID": request_id,
         },
@@ -145,7 +145,7 @@ def test_verified_subject_cannot_be_overridden_by_headers(client, scheme):
     [
         {},
         {"X-User-ID": "alice"},
-        {"X-Session-Owner": "alice"},
+        {"X-Account-Owner": "alice"},
         {"X-Aura-BFF-Key": BFF_KEY},
         {"X-Request-ID": str(uuid4())},
         {"Cookie": "aura_session=" + signed_token()},
@@ -302,7 +302,7 @@ def test_resource_ownership_uses_verified_subject_and_server_owner(
         headers={
             "Authorization": "Bearer " + signed_token(user_id),
             "X-User-ID": "alice",
-            "X-Session-Owner": "alice",
+            "X-Account-Owner": "alice",
         },
     )
     assert response.status_code == status
@@ -396,6 +396,8 @@ def test_production_app_has_no_test_routes_and_exposes_lifecycle_routes():
         assert set(client.get("/openapi.json").json()["paths"]) == {
             "/api/v1/health",
             "/api/v1/auth/login",
+            "/api/v1/auth/register",
+            "/api/v1/auth/me",
             "/api/v1/auth/refresh",
             "/api/v1/auth/logout",
             "/api/v1/catalog",

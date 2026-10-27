@@ -2,14 +2,14 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { itemPrice, shippingFee } from "@/features/cart/model/pricing";
 import { catalogOf, type Inquiry, type MockDatabase } from "../data/store";
-import { resolveSession } from "../session";
+import { resolveIdentity } from "../auth";
 import { HttpError, requireJsonBody, requireString } from "../http";
 import { orderItems } from "../cart";
 
 export function checkoutRoutes(database: MockDatabase) {
   const router = Router();
   router.get("/orders", (req, res) => {
-    const { owner, user } = resolveSession(req, res, database);
+    const { owner, user } = resolveIdentity(req, res, database);
     if (!user) {
       throw new HttpError(401, "로그인이 필요해요.");
     }
@@ -28,7 +28,7 @@ export function checkoutRoutes(database: MockDatabase) {
     );
   });
   router.post("/orders", requireJsonBody, (req, res) => {
-    const { owner, user } = resolveSession(req, res, database);
+    const { owner, user } = resolveIdentity(req, res, database);
     const catalog = catalogOf(database);
     const items = orderItems(req.body.items, catalog);
     const prices = items.map((item) => itemPrice(item, catalog.products));

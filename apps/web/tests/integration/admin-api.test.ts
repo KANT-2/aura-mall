@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { once } from "node:events";
 import type { Server } from "node:http";
@@ -28,21 +29,38 @@ afterAll(
 );
 
 function client() {
-  let cookie = "";
-  return async function api(path: string, method = "GET", data?: unknown) {
+  let token = "";
+  const guestId = randomUUID();
+  return async function api(
+    path: string,
+    method = "GET",
+    data?: unknown,
+    headers: Record<string, string> = {},
+  ) {
     const response = await fetch(base + path, {
       method,
-      headers: { "Content-Type": "application/json", Cookie: cookie },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Guest-ID": guestId,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
       body: data === undefined ? undefined : JSON.stringify(data),
     });
-    cookie = response.headers.get("set-cookie")?.split(";")[0] ?? cookie;
-    return { status: response.status, body: await response.json() };
+    const body = response.status === 204 ? null : await response.json();
+    if (body?.accessToken) {
+      token = body.accessToken;
+    }
+
+    return { status: response.status, body, guestId, headers: response.headers };
   };
 }
+
 async function adminClient() {
   const api = client();
   const login = await api("/api/auth/login", "POST", admin);
-  expect(login.body.user.role).toBe("admin");
+  expect(login.body.accessToken).toBeTruthy();
+  expect((await api("/api/auth/me")).body.role).toBe("admin");
   return api;
 }
 const inquiry = {
@@ -91,7 +109,8 @@ describe("Mock admin API authorization", () => {
       password: "password123",
       role: "admin",
     });
-    expect(registered.body.user.role).toBe("member");
+    expect(registered.status).toBe(201);
+    expect((await api("/api/auth/me")).body.role).toBe("member");
     expect((await api("/api/admin/overview")).status).toBe(403);
   });
   it("rejects access after logout and after the role is revoked", async () => {

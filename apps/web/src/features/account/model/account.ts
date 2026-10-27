@@ -8,6 +8,6 @@ export type Member = {
   /** Display hint only. Every admin API checks the server-side account role again. */
   role?: MemberRole;
 };
-export type Session = { user: Member | null; guestId: string };
+export type AccountState = { user: Member | null; guestId: string };
 export type Credentials = { email: string; password: string };
 export type Registration = Credentials & { name: string; marketing?: boolean };

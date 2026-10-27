@@ -8,10 +8,10 @@ export type BackendResult = { status: number; data: unknown; cookies: string[]; 
 type BackendOptions = {
   method?: string;
   body?: string;
-  cookie?: string;
   /** Supplied by the BFF cookie adapter, never copied from browser Authorization. */
   token?: string;
   owner?: string;
+  guestId?: string;
   /** Already filtered by the route's allow-list; never a raw browser query string. */
   query?: URLSearchParams;
   signal?: AbortSignal;
@@ -75,16 +75,16 @@ export async function backendRequest(
       headers.set("Content-Type", "application/json");
     }
 
-    if (options.cookie) {
-      headers.set("Cookie", options.cookie);
-    }
-
     if (options.token) {
       headers.set("Authorization", `Bearer ${options.token}`);
     }
 
     if (options.owner) {
-      headers.set("X-Session-Owner", options.owner);
+      headers.set("X-Account-Owner", options.owner);
+    }
+
+    if (options.guestId) {
+      headers.set("X-Guest-ID", options.guestId);
     }
 
     const search = options.query?.size ? `?${options.query}` : "";

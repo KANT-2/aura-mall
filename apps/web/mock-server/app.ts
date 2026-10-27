@@ -5,7 +5,7 @@ import { accountRoutes } from "./routes/account";
 import { atelierRoutes } from "./routes/atelier";
 import { checkoutRoutes } from "./routes/checkout";
 import { adminRoutes } from "./routes/admin";
-import { resolveSession, ownerOf } from "./session";
+import { resolveIdentity, ownerOf, issueTokens } from "./auth";
 import { HttpError, requireJsonBody } from "./http";
 import { isRecord } from "@/lib/validation";
 import { restoreDraft, restoreRecipes } from "@/features/atelier/model/recipes";
@@ -45,7 +45,7 @@ export function createMockApp({
   );
   if (testMode) {
     app.post("/__test__/seed", requireJsonBody, (req, res) => {
-      const { session } = resolveSession(req, res, database);
+      const { identity } = resolveIdentity(req, res, database);
       if (req.body.member) {
         const salt = randomBytes(16).toString("hex");
         const member = { ...req.body.member, id: req.body.member.id ?? randomUUID() };
@@ -54,10 +54,10 @@ export function createMockApp({
           salt,
           passwordHash: scryptSync(req.body.password ?? "test-password", salt, 32).toString("hex"),
         };
-        session.userId = member.id;
+        identity.userId = member.id;
       }
 
-      const owner = ownerOf(session);
+      const owner = ownerOf(identity);
       if (req.body.recipes) {
         database.state.recipes[owner] = restoreRecipes(req.body.recipes, catalog.ingredients);
       }
@@ -68,11 +68,14 @@ export function createMockApp({
           throw new HttpError(400, "Invalid test draft");
         }
 
-        database.state.drafts[session.guestId] = draft;
+        database.state.drafts[identity.guestId] = draft;
       }
 
       database.persist();
-      res.json({ guestId: session.guestId });
+      res.json({
+        guestId: identity.guestId,
+        ...(identity.userId ? issueTokens(database, identity.userId) : {}),
+      });
     });
   }
 
