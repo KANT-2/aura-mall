@@ -1,6 +1,7 @@
 import express, { type ErrorRequestHandler } from "express";
 import { randomBytes, randomUUID, scryptSync } from "node:crypto";
 import { createDatabase, catalog, catalogOf, type MockDatabase } from "./data/store";
+import { adminAuthRoutes } from "./routes/admin-auth";
 import { accountRoutes } from "./routes/account";
 import { atelierRoutes } from "./routes/atelier";
 import { checkoutRoutes } from "./routes/checkout";
@@ -39,6 +40,7 @@ export function createMockApp({
   app.use(
     "/api",
     accountRoutes(database),
+    adminAuthRoutes(database),
     atelierRoutes(database),
     checkoutRoutes(database),
     adminRoutes(database),

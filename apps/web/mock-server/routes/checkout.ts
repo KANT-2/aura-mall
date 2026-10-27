@@ -29,6 +29,24 @@ export function checkoutRoutes(database: MockDatabase) {
   });
   router.post("/orders", requireJsonBody, (req, res) => {
     const { owner, user } = resolveIdentity(req, res, database);
+    if (!user) {
+      throw new HttpError(401, "로그인 후 주문할 수 있어요.");
+    }
+
+    const key = req.get("Idempotency-Key");
+    if (key !== undefined && !/^[A-Za-z0-9-]{8,64}$/.test(key)) {
+      throw new HttpError(400, "요청 식별자를 확인해 주세요.");
+    }
+
+    const previous = key
+      ? database.state.orders.find((order) => order.owner === owner && order.idempotencyKey === key)
+      : undefined;
+    if (previous) {
+      const { id, items, total, recipient, address, created } = previous;
+      res.json({ id, items, total, recipient, address, created });
+      return;
+    }
+
     const catalog = catalogOf(database);
     const items = orderItems(req.body.items, catalog);
     const prices = items.map((item) => itemPrice(item, catalog.products));
@@ -46,6 +64,7 @@ export function checkoutRoutes(database: MockDatabase) {
     const order = {
       id: randomUUID(),
       owner,
+      idempotencyKey: key,
       items,
       recipient,
       address,

@@ -678,3 +678,20 @@
     margin-bottom: 10px;
   }
 }
+
+.loginForm {
+  display: grid;
+  gap: 20px;
+}
+
+.loginForm label {
+  display: grid;
+  gap: 8px;
+}
+
+.loginForm input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}

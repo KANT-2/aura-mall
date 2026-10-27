@@ -18,22 +18,22 @@ test("guests and members cannot use admin pages or APIs", async ({ page }) => {
   await expect(page.getByTestId(testIds.admin.gate)).toContainText("관리자 로그인이 필요해요");
   await expect(page.getByRole("link", { name: "로그인" })).toHaveAttribute(
     "href",
-    "/login?next=%2Fadmin",
+    "/admin/login?next=%2Fadmin",
   );
   expect((await page.request.get("/api/admin/overview")).status()).toBe(401);
 
   await seedMember(page, "member");
   await page.goto("/admin/products");
-  await expect(page.getByTestId(testIds.admin.gate)).toContainText("관리자 권한이 없어요");
+  await expect(page.getByTestId(testIds.admin.gate)).toContainText("관리자 로그인이 필요해요");
   await expect(page.getByTestId(testIds.admin.shell)).toHaveCount(0);
-  expect((await page.request.get("/api/admin/products")).status()).toBe(403);
+  expect((await page.request.get("/api/admin/products")).status()).toBe(401);
   expect(
     (
       await page.request.patch("/api/admin/products/fresh-hand-cream", {
         data: { version: 1, price: 1 },
       })
     ).status(),
-  ).toBe(403);
+  ).toBe(401);
 });
 
 test("admin edits a product, adjusts stock, processes an inquiry and views an order", async ({
@@ -43,7 +43,12 @@ test("admin edits a product, adjusts stock, processes an inquiry and views an or
   const product = testInfo.project.name === "mobile" ? "SOFT 디퓨저" : "WARM 디퓨저";
   const brand = `E2E Brand ${randomUUID().slice(0, 8)}`;
   const reason = `정기 입고 ${randomUUID().slice(0, 8)}`;
-  await seedMember(page, "admin");
+  await seedMember(page, "member");
+  await page.goto("/admin/login");
+  await page.getByLabel("이메일", { exact: true }).fill("admin@aura.local");
+  await page.getByLabel("비밀번호", { exact: true }).fill("aura-admin-local");
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page.getByTestId(testIds.admin.shell)).toBeVisible();
   expect(
     (
       await page.request.post("/api/partner", {
@@ -116,4 +121,21 @@ test("admin edits a product, adjusts stock, processes an inquiry and views an or
   await page.getByTestId(testIds.admin.logout).click();
   await expect(page).toHaveURL((url) => url.pathname === "/");
   expect((await page.request.get("/api/admin/overview")).status()).toBe(401);
+});
+
+test("admin sign-in/out leaves the customer's JWT identity intact", async ({ page }) => {
+  await seedMember(page, "member");
+  const before = await (await page.request.get("/api/auth/me")).json();
+  await page.goto("/admin/login?next=https://attacker.invalid");
+  await page.getByLabel("이메일", { exact: true }).fill("admin@aura.local");
+  await page.getByLabel("비밀번호", { exact: true }).fill("wrong-password");
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page.locator("form").getByRole("alert")).toContainText("이메일 또는 비밀번호");
+  await page.getByLabel("비밀번호", { exact: true }).fill("aura-admin-local");
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page).toHaveURL((url) => url.pathname === "/admin");
+  expect(await (await page.request.get("/api/auth/me")).json()).toEqual(before);
+  await page.getByTestId(testIds.admin.logout).click();
+  await expect(page).toHaveURL((url) => url.pathname === "/");
+  expect(await (await page.request.get("/api/auth/me")).json()).toEqual(before);
 });

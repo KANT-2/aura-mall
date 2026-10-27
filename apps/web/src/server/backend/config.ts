@@ -8,6 +8,7 @@ export function backendConfig() {
     const prefix = process.env.API_PREFIX ?? "/api";
     const accessCookie = process.env.API_ACCESS_COOKIE ?? "aura_access";
     const refreshCookie = process.env.API_REFRESH_COOKIE ?? "aura_refresh";
+    const adminCookie = process.env.API_ADMIN_ACCESS_COOKIE ?? "aura_admin_access";
     const timeoutMs = Number(process.env.API_TIMEOUT_MS ?? 10000);
     const appOrigin = process.env.APP_ORIGIN ? new URL(process.env.APP_ORIGIN).origin : undefined;
     const bffSharedKey = process.env.API_BFF_SHARED_KEY || undefined;
@@ -18,8 +19,8 @@ export function backendConfig() {
       baseUrl.search ||
       baseUrl.hash ||
       !/^\/(?:[a-zA-Z0-9_-]+\/?)*$/.test(prefix) ||
-      ![accessCookie, refreshCookie].every((name) => /^[A-Za-z0-9_-]+$/.test(name)) ||
-      new Set([accessCookie, refreshCookie, "aura_guest"]).size !== 3 ||
+      ![accessCookie, refreshCookie, adminCookie].every((name) => /^[A-Za-z0-9_-]+$/.test(name)) ||
+      new Set([accessCookie, refreshCookie, adminCookie, "aura_guest"]).size !== 4 ||
       (process.env.API_AUTH_MODE !== undefined && process.env.API_AUTH_MODE !== "jwt") ||
       !Number.isInteger(timeoutMs) ||
       timeoutMs < 1 ||
@@ -35,6 +36,7 @@ export function backendConfig() {
       apiUrl: `${base}${prefix.replace(/\/$/, "")}`,
       accessCookie,
       refreshCookie,
+      adminCookie,
       timeoutMs,
       appOrigin,
       bffSharedKey,

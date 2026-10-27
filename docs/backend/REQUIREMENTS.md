@@ -118,21 +118,21 @@ Refresh Token 회전은 백엔드가 수행하고 BFF가 HttpOnly 쿠키로 보�
 
 관리자는 고객과 분리된 `admins` 테이블 계정이며 로그인 API와 쿠키도 따로 쓴다(팀 결정). 업무 경로·DTO는 #32 관리자 API 계약을 따른다.
 
-| ID        | 우선 | 경로                                              | 요구사항 · 인수 기준                                                                         |
-| --------- | ---- | ------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| FR-ADM-01 | P0   | `POST /api/admin/auth/login`                      | `{ email, password }` → 관리자 세션. 비활성(`disabled`) 계정·잘못된 비밀번호는 401           |
-| FR-ADM-02 | P0   | `POST /api/admin/auth/logout`                     | 관리자 토큰 폐기                                                                             |
-| FR-ADM-03 | P0   | `GET /api/admin/auth/me`                          | 현재 관리자 정보 또는 401                                                                    |
-| FR-ADM-04 | P1   | `POST /api/admin/admins`                          | 로그인한 관리자만 새 관리자 등록. 같은 이메일은 409. 감사 기록 `admin.create`                |
-| FR-ADM-05 | P0   | (모든 `/api/admin/**`)                            | 요청마다 실제 관리자 계정·상태를 다시 조회. 미인증 401, 고객 토큰 403                        |
-| FR-ADM-06 | P1   | `GET /api/admin/overview`                         | 최근 7일 주문 수·금액, 문의 상태별 건수, 재고 5개 이하 상품                                  |
-| FR-ADM-07 | P0   | `GET /api/admin/products`, `GET .../{id}`         | 검색·컬렉션·재고 필터, `AdminPage` 20개씩. 상세에 변경 이력                                  |
-| FR-ADM-08 | P0   | `PATCH /api/admin/products/{id}`                  | 상품 정보 수정. `version`이 다르면 409. 감사 기록 `product.update`                           |
-| FR-ADM-09 | P0   | `POST /api/admin/products/{id}/stock-adjustments` | `{ version, delta, reason, key }`. 재고 0~99,999 유지, 같은 `key` 재전송은 200(한 번만 반영) |
-| FR-ADM-10 | P0   | `GET /api/admin/orders`, `GET .../{id}`           | 기간(한국 시간) 필터 목록, 상세는 주문 당시 스냅샷·주문자·배송지                             |
-| FR-ADM-11 | P0   | `GET /api/admin/inquiries`, `GET .../{id}`        | 상태 필터 목록, 상세는 원문·상태·내부 메모·이력                                              |
-| FR-ADM-12 | P0   | `PATCH /api/admin/inquiries/{id}`                 | `{ version, status?, memo? }`. `version` 불일치 409. 감사 기록 `inquiry.update`              |
-| FR-ADM-13 | P1   | (운영 절차)                                       | 첫 관리자 생성 명령(CLI). 화면 가입 없음                                                     |
+| ID        | 우선 | 경로                                              | 요구사항 · 인수 기준                                                                                 |
+| --------- | ---- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| FR-ADM-01 | P0   | `POST /api/admin/auth/login`                      | `{ email, password }` → 관리자 Access JWT·공개 프로필. 비활성(`disabled`) 계정·잘못된 비밀번호는 401 |
+| FR-ADM-02 | P0   | `POST /api/admin/auth/logout`                     | 관리자 토큰 폐기                                                                                     |
+| FR-ADM-03 | P0   | `GET /api/admin/auth/me`                          | 현재 관리자 정보 또는 401                                                                            |
+| FR-ADM-04 | P1   | `POST /api/admin/admins`                          | 로그인한 관리자만 새 관리자 등록. 같은 이메일은 409. 감사 기록 `admin.create`                        |
+| FR-ADM-05 | P0   | (모든 `/api/admin/**`)                            | 요청마다 실제 관리자 계정·상태를 다시 조회. 미인증 401, 고객 토큰 403                                |
+| FR-ADM-06 | P1   | `GET /api/admin/overview`                         | 최근 7일 주문 수·금액, 문의 상태별 건수, 재고 5개 이하 상품                                          |
+| FR-ADM-07 | P0   | `GET /api/admin/products`, `GET .../{id}`         | 검색·컬렉션·재고 필터, `AdminPage` 20개씩. 상세에 변경 이력                                          |
+| FR-ADM-08 | P0   | `PATCH /api/admin/products/{id}`                  | 상품 정보 수정. `version`이 다르면 409. 감사 기록 `product.update`                                   |
+| FR-ADM-09 | P0   | `POST /api/admin/products/{id}/stock-adjustments` | `{ version, delta, reason, key }`. 재고 0~99,999 유지, 같은 `key` 재전송은 200(한 번만 반영)         |
+| FR-ADM-10 | P0   | `GET /api/admin/orders`, `GET .../{id}`           | 기간(한국 시간) 필터 목록, 상세는 주문 당시 스냅샷·주문자·배송지                                     |
+| FR-ADM-11 | P0   | `GET /api/admin/inquiries`, `GET .../{id}`        | 상태 필터 목록, 상세는 원문·상태·내부 메모·이력                                                      |
+| FR-ADM-12 | P0   | `PATCH /api/admin/inquiries/{id}`                 | `{ version, status?, memo? }`. `version` 불일치 409. 감사 기록 `inquiry.update`                      |
+| FR-ADM-13 | P1   | (운영 절차)                                       | 첫 관리자 생성 명령(CLI). 화면 가입 없음                                                             |
 
 ### 3.7 공통 (COM)
 

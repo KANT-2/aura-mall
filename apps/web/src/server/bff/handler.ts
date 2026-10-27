@@ -8,6 +8,8 @@ import { clearTokens, handleAuth, type AuthAction } from "@/server/bff/auth";
 import { jsonRequestBody } from "@/server/bff/request-body";
 import { requestOrigin } from "@/server/bff/request-origin";
 
+import { clearAdminToken, handleAdminAuth, type AdminAuthAction } from "@/server/bff/admin-auth";
+
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type Params = Record<string, string>;
 type BackendPath = string | ((params: Params) => string);
@@ -16,6 +18,9 @@ type HandlerOptions = {
   authenticated?: boolean;
   query?: readonly string[];
   authAction?: AuthAction;
+  adminAuthAction?: AdminAuthAction;
+  authScope?: "member" | "admin";
+  idempotencyKey?: boolean;
   bodyFields?: readonly string[];
   responseBody?: (data: unknown) => unknown;
 };
@@ -48,7 +53,16 @@ export function createBffHandler(
 export function createBffHandler(
   method: Method,
   path: BackendPath,
-  { authenticated = true, query, authAction, bodyFields, responseBody }: HandlerOptions = {},
+  {
+    authenticated = true,
+    query,
+    authAction,
+    adminAuthAction,
+    authScope = "member",
+    idempotencyKey = false,
+    bodyFields,
+    responseBody,
+  }: HandlerOptions = {},
 ) {
   return async function handle(request: Request, context?: RouteContext) {
     const requestId = randomUUID();
@@ -89,18 +103,35 @@ export function createBffHandler(
         );
       }
 
+      if (adminAuthAction) {
+        return await handleAdminAuth(adminAuthAction, request, headers, secure, body);
+      }
+
       if (authAction) {
         return await handleAuth(authAction, request, headers, secure, body);
       }
 
       const backendPath = typeof path === "string" ? path : path(await context!.params);
       const token = authenticated
-        ? requestJwt(request.headers.get("cookie"), config.accessCookie)
+        ? requestJwt(
+            request.headers.get("cookie"),
+            authScope === "admin" ? config.adminCookie : config.accessCookie,
+          )
         : undefined;
+      if (authScope === "admin" && !token) {
+        throw new ApiError(401, "관리자 로그인이 필요해요.", "ADMIN_LOGIN_REQUIRED");
+      }
+
       const visitorHeaders = new Headers();
-      const guestId = authenticated
-        ? visitorId(request.headers.get("cookie"), visitorHeaders, secure)
-        : undefined;
+      const guestId =
+        authenticated && authScope === "member"
+          ? visitorId(request.headers.get("cookie"), visitorHeaders, secure)
+          : undefined;
+      const key = idempotencyKey ? request.headers.get("idempotency-key") : null;
+      if (key !== null && !/^[A-Za-z0-9-]{8,64}$/.test(key)) {
+        throw new ApiError(400, "요청 식별자를 확인해 주세요.", "IDEMPOTENCY_KEY_INVALID");
+      }
+
       const response = await backendRequest(backendPath, {
         method,
         body,
@@ -109,6 +140,7 @@ export function createBffHandler(
         requestId,
         token,
         guestId,
+        idempotencyKey: key ?? undefined,
         owner: authenticated ? (request.headers.get("x-account-owner") ?? undefined) : undefined,
       });
       if (response.status >= 400) {
@@ -133,6 +165,10 @@ export function createBffHandler(
         // Only a rejected refresh explicitly ends the browser's authentication.
         if (authAction === "refresh" && secure !== undefined) {
           clearTokens(headers, secure);
+        }
+
+        if (adminAuthAction && adminAuthAction !== "login" && secure !== undefined) {
+          clearAdminToken(headers, secure);
         }
 
         headers.set("WWW-Authenticate", "Bearer");

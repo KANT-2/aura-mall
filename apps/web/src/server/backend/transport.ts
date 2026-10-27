@@ -12,6 +12,7 @@ type BackendOptions = {
   token?: string;
   owner?: string;
   guestId?: string;
+  idempotencyKey?: string;
   /** Already filtered by the route's allow-list; never a raw browser query string. */
   query?: URLSearchParams;
   signal?: AbortSignal;
@@ -85,6 +86,10 @@ export async function backendRequest(
 
     if (options.guestId) {
       headers.set("X-Guest-ID", options.guestId);
+    }
+
+    if (options.idempotencyKey) {
+      headers.set("Idempotency-Key", options.idempotencyKey);
     }
 
     const search = options.query?.size ? `?${options.query}` : "";

@@ -7,7 +7,7 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api/errors";
-import { accountKey } from "@/features/account/api/account";
+import { adminAccountKey } from "@/features/admin/api/auth";
 import { catalogKey } from "@/features/catalog/api/catalog";
 import {
   adjustStock,
@@ -43,7 +43,7 @@ const options = {
 /** A 401/403 means the access token expired or the role was revoked; let the shell re-check. */
 function onAccessError(client: QueryClient, error: unknown) {
   if (accessDenied(error)) {
-    void client.invalidateQueries({ queryKey: accountKey });
+    void client.invalidateQueries({ queryKey: adminAccountKey });
   }
 }
 

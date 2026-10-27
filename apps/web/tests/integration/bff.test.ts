@@ -497,12 +497,13 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
   });
 
   it("forwards only allow-listed admin query parameters and keeps admin errors", async () => {
+    respond = (res) => json(res, { items: [], total: 0, page: 2, pageSize: 20 });
     await adminProducts(
       request(
         "/api/admin/products?q=%20hand%20&collection=fresh&collection=warm&page=2&role=admin" +
           "&url=https://attacker.test&stock=" +
           "x".repeat(101),
-        { headers: { Cookie: `aura_access=${token}` } },
+        { headers: { Cookie: `aura_admin_access=${token}` } },
       ),
     );
     expect(calls[0].url).toBe("/api/admin/products?q=hand&collection=fresh&page=2");
@@ -511,7 +512,11 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
     const denied = await updateAdminInquiry(
       request("/api/admin/inquiries/a", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Origin: "http://mall.test" },
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "http://mall.test",
+          Cookie: `aura_admin_access=${token}`,
+        },
         body: JSON.stringify({ version: 1, status: "done" }),
       }),
       { params: Promise.resolve({ id: "../orders" }) },
@@ -520,7 +525,11 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
     const forbidden = await updateAdminInquiry(
       request("/api/admin/inquiries/a", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Origin: "http://mall.test" },
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "http://mall.test",
+          Cookie: `aura_admin_access=${token}`,
+        },
         body: JSON.stringify({ version: 1, status: "done" }),
       }),
       { params: Promise.resolve({ id: "a" }) },

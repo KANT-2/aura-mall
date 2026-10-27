@@ -87,7 +87,7 @@ e2e/
 
 BFF는 요청 출처·JSON 크기·허용 쿠키·제한시간을 처리하고, FastAPI의 `detail` 및 422 오류를 공통 오류 형식으로 변환합니다. 가격·소유권·인증·트랜잭션은 백엔드에서 검증합니다. FastAPI 업무 API는 `apps/api`에 순차적으로 구현하며 웹 개발의 기본 백엔드는 Mock입니다.
 
-카탈로그·입점 문의·레시피와 사용자 JWT 인증은 구현된 FastAPI API에 연결합니다. BFF는 요청 필드를 제한하고 응답을 공개 DTO로 검증합니다. FastAPI 오류를 Mock으로 우회하지 않습니다. 초안 API와 운영 관리자 토큰 발급·인증 저장소 연결은 후속 작업입니다.
+카탈로그·입점 문의·레시피와 사용자 JWT 인증은 구현된 FastAPI API에 연결합니다. BFF는 요청 필드를 제한하고 응답을 공개 DTO로 검증합니다. FastAPI 오류를 Mock으로 우회하지 않습니다. 관리자 전용 JWT 로그인·등록·업무 API와 주문 중복 방지 키도 연결합니다. 초안 API는 후속 작업입니다.
 
 Mock과 FastAPI는 동일한 JWT 계약을 사용합니다. BFF는 TokenPair JSON을 `aura_access`·`aura_refresh` HttpOnly 쿠키에 보관하고 Access JWT만 Bearer로 전달합니다. 사용자 조회는 `/api/auth/me`, 갱신은 `/api/auth/refresh`입니다. 브라우저는 401에서 탭 간 Web Lock으로 갱신을 직렬화하고 한 번만 재시도합니다. 로그아웃은 백엔드의 계열 폐기 204를 확인한 뒤 쿠키를 삭제합니다. 서버 세션·`/api/session`·쿠키 인증 모드는 제거했습니다.
 
@@ -114,13 +114,13 @@ Mock 서버도 Bearer JWT를 검증하고 토큰 계열의 폐기 상태를 확�
 
 장바구니는 `useSyncExternalStore`로 구독하며 초기 복원이 끝나기 전에 빈 배열을 저장하지 않습니다. 손상된 JSON은 빈 장바구니로 복원하고, 저장 공간이 차단되면 저장 실패를 알리며 담기 성공을 표시하지 않습니다. 로컬 상품·가격·`unitPrice`는 신뢰하지 않고 현재 카탈로그로 복원합니다. 같은 항목의 누적 수량 15개 상한과 단품·Gift Set 구성품의 합산 재고를 화면에서 검사합니다.
 
-장바구니 API는 제거했습니다. 모의 주문은 `{ recipient, address, coupon?, items }`를 받으며, 각 `items` 항목에 `{ productId?, quantity, selection?, custom? }`를 전송합니다. 서버가 가격·구성·수량·재고와 맞춤 색을 다시 계산하고 응답의 상품에 `unitPrice`를 포함합니다. 사용자 간 재고 예약이나 주문 후 fixture 재고 차감은 수행하지 않습니다. 실제 주문 UI를 연결할 때는 주문 성공을 확인한 뒤 로컬 장바구니를 비웁니다.
+장바구니 API는 제거했습니다. 모의 주문은 `{ recipient, address, coupon?, items }`를 받으며, 각 `items` 항목에 `{ productId?, quantity, selection?, custom? }`를 전송합니다. 서버가 가격·구성·수량·재고와 맞춤 색을 다시 계산하고 응답의 상품에 `unitPrice`를 포함합니다. 사용자 간 재고 예약이나 주문 후 fixture 재고 차감은 수행하지 않습니다. 주문 재전송에는 같은 `Idempotency-Key`를 유지합니다(8~64자 영숫자·하이픈). 같은 회원·같은 키의 주문은 200, 신규 주문은 201입니다. 실제 주문 UI를 연결할 때는 주문 성공을 확인한 뒤 로컬 장바구니를 비웁니다.
 
 TanStack Query는 서버 데이터의 조회·로딩·오류·변경 후 캐시 갱신을 맡습니다. 회원별 쿼리 키에 소유자를 포함하고 인증 변경 시 기존 개인 캐시를 취소·제거합니다. 레시피 변경 요청에는 시작 시점의 소유자를 보내 계정 전환 중 잘못된 소유자에게 적용되는 요청을 거절합니다. 초기 조회가 끝나기 전에 빈 초안으로 편집기를 초기화하지 않습니다.
 
 기본 저장 파일은 `apps/web/mock-server/.data/db.json`이며 서버를 재시작해도 유지합니다. 삭제하면 초기화됩니다. `MOCK_PERSIST=0 npm run mock`은 메모리에서만 동작합니다. `MOCK_PORT`로 포트를 지정할 수 있습니다. 이 저장소는 단일 프로세스 개발용 JSON 파일이며 운영 DB의 트랜잭션·배포·복구를 제공하지 않습니다. 기존 서버 장바구니는 브라우저로 자동 이전하지 않으며 저장 파일에서 다시 불러오지 않습니다.
 
-관리자 계약은 [BFF 문서의 관리자 API](../../docs/FASTAPI_BFF.md#관리자-api-1단계-제안)를 따릅니다. `npm run mock`은 시작할 때 개발용 관리자 계정 `admin@aura.local` / `aura-admin-local`을 생성하거나 관리자 역할로 되돌립니다. `MOCK_ADMIN_EMAIL`·`MOCK_ADMIN_PASSWORD`로 바꾸고, `MOCK_ADMIN_EMAIL=`(빈 값)이면 생성하지 않습니다. 이 계정은 로컬 Mock 전용이며 운영 관리자 발급 절차와 무관합니다. 로그인 후 `/admin` 또는 마이페이지의 관리자 링크로 이동합니다.
+관리자 계약은 [BFF 문서의 관리자 API](../../docs/FASTAPI_BFF.md#관리자-api-1단계-제안)를 따릅니다. `npm run mock`은 시작할 때 개발용 관리자 계정 `admin@aura.local` / `aura-admin-local`을 생성하거나 관리자 역할로 되돌립니다. `MOCK_ADMIN_EMAIL`·`MOCK_ADMIN_PASSWORD`로 바꾸고, `MOCK_ADMIN_EMAIL=`(빈 값)이면 생성하지 않습니다. 이 계정은 로컬 Mock 전용이며 운영 관리자 발급 절차와 무관합니다. `/admin/login`에서 관리자 계정으로 로그인합니다. 회원 인증과 별도의 JWT 쿠키를 사용하므로 관리자 로그아웃 후에도 회원 로그인은 유지됩니다.
 
 Playwright는 `MOCK_TEST_MODE=1`, `MOCK_PERSIST=0`으로 API를 시작하고 테스트별 쿠키에 연결된 `POST /__test__/seed`로 데이터를 준비합니다. 일반 실행에서는 시드 경로를 노출하지 않습니다. 다른 테스트나 실제 개발 데이터를 전역 초기화하지 않습니다.
 
@@ -151,7 +151,7 @@ Playwright는 포트 4000의 메모리 Mock API와 포트 3100의 프로덕션 N
 
 `test:e2e:jwt`는 uv/Python 환경과 Next 빌드가 필요합니다. 포트 8100에 [테스트 전용 FastAPI 앱](../api/tests/fixtures/bff_app.py), 3200에 JWT 모드 Next 프로덕션 서버를 띄워 실제 JWT 검증기를 통한 로그인·로그아웃·폐기·위조·만료·회원 분리·출처 검사를 실행합니다. 테스트용 사용자·메모리 인증 저장소는 운영 앱에 등록하지 않습니다. 탭 간 갱신 테스트에는 Playwright Chromium 설치가 필요합니다.
 
-`test:e2e:fastapi`는 포트 8200에 실제 운영 카탈로그·문의·레시피 라우터를 사용하는 테스트 앱, 3300에 Next 프로덕션 서버를 실행합니다. 저장소만 테스트 대역으로 바꾸고 실제 서비스·도메인·JWT 검증기를 통과해 상품 SSR·문의 오류·레시피 CRUD·회원 분리·409를 검증합니다. PostgreSQL 트랜잭션과 운영 로그인 검증은 포함하지 않습니다. uv/Python과 Next 빌드가 필요하며 브라우저 설치는 필요하지 않습니다.
+`test:e2e:fastapi`는 포트 8200에 실제 운영 카탈로그·문의·레시피 라우터를 사용하는 테스트 앱, 3300에 Next 프로덕션 서버를 실행합니다. 저장소만 테스트 대역으로 바꾸고 실제 서비스·도메인·JWT 검증기를 통과해 상품 SSR·문의 오류·레시피 CRUD·회원 분리·409와 관리자 JWT 로그인·등록·폐기, 주문 중복 방지를 검증합니다. 실제 PostgreSQL 영속성·트랜잭션 검증은 포함하지 않습니다. uv/Python과 Next 빌드가 필요하며 브라우저 설치는 필요하지 않습니다.
 
 개발 서버를 켜 둔 채 검증하려면 `AURA_E2E_MOCK_PORT=4100 npm run test:e2e`로 테스트 Mock 포트를 분리합니다. 반응형 회귀 검증에는 320px 가로 넘침, 상품 사진과 제목의 겹침, Gift Set 선택·축소 이미지, 조향 결과 버튼 배치, 컬렉션 설명 정렬도 포함합니다.
 

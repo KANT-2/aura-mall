@@ -109,9 +109,9 @@ FastAPI 경로 = BFF 경로의 `/api` → `/api/v1`. trailing slash 리다이렉
 
 | 메서드 | FastAPI 경로                                    | 요청 → 응답                                                                         |
 | ------ | ----------------------------------------------- | ----------------------------------------------------------------------------------- |
-| POST   | `/api/v1/admin/auth/login`                      | `{ email, password }` → 관리자 세션                                                 |
+| POST   | `/api/v1/admin/auth/login`                      | `{ email, password }` → 관리자 Access JWT·공개 관리자 프로필                        |
 | POST   | `/api/v1/admin/auth/logout`                     | → 관리자 토큰 폐기                                                                  |
-| GET    | `/api/v1/admin/auth/me`                         | → 현재 관리자 또는 401                                                              |
+| GET    | `/api/v1/admin/session`                         | → 현재 관리자 또는 401                                                              |
 | POST   | `/api/v1/admin/admins`                          | `{ email, name, password }` → 201 (로그인한 관리자만)                               |
 | GET    | `/api/v1/admin/overview`                        | → `AdminOverview`                                                                   |
 | GET    | `/api/v1/admin/products`                        | 쿼리 `q`, `collection`, `stock=low\|out`, `page` → `AdminPage<AdminProduct>`        |
@@ -167,7 +167,7 @@ Refresh 원문은 BFF의 HttpOnly `aura_refresh`(Path=/api/auth), 해시는 DB�
 
 ### 4.4 관리자 인증
 
-운영 관리자 로그인·등록·발급 저장소는 후속 구현 범위다. 설계상 관리자는 `admins` 테이블 계정으로 `/api/v1/admin/auth/login`에서 로그인하고, BFF가 관리자 쿠키를 따로 전달한다(팀 결정). 고객 토큰으로는 관리자 API를 쓸 수 없다. FastAPI는 관리자 요청마다 `admins.status = 'active'`를 다시 확인해 비활성화·로그아웃을 즉시 반영한다. 첫 관리자는 CLI 명령으로 만들고, 이후 관리자는 로그인한 관리자가 등록한다.
+관리자 로그인·등록·JWT 발급 저장소와 BFF는 연결되어 있다. 관리자는 `admins` 테이블 계정으로 `/api/v1/admin/auth/login`에서 로그인하고, BFF가 관리자 전용 JWT 쿠키를 Bearer로 변환한다. 웹 경로 `/api/admin/auth/me`는 FastAPI `/admin/session`으로 연결하며 서버 세션 ID는 사용하지 않는다. 고객 토큰으로는 관리자 API를 쓸 수 없다. FastAPI는 관리자 요청마다 `admins.status = 'active'`를 다시 확인해 비활성화·로그아웃을 즉시 반영한다. 첫 관리자는 CLI 명령으로 만들고, 이후 관리자는 로그인한 관리자가 등록한다.
 
 ### 4.5 인가
 
@@ -180,7 +180,7 @@ Refresh 원문은 BFF의 HttpOnly `aura_refresh`(Path=/api/auth), 해시는 DB�
 
 ## 5. 데이터
 
-테이블·컬럼·제약은 [ERD](ERD.md)와 `apps/api/db/schema.sql`을 따른다. 테이블 23개: 회원·인증 6(users·admins·user_coupons·revoked_tokens·auth_token_families·refresh_tokens), 상품 8, 조향 3, 주문 3, 문의 1, 관리자 운영 2(stock_adjustments·admin_audit_logs). 장바구니 테이블 없음.
+테이블·컬럼·제약은 [ERD](ERD.md)와 `apps/api/db/schema.sql`을 따른다. 테이블 24개: 회원·인증 7(users·admins·user_coupons·revoked_tokens·auth_token_families·refresh_tokens·admin_sessions), 상품 8, 조향 3, 주문 3, 문의 1, 관리자 운영 2(stock_adjustments·admin_audit_logs). 장바구니 테이블 없음.
 
 | 원칙              | 내용                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------- |
