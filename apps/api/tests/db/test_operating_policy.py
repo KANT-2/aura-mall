@@ -9,7 +9,7 @@ from sqlalchemy import select, update
 from test_admin_api import URL, db, new_customer
 from test_admin_api import client as client
 from test_order_cancellation import cancel, order
-from test_payments_api import confirm, order_status, start
+from test_payments_api import confirm, order_status, payment_row, start
 from test_payments_api import pg as pg
 
 from aura_api.config import Settings
@@ -23,7 +23,14 @@ ITEMS = [{"productId": "fresh-hand-cream", "quantity": 1}]
 
 def test_expiry_boundary_at_exactly_ten_minutes(client, pg, monkeypatch):
     now = datetime.now(UTC)
-    ids = [uuid.UUID(order(client, new_customer(), items=ITEMS)["id"]) for _ in range(3)]
+    ids, payments = [], []
+    for _ in range(3):
+        member = new_customer()
+        placed = order(client, member, items=ITEMS)
+        ids.append(uuid.UUID(placed["id"]))
+        payment = start(client, member, placed["id"]).json()
+        assert payment["status"] == "READY"
+        payments.append(payment["id"])
 
     class Clock(datetime):
         @classmethod
@@ -49,6 +56,8 @@ def test_expiry_boundary_at_exactly_ten_minutes(client, pg, monkeypatch):
 
     db(run)
     assert [order_status(target) for target in ids] == ["received", "cancelled", "cancelled"]
+    assert [payment_row(target).status for target in payments] == ["READY", "CANCELED", "CANCELED"]
+    assert pg.calls == []  # No approval request has reached the PG.
 
 
 def test_revenue_excludes_only_confirmed_cancel_and_preserves_order_counts(client, pg):
