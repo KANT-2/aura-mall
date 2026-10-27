@@ -3,8 +3,10 @@
 import threading
 from dataclasses import replace
 from datetime import UTC, datetime
+from math import ceil
 from uuid import UUID
 
+from aura_api.identity.repository import LOGIN_FAILURE_LIMIT, LOGIN_LOCK
 from aura_api.identity.tokens import UserRecord
 
 
@@ -14,6 +16,7 @@ class MemoryAuthRepository:
         self.issuer = issuer
         self.families, self.refreshes, self.revoked = {}, {}, {}
         self.lock = threading.RLock()
+        self.login_failures = {}
         self.profiles = {}
 
     async def find_user(self, email):
@@ -21,6 +24,21 @@ class MemoryAuthRepository:
 
     async def find_user_by_id(self, user_id):
         return next((user for user in self.users.values() if user.id == user_id), None)
+
+    async def reserve_login_attempt(self, email_hash):
+        with self.lock:
+            failures, until = self.login_failures.get(email_hash, (0, None))
+            now = datetime.now(UTC)
+            if until is not None and until > now:
+                return ceil((until - now).total_seconds())
+            failures += 1
+            locked = now + LOGIN_LOCK if failures >= LOGIN_FAILURE_LIMIT else None
+            self.login_failures[email_hash] = (failures, locked)
+            return 0
+
+    async def clear_login_failures(self, email_hash):
+        with self.lock:
+            self.login_failures.pop(email_hash, None)
 
     async def update_profile(self, user_id, *, name=None, marketing=None):
         with self.lock:

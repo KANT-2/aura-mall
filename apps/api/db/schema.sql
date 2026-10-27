@@ -3,7 +3,7 @@
 -- contract in docs/FASTAPI_BFF.md. Run once on an empty database (PostgreSQL 13+):
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/schema.sql
 -- Then load initial catalog data with db/seed.sql. The cart is not stored (browser only).
--- This file is the latest full schema (migrations 0001 + 0002 + 0003). Alembic applies the same
+-- This file is the latest full schema (migrations 0001 through 0005). Alembic applies the same
 -- DDL step by step from migrations/sql/; tests/db checks that both give the same tables.
 
 BEGIN;
@@ -20,10 +20,21 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     marketing     BOOLEAN      NOT NULL DEFAULT false,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    is_active     BOOLEAN      NOT NULL DEFAULT true    -- false: login refused (0002)
+    is_active     BOOLEAN      NOT NULL DEFAULT true,   -- false: login refused (0002)
+    -- 0005: a deactivated member stays restorable until deletion_scheduled_at. The purge job
+    -- anonymizes the account afterwards and records deleted_at; orders keep their user_id.
+    deletion_requested_at TIMESTAMPTZ,
+    deletion_scheduled_at TIMESTAMPTZ,
+    deleted_at            TIMESTAMPTZ,
+    CONSTRAINT users_deletion_schedule_check
+        CHECK ((deletion_requested_at IS NULL) = (deletion_scheduled_at IS NULL)),
+    CONSTRAINT users_deletion_inactive_check
+        CHECK ((deletion_requested_at IS NULL AND deleted_at IS NULL) OR NOT is_active)
 );
 -- Emails are stored lower-cased; the index also blocks case-only duplicates.
 CREATE UNIQUE INDEX users_email_lower_key ON users (lower(email));
+CREATE INDEX users_deletion_due_idx ON users (deletion_scheduled_at)
+    WHERE deletion_scheduled_at IS NOT NULL AND deleted_at IS NULL;
 
 CREATE TABLE user_coupons (
     id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -113,6 +124,34 @@ CREATE TABLE admin_sessions (
 );
 CREATE INDEX admin_sessions_admin_id_idx ON admin_sessions (admin_id);
 CREATE INDEX admin_sessions_expires_at_idx ON admin_sessions (expires_at);
+
+-- Consecutive member login failures per normalized email, stored only as a SHA-256 hex (0005).
+-- Unknown emails get rows too so the limit never reveals whether an account exists.
+CREATE TABLE login_failures (
+    email_hash    VARCHAR(64) PRIMARY KEY,
+    failure_count INTEGER     NOT NULL DEFAULT 0,
+    locked_until  TIMESTAMPTZ,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT login_failures_email_hash_check CHECK (email_hash ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT login_failures_failure_count_check CHECK (failure_count >= 0)
+);
+CREATE INDEX login_failures_updated_at_idx ON login_failures (updated_at);
+
+-- One row per member purge execution, including dry runs (0005). A row left in 'running'
+-- means the process stopped before recording its result.
+CREATE TABLE member_deletion_runs (
+    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    started_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at     TIMESTAMPTZ,
+    status          VARCHAR(20) NOT NULL DEFAULT 'running',
+    dry_run         BOOLEAN     NOT NULL,
+    eligible        INTEGER     NOT NULL DEFAULT 0,
+    deleted         INTEGER     NOT NULL DEFAULT 0,
+    failed          INTEGER     NOT NULL DEFAULT 0,
+    failed_user_ids UUID[]      NOT NULL DEFAULT '{}',
+    CONSTRAINT member_deletion_runs_status_check
+        CHECK (status IN ('running', 'succeeded', 'partial', 'failed'))
+);
 
 -- ---------------------------------------------------------------------------
 -- Catalog: original string IDs from apps/web/mock-server/fixtures/catalog.json
