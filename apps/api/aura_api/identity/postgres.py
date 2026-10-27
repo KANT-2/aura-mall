@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import psycopg
@@ -16,6 +17,9 @@ from aura_api.identity.repository import (
 from aura_api.identity.schema_contract import inspect_contract
 from aura_api.identity.tokens import IssuedTokens, UserRecord, hash_login_email
 
+if TYPE_CHECKING:
+    from aura_api.infra.database_rotation import RotatingDatabase
+
 # Restorable = deactivated, grace period not over (DB clock) and not yet purged.
 USER_COLUMNS = """id, password_hash, is_active, deletion_requested_at,
     (NOT is_active AND deletion_requested_at IS NOT NULL AND deleted_at IS NULL
@@ -32,17 +36,36 @@ def user_record(row) -> UserRecord | None:
 class PostgresAuthRepository:
     """JWT token families and customer profiles; no automatic DDL or fallback."""
 
-    def __init__(self, dsn: str, issuer: str, *, schema: str = "public"):
+    def __init__(
+        self,
+        dsn: str,
+        issuer: str,
+        *,
+        schema: str = "public",
+        runtime: "RotatingDatabase | None" = None,
+    ):
         self._dsn = dsn
         self._issuer = issuer
         self._schema = schema
+        self._runtime = runtime
+
+    @asynccontextmanager
+    async def _dsn_lease(self):
+        if self._runtime is None:
+            yield self._dsn
+        else:
+            async with self._runtime.lease() as generation:
+                yield generation.dsn
 
     @asynccontextmanager
     async def _connection(self, *, check_schema: bool = True):
         try:
-            async with await psycopg.AsyncConnection.connect(
-                self._dsn, row_factory=dict_row, connect_timeout=3
-            ) as connection:
+            async with (
+                self._dsn_lease() as dsn,
+                await psycopg.AsyncConnection.connect(
+                    dsn, row_factory=dict_row, connect_timeout=3
+                ) as connection,
+            ):
                 await connection.execute(
                     sql.SQL("SET LOCAL search_path TO pg_catalog, {}").format(
                         sql.Identifier(self._schema)

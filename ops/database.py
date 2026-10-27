@@ -7,6 +7,7 @@ All commands share a host lock; interrupted rotations recover from a durable jou
 
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 import secrets
@@ -107,7 +108,7 @@ class Database:
         self.home.mkdir(mode=0o700, exist_ok=True)
         self.home.chmod(0o700)
         self.state = self.home / "state"
-        for name in ("state", "ca", "server", "client", "replication", "backups"):
+        for name in ("state", "ca", "server", "client", "replication", "backups", "runtime"):
             (self.home / name).mkdir(
                 mode=0o755 if name in {"server", "client"} else 0o700, exist_ok=True
             )
@@ -424,6 +425,38 @@ class Database:
 
     def verify_api(self):
         retry(lambda: self.dc("exec", "-T", "api", "python", "-c", VERIFY_API, timeout=20))
+        self.wait_api_generation()
+
+    def wait_api_generation(self, url=None, seconds=120):
+        """Acknowledge every live worker in every running API container, not a fresh CLI DSN."""
+        target = url if url is not None else self.url_file.read_text().strip()
+        version = hashlib.sha256(target.encode()).hexdigest()
+
+        def acknowledged():
+            containers = self.dc("ps", "--status", "running", "-q", "api").stdout.split()
+            if not containers:
+                raise OperationError("No running API container can acknowledge the credentials")
+            workers = {}
+            for container in containers:
+                result = run(
+                    [
+                        "docker",
+                        "exec",
+                        "-i",
+                        container.decode(),
+                        "python",
+                        "-m",
+                        "aura_api.infra.database_rotation",
+                    ],
+                    data=json.dumps({"version": version}),
+                    timeout=15,
+                )
+                workers[container.decode()] = json.loads(result.stdout)
+            if containers != self.dc("ps", "--status", "running", "-q", "api").stdout.split():
+                raise OperationError("API container membership changed during acknowledgement")
+            return workers
+
+        return retry(acknowledged, seconds)
 
     def restart_api(self):
         self.dc("up", "-d", "--no-deps", "--force-recreate", "api", timeout=180)
@@ -511,13 +544,26 @@ SELECT pg_create_physical_replication_slot('aura_standby')
         self.verify_api()
 
     def finish_rotation(self, record):
+        if self.url_file.read_text().strip() != record["new_url"]:
+            raise OperationError("The rotation URL changed before old credentials were retired")
+        self.wait_api_generation(record["new_url"])
         old_user = unquote(urlsplit(record["old_url"]).username)
         self.sql(
             self.primary,
-            f"ALTER ROLE {identifier(old_user)} NOLOGIN; "
-            f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-            f"WHERE usename={literal(old_user)} AND pid<>pg_backend_pid();",
+            f"ALTER ROLE {identifier(old_user)} NOLOGIN;",
         )
+
+        def drained():
+            if (
+                self.sql(
+                    self.primary,
+                    f"SELECT count(*) FROM pg_stat_activity WHERE usename={literal(old_user)};",
+                )
+                != "0"
+            ):
+                raise OperationError("Old database sessions remain; they will not be terminated")
+
+        retry(drained, 120)
         self.wait_replica()
         self.write("rotated.json", time.time())
         self.journal.unlink()
@@ -538,7 +584,7 @@ SELECT pg_create_physical_replication_slot('aura_standby')
         self.sql(self.primary, f"ALTER ROLE {identifier(old_user)} LOGIN;")
         self.set_replication_password(record["old_replication_password"])
         atomic(self.url_file, record["old_url"] + "\n")
-        self.restart_api()
+        self.wait_api_generation(record["old_url"])
         self.sql(self.primary, f"ALTER ROLE {identifier(record['new_user'])} NOLOGIN;")
         self.journal.unlink()
 
@@ -551,6 +597,14 @@ SELECT pg_create_physical_replication_slot('aura_standby')
         if parts.username not in {"aura_app_a", "aura_app_b"}:
             raise OperationError("Only the managed application login roles can be rotated")
         new_user = "aura_app_b" if parts.username == "aura_app_a" else "aura_app_a"
+        if (
+            self.sql(
+                self.primary,
+                f"SELECT count(*) FROM pg_stat_activity WHERE usename={literal(new_user)};",
+            )
+            != "0"
+        ):
+            raise OperationError("Inactive login still has sessions; finish the earlier rotation")
         password = secrets.token_urlsafe(48)
         new_url = urlunsplit(parts._replace(netloc=f"{new_user}:{password}@{parts.hostname}:5432"))
         record = {
@@ -569,7 +623,7 @@ SELECT pg_create_physical_replication_slot('aura_standby')
             self.set_replication_password(secrets.token_urlsafe(48))
             self.wait_replica()
             atomic(self.url_file, new_url + "\n")
-            self.restart_api()
+            self.wait_api_generation(new_url)
             record["phase"] = "committed"
             atomic(self.journal, json.dumps(record))
         except (OperationError, subprocess.TimeoutExpired):

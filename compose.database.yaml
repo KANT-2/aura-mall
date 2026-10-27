@@ -63,9 +63,11 @@ services:
     environment:
       AURA_DATABASE_URL: ""
       AURA_DATABASE_URL_FILE: /run/aura-db-client/database-url
+      AURA_DATABASE_RUNTIME_DIR: /run/aura-db-runtime
     volumes:
       # Mount the directory so atomic file replacement is visible in the container.
       - ./.db-ops/client:/run/aura-db-client:ro
+      - ./.db-ops/runtime:/run/aura-db-runtime
 
 volumes:
   postgres_standby:

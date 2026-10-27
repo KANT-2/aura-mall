@@ -54,6 +54,11 @@ def create_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]
 
 async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
     """FastAPI dependency. Fails closed when no database is configured."""
+    runtime = getattr(request.app.state, "database_runtime", None)
+    if runtime is not None:
+        async with runtime.lease() as generation, generation.sessions() as session:
+            yield session
+        return
     sessionmaker: async_sessionmaker[AsyncSession] | None = getattr(
         request.app.state, "sessionmaker", None
     )
