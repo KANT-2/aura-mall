@@ -6,6 +6,7 @@ import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -186,7 +187,6 @@ def test_deactivate_revokes_all_devices_preserves_other_member_and_email(client,
     for pair in (first, second, rotated):
         assert protected(client, pair["accessToken"]).status_code == 401
         assert refresh(client, pair["refreshToken"]).status_code == 401
-    assert login(client).status_code == 401
     assert deactivate(client, first["accessToken"]).status_code == 401
     assert protected(client, bob["accessToken"]).status_code == 200
     assert refresh(client, bob["refreshToken"]).status_code == 200
@@ -205,8 +205,11 @@ def test_deactivate_revokes_all_devices_preserves_other_member_and_email(client,
             for family, token, blacklisted in persisted
         )
         assert query(
-            repository, "SELECT is_active,marketing,email FROM users WHERE id=%s", (ALICE,)
-        ) == [(False, False, "alice@example.com")]
+            repository,
+            "SELECT is_active,marketing,email,deleted_at IS NULL,"
+            "deletion_scheduled_at - deletion_requested_at FROM users WHERE id=%s",
+            (ALICE,),
+        ) == [(False, False, "alice@example.com", True, timedelta(days=30))]
         registration = client.post(
             "/api/v1/auth/register",
             json={"name": "New account", "email": "alice@example.com", "password": PASSWORD},
@@ -330,7 +333,20 @@ def test_stale_password_check_is_rejected_without_deactivation(client, repositor
     assert login(client).status_code == 200
 
 
-def test_data_cleanup_preserves_orders_referenced_coupons_and_other_members(client, repository):
+def expire_grace(repository, user_id=ALICE):
+    query(
+        repository,
+        "UPDATE users SET deletion_requested_at=now()-interval '31 days',"
+        "deletion_scheduled_at=now()-interval '1 day' WHERE id=%s",
+        (user_id,),
+    )
+
+
+def purge(client, repository, user_id=ALICE):
+    return client.portal.call(repository.purge_member, user_id)
+
+
+def test_purge_preserves_orders_referenced_coupons_and_other_members(client, repository):
     pg_only(repository)
     token = login(client).json()["accessToken"]
     alice_recipe, bob_recipe, order_id, used, bob_coupon = [uuid4() for _ in range(5)]
@@ -380,6 +396,12 @@ def test_data_cleanup_preserves_orders_referenced_coupons_and_other_members(clie
     )
     before = query(repository, "SELECT * FROM order_items WHERE order_id=%s", (order_id,))
     assert deactivate(client, token).status_code == 204
+    # The grace period keeps restorable data; only the purge job removes it.
+    assert query(repository, "SELECT id FROM recipes WHERE id=%s", (alice_recipe,)) == [
+        (alice_recipe,)
+    ]
+    expire_grace(repository)
+    assert purge(client, repository) is True
     assert query(repository, "SELECT * FROM order_items WHERE order_id=%s", (order_id,)) == before
     assert query(
         repository, "SELECT recipient,address,coupon_id FROM orders WHERE id=%s", (order_id,)
@@ -433,44 +455,35 @@ def test_coupon_deleted_only_when_all_safety_conditions_hold(client, repository,
         query(repository, "UPDATE user_coupons SET status='USED' WHERE id=%s", (coupon,))
     token = login(client).json()["accessToken"]
     assert deactivate(client, token).status_code == 204
+    assert query(repository, "SELECT id FROM user_coupons WHERE id=%s", (coupon,)) == [(coupon,)]
+    expire_grace(repository)
+    assert purge(client, repository) is True
     assert bool(query(repository, "SELECT id FROM user_coupons WHERE id=%s", (coupon,))) is (
         link != "none"
     )
 
 
-def test_partial_cleanup_failure_rolls_back_everything(client, repository, monkeypatch):
+def test_partial_deactivation_failure_rolls_back_everything(client, repository):
     pg_only(repository)
     pair, second = login(client).json(), login(client).json()
-    recipe_id, coupon = uuid4(), uuid4()
+    # Trigger fails at the last write, after the account and family updates.
     query(
         repository,
-        "INSERT INTO recipes(id,user_id,version,name,label,color) VALUES (%s,%s,"
-        "1,'Private','classic','#ffffff')",
-        (recipe_id, ALICE),
-    )
-    query(
-        repository,
-        "INSERT INTO user_coupons(id,user_id,type) VALUES (%s,%s,'FREE_SHIPPING')",
-        (coupon, ALICE),
-    )
-    # Trigger fails at the last cleanup statement, after account/tokens/coupon writes.
-    query(
-        repository,
-        "CREATE FUNCTION reject_recipe_delete() RETURNS trigger LANGUAGE plpgsql "
+        "CREATE FUNCTION reject_revocation() RETURNS trigger LANGUAGE plpgsql "
         "AS $$ BEGIN RAISE EXCEPTION 'private DB failure'; END $$",
     )
     query(
         repository,
-        "CREATE TRIGGER fail_cleanup BEFORE DELETE ON recipes FOR EACH ROW "
-        "EXECUTE FUNCTION reject_recipe_delete()",
+        "CREATE TRIGGER fail_revocation BEFORE INSERT ON revoked_tokens FOR EACH ROW "
+        "EXECUTE FUNCTION reject_revocation()",
     )
     response = deactivate(client, pair["accessToken"])
     assert response.status_code == 503 and "private DB failure" not in response.text
-    assert query(repository, "SELECT is_active,marketing FROM users WHERE id=%s", (ALICE,)) == [
-        (True, True)
-    ]
-    assert query(repository, "SELECT id FROM user_coupons WHERE id=%s", (coupon,)) == [(coupon,)]
-    assert query(repository, "SELECT id FROM recipes WHERE id=%s", (recipe_id,)) == [(recipe_id,)]
+    assert query(
+        repository,
+        "SELECT is_active,marketing,deletion_requested_at FROM users WHERE id=%s",
+        (ALICE,),
+    ) == [(True, True, None)]
     for current in (pair, second):
         assert protected(client, current["accessToken"]).status_code == 200
         assert refresh(client, current["refreshToken"]).status_code == 200
@@ -532,9 +545,7 @@ def test_business_write_waits_for_deactivation_and_is_rejected(
 
 
 @pytest.mark.parametrize("kind", ["order", "recipe"])
-def test_business_commit_before_deactivation_is_preserved_or_cleaned(
-    client, repository, monkeypatch, kind
-):
+def test_business_commit_before_deactivation_is_preserved(client, repository, monkeypatch, kind):
     pg_only(repository)
     if kind == "order":
         query(
@@ -571,7 +582,9 @@ def test_business_commit_before_deactivation_is_preserved_or_cleaned(
     assert len(query(repository, "SELECT id FROM orders WHERE user_id=%s", (ALICE,))) == (
         1 if kind == "order" else 0
     )
-    assert query(repository, "SELECT id FROM recipes WHERE user_id=%s", (ALICE,)) == []
+    assert len(query(repository, "SELECT id FROM recipes WHERE user_id=%s", (ALICE,))) == (
+        1 if kind == "recipe" else 0
+    )
 
 
 def test_password_changed_after_confirmation_prevents_deactivation(client, repository, monkeypatch):
