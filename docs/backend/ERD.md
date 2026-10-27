@@ -559,6 +559,7 @@ erDiagram
 | idempotency_key | VARCHAR(64)  | NULL                                                     | 같은 주문 중복 생성 방지           |
 | created_at      | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                   | `Order.created`                    |
 | status          | VARCHAR(20)  | NOT NULL DEFAULT `received`, CHECK 6개 상태              | `Order.status` (마이그레이션 0006) |
+|                 |              | INDEX(created_at) WHERE status = `received`              | 미결제 만료 대상 조회 (0008)       |
 |                 |              | UK(user_id, idempotency_key)                             |                                    |
 |                 |              | INDEX(user_id, created_at DESC)                          | 내 주문 최신순 조회                |
 
@@ -594,24 +595,24 @@ erDiagram
 
 **payments** — 주문별 PG 결제 시도 (마이그레이션 0007)
 
-| 컬럼               | 타입         | 제약                                                    | 설명                                |
-| ------------------ | ------------ | ------------------------------------------------------- | ----------------------------------- |
-| id                 | UUID         | PK                                                      | PG 멱등키로도 사용                  |
-| order_id           | UUID         | FK → orders, INDEX                                      | 주문 삭제 시 함께 지우지 않음       |
-| provider           | VARCHAR(20)  | NOT NULL                                                | `toss`                              |
-| pg_order_id        | VARCHAR(64)  | NOT NULL, UK, CHECK 영문·숫자·`-`·`_` 6~64자            | PG에 보낸 주문번호(`aura-<id hex>`) |
-| payment_key        | VARCHAR(200) | UK, NULL                                                | PG paymentKey. 승인 요청 시 기록    |
-| amount             | INTEGER      | NOT NULL, CHECK > 0                                     | 발급 시점의 `orders.total`          |
-| status             | VARCHAR(20)  | CHECK `READY`·`IN_PROGRESS`·`DONE`·`FAILED`             |                                     |
-| method             | VARCHAR(30)  | NULL                                                    | PG 결제수단 (카드 등)               |
-| failure_code       | VARCHAR(100) | NULL                                                    | PG 실패 코드                        |
-| failure_message    | VARCHAR(500) | NULL                                                    | PG 실패 사유                        |
-| review_reason      | VARCHAR(100) | NULL                                                    | 승인됐지만 수동 처리가 필요한 사유  |
-| confirm_started_at | TIMESTAMPTZ  | `READY`가 아니면 paymentKey와 함께 필수 (CHECK)         | 승인 요청 시각, 재확인 기준         |
-| approved_at        | TIMESTAMPTZ  | `DONE`일 때만 값 (CHECK)                                | PG 승인 시각                        |
-| created_at         | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                  |                                     |
-| updated_at         | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                  |                                     |
-|                    |              | UNIQUE(order_id) WHERE status IN READY·IN_PROGRESS·DONE | 주문당 진행·완료 결제는 1건         |
+| 컬럼               | 타입         | 제약                                                    | 설명                                            |
+| ------------------ | ------------ | ------------------------------------------------------- | ----------------------------------------------- |
+| id                 | UUID         | PK                                                      | PG 멱등키로도 사용                              |
+| order_id           | UUID         | FK → orders, INDEX                                      | 주문 삭제 시 함께 지우지 않음                   |
+| provider           | VARCHAR(20)  | NOT NULL                                                | `toss`                                          |
+| pg_order_id        | VARCHAR(64)  | NOT NULL, UK, CHECK 영문·숫자·`-`·`_` 6~64자            | PG에 보낸 주문번호(`aura-<id hex>`)             |
+| payment_key        | VARCHAR(200) | UK, NULL                                                | PG paymentKey. 승인 요청 시 기록                |
+| amount             | INTEGER      | NOT NULL, CHECK > 0                                     | 발급 시점의 `orders.total`                      |
+| status             | VARCHAR(20)  | CHECK `READY`·`IN_PROGRESS`·`DONE`·`FAILED`·`CANCELED`  | `CANCELED`: 주문 취소로 닫힌 미사용 시도 (0008) |
+| method             | VARCHAR(30)  | NULL                                                    | PG 결제수단 (카드 등)                           |
+| failure_code       | VARCHAR(100) | NULL                                                    | PG 실패 코드                                    |
+| failure_message    | VARCHAR(500) | NULL                                                    | PG 실패 사유                                    |
+| review_reason      | VARCHAR(100) | NULL                                                    | 승인됐지만 수동 처리가 필요한 사유              |
+| confirm_started_at | TIMESTAMPTZ  | `READY`가 아니면 paymentKey와 함께 필수 (CHECK)         | 승인 요청 시각, 재확인 기준                     |
+| approved_at        | TIMESTAMPTZ  | `DONE`일 때만 값 (CHECK)                                | PG 승인 시각                                    |
+| created_at         | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                  |                                                 |
+| updated_at         | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                  |                                                 |
+|                    |              | UNIQUE(order_id) WHERE status IN READY·IN_PROGRESS·DONE | 주문당 진행·완료 결제는 1건                     |
 
 > 카드 번호 등 결제수단 정보는 저장하지 않습니다. 브라우저가 PG 결제창과 직접 통신합니다.
 
