@@ -15,7 +15,7 @@ CREATE INDEX revoked_expiry_test ON revoked_tokens (expires_at);
 ALTER TABLE users ADD COLUMN is_active boolean NOT NULL;
 CREATE TABLE auth_token_families (
     id uuid PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES users(id),
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at timestamptz NOT NULL,
     revoked_at timestamptz,
     UNIQUE (id, user_id)
@@ -32,7 +32,7 @@ CREATE TABLE refresh_tokens (
     revoked_at timestamptz,
     access_jti uuid NOT NULL UNIQUE,
     access_expires_at timestamptz NOT NULL,
-    FOREIGN KEY (family_id, user_id) REFERENCES auth_token_families(id, user_id),
+    FOREIGN KEY (family_id, user_id) REFERENCES auth_token_families(id, user_id) ON DELETE CASCADE,
     CHECK (expires_at > created_at),
     CHECK (access_expires_at > created_at)
 );
