@@ -130,6 +130,8 @@ class Database:
             "-f",
             str(ROOT / "compose.database.yaml"),
         ]
+        if (ROOT / "compose.lb.yaml").exists():
+            self.compose.extend(["-f", str(ROOT / "compose.lb.yaml")])
 
     def dc(self, *args, **kwargs):
         return run([*self.compose, *args], **kwargs)

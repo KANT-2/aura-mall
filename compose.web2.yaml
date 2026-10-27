@@ -1,22 +1,5 @@
+# Optional second Next.js instance; use after compose.lb.yaml.
 services:
-  api:
-    deploy:
-      replicas: 2
-    networks:
-      aura-internal:
-      caddy:
-        aliases:
-          - aura-api
-
-  web:
-    environment:
-      API_URL: ${AURA_API_PROXY_URL:-http://caddy:8080}
-    networks:
-      aura-internal:
-      caddy:
-        aliases:
-          - aura-web
-
   web2:
     image: aura-web
     restart: unless-stopped
@@ -28,11 +11,11 @@ services:
       API_ADMIN_ACCESS_COOKIE: ${API_ADMIN_ACCESS_COOKIE:-aura_admin_access}
       API_BFF_SHARED_KEY: ${AURA_BFF_SHARED_KEY:?Set AURA_BFF_SHARED_KEY in .env}
       APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN in .env}
+    ports: !reset []
+    expose:
+      - "3000"
     networks:
-      - aura-internal
-      - caddy
-
-networks:
-  caddy:
-    external: true
-    name: caddy
+      aura-internal: {}
+      caddy:
+        aliases:
+          - aura-web

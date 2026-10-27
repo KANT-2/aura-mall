@@ -59,6 +59,8 @@ FastAPI는 `http://127.0.0.1:8000`에서 실행되며 `/health`, `/api/v1/health
 
 ## 문서
 
+Next.js와 API의 배포는 [기존 Caddy를 사용하는 배포 안내](docs/backend/DEPLOYMENT.md)를 참고하세요. `compose.lb.yaml`은 기존 공용 Caddy의 네트워크를 연결하며 AURA에서 프록시를 추가로 실행하지 않습니다.
+
 PostgreSQL TLS, self-signed CA 기반 인증서 자동 갱신, 접속 비밀번호 회전, 로컬 복제본과 복구 절차는 [DB 운영 안내](docs/operations/DATABASE.md)를 참고하세요. 기존 Compose에 별도 설정을 추가하는 방식이며 최초 전환은 운영자가 수행합니다.
 
 [문서 목록](docs/README.md)에서 제품 기획, 앱별 개발 안내, API 계약, 에셋과 과거 검수 기록을 찾을 수 있습니다. 작업 지침은 [AGENTS.md](AGENTS.md)와 [웹 전용 지침](apps/web/AGENTS.md)에 있습니다.

@@ -83,14 +83,21 @@ jobs:
 
           echo "Validating Compose configuration..."
           test -f compose.web2.yaml
-          docker network inspect caddy > /dev/null
 
           compose_args=(-f compose.yaml)
           if test -f .db-ops/client/database-url; then
             compose_args+=(-f compose.database.yaml)
           fi
+          if test -f compose.lb.yaml; then
+            compose_args+=(-f compose.lb.yaml)
+          fi
           compose_args+=(-f compose.web2.yaml)
           docker compose "${compose_args[@]}" config --quiet
+          caddy_network=$(docker compose "${compose_args[@]}" config --format json |
+            python3 -c 'import json,sys; print(json.load(sys.stdin)["networks"]["caddy"]["name"])')
+          docker network inspect "$caddy_network" > /dev/null
+          api_replicas=$(docker compose "${compose_args[@]}" config --format json |
+            python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["api"]["deploy"]["replicas"])')
 
           echo "Checking AURA database..."
           if test -f .db-ops/client/database-url; then
@@ -120,19 +127,19 @@ jobs:
           echo "Applying Alembic migrations..."
           docker compose "${compose_args[@]}" run --rm --no-deps api alembic upgrade head
 
-          echo "Deploying two FastAPI and two Next.js containers..."
+          echo "Deploying $api_replicas FastAPI and two Next.js containers..."
           if test -f .db-ops/client/database-url; then
             python3 ops/database.py deploy-api
           fi
           docker compose "${compose_args[@]}" up -d --no-deps api web web2
 
-          echo "Checking both API containers..."
+          echo "Checking all API containers..."
           healthy=false
           for attempt in $(seq 1 12); do
             mapfile -t api_containers < <(
               docker compose "${compose_args[@]}" ps --status running -q api
             )
-            if [ "${#api_containers[@]}" -eq 2 ]; then
+            if [ "${#api_containers[@]}" -eq "$api_replicas" ]; then
               healthy=true
               for container in "${api_containers[@]}"; do
                 if ! docker exec "$container" python -c \
