@@ -648,6 +648,52 @@ def test_postgres_refresh_expiring_while_waiting_for_family_lock(client, reposit
             assert pending.result(timeout=10).status_code == 401
 
 
+def test_postgres_deleted_member_cannot_reuse_access_or_refresh(client, repository):
+    """A removed member's previously issued credentials must not authenticate."""
+    if isinstance(repository, MemoryRepository):
+        pytest.skip("Requires explicitly approved PostgreSQL integration database")
+    pair = login(client).json()
+    assert protected(client, pair["accessToken"]).status_code == 200
+    with psycopg.connect(repository._dsn) as connection:
+        connection.execute(
+            sql.SQL("SET LOCAL search_path TO {}").format(sql.Identifier(repository._schema))
+        )
+        connection.execute("DELETE FROM users WHERE id=%s", (ALICE,))
+    assert protected(client, pair["accessToken"]).status_code == 401
+    assert refresh(client, pair["refreshToken"]).status_code == 401
+
+
+def test_postgres_refresh_logout_race_never_resurrects_session(client, repository):
+    """Concurrent refresh/logout must not leave a usable token in that family."""
+    if isinstance(repository, MemoryRepository):
+        pytest.skip("Requires explicitly approved PostgreSQL integration database")
+    pair = login(client).json()
+    barrier = threading.Barrier(2)
+
+    def do_refresh():
+        barrier.wait(timeout=5)
+        return refresh(client, pair["refreshToken"])
+
+    def do_logout():
+        barrier.wait(timeout=5)
+        return logout(client, pair["accessToken"])
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        refreshed_future = executor.submit(do_refresh)
+        logout_future = executor.submit(do_logout)
+        refreshed = refreshed_future.result(timeout=15)
+        logged_out = logout_future.result(timeout=15)
+
+    assert logged_out.status_code == 204
+    assert refreshed.status_code in (200, 401)
+    assert protected(client, pair["accessToken"]).status_code == 401
+    assert refresh(client, pair["refreshToken"]).status_code == 401
+    if refreshed.status_code == 200:
+        successor = refreshed.json()
+        assert protected(client, successor["accessToken"]).status_code == 401
+        assert refresh(client, successor["refreshToken"]).status_code == 401
+
+
 def test_postgres_commit_error_is_sanitized(monkeypatch):
     class CommitFailure:
         async def __aenter__(self):
