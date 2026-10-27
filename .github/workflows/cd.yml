@@ -54,7 +54,7 @@ jobs:
             "$DEPLOY_USER@$DEPLOY_HOST" \
             "hostname && test -d '$DEPLOY_PATH' && echo 'SSH connection OK'"
 
-        - name: Deploy AURA to Debian
+      - name: Deploy AURA to Debian
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
