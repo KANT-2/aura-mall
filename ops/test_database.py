@@ -89,6 +89,10 @@ def main():
             cli("init")
             assert (db.client / "ca.crt").read_bytes() == ca
             cli("bootstrap")
+            cli("migrate")
+            assert db.sql("db", "SELECT count(*) FROM alembic_version;") == "1"
+            assert db.sql("db", "SELECT count(*) FROM users;") == "0"
+            print("PASS: verified TLS administrator migrations; no accounts seeded", flush=True)
             db.sql(
                 "db",
                 "CREATE TABLE rotation_probe(id int PRIMARY KEY, value text); "
