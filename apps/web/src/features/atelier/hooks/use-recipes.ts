@@ -1,6 +1,6 @@
 "use client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "@/features/account/hooks/use-session";
+import { useAccount } from "@/features/account/hooks/use-account";
 import { useNotify } from "@/components/feedback/notification-provider";
 import {
   getRecipes,
@@ -9,7 +9,7 @@ import {
   type RecipeInput,
 } from "@/features/atelier/api/recipes";
 export function useRecipes() {
-  const { owner, ready } = useSession();
+  const { owner, ready } = useAccount();
   const client = useQueryClient();
   const notify = useNotify();
   const key = recipesKey(owner);

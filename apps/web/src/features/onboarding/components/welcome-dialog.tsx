@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { Asset } from "@/components/ui/asset";
 import { Beaker } from "@/components/illustrations/beaker";
-import { useSession } from "@/features/account/hooks/use-session";
+import { useAccount } from "@/features/account/hooks/use-account";
 
 const screens = [
   {
@@ -35,7 +35,7 @@ const screens = [
 const KEY = "aura_welcome_pending_v8";
 export function WelcomeJourney() {
   const router = useRouter();
-  const { user } = useSession();
+  const { user } = useAccount();
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [drops, setDrops] = useState(0);

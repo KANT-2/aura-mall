@@ -9,7 +9,7 @@ import { Arrow } from "@/components/ui/arrow";
 import { Asset } from "@/components/ui/asset";
 
 import { useCart } from "@/features/cart/hooks/use-cart";
-import { useSession } from "@/features/account/hooks/use-session";
+import { useAccount } from "@/features/account/hooks/use-account";
 import { AuraWordmark } from "@/components/brand/wordmark";
 import { Icon } from "@/components/ui/navigation-icon";
 
@@ -20,7 +20,7 @@ export function SiteHeader() {
 
 function HeaderContents() {
   const { collections, types } = useCatalog();
-  const { user } = useSession(),
+  const { user } = useAccount(),
     { cart } = useCart();
   const [menu, setMenu] = useState(false),
     [collection, setCollection] = useState("fresh"),

@@ -5,13 +5,14 @@ import psycopg
 from psycopg import sql
 from psycopg.rows import dict_row
 
+from aura_api.domain.identity import Registration
 from aura_api.identity.repository import AuthStorageUnavailable, TokenIssuer
 from aura_api.identity.schema_contract import inspect_contract
 from aura_api.identity.tokens import IssuedTokens, UserRecord
 
 
 class PostgresAuthRepository:
-    """PR #33 base plus pending lifecycle extension; no automatic DDL or fallback."""
+    """JWT token families and customer profiles; no automatic DDL or fallback."""
 
     def __init__(self, dsn: str, issuer: str, *, schema: str = "public"):
         self._dsn = dsn
@@ -76,7 +77,48 @@ class PostgresAuthRepository:
             ),
         )
 
-    async def create_session(self, tokens: IssuedTokens) -> bool:
+    async def register(
+        self, registration: Registration, password_hash: str, tokens: IssuedTokens
+    ) -> bool:
+        async with self._connection() as connection:
+            cursor = await connection.execute(
+                """INSERT INTO users (id, email, name, password_hash, marketing, is_active)
+                   VALUES (%s, %s, %s, %s, %s, true)
+                   ON CONFLICT (lower(email)) DO NOTHING RETURNING id""",
+                (
+                    tokens.user_id,
+                    registration.email,
+                    registration.name,
+                    password_hash,
+                    registration.marketing,
+                ),
+            )
+            if await cursor.fetchone() is None:
+                return False
+            await connection.execute(
+                "INSERT INTO user_coupons (user_id, type) VALUES (%s, 'FREE_SHIPPING')",
+                (tokens.user_id,),
+            )
+            await connection.execute(
+                "INSERT INTO auth_token_families (id, user_id, created_at) VALUES (%s, %s, %s)",
+                (tokens.family_id, tokens.user_id, tokens.issued_at),
+            )
+            await self._insert_tokens(connection, tokens)
+        return True
+
+    async def profile(self, user_id: UUID) -> dict | None:
+        async with self._connection() as connection:
+            cursor = await connection.execute(
+                """SELECT id, email, name, marketing,
+                     EXISTS (SELECT 1 FROM user_coupons c WHERE c.user_id = u.id
+                       AND c.type = 'FREE_SHIPPING' AND c.status = 'AVAILABLE') AS coupon
+                   FROM users u WHERE id = %s AND is_active""",
+                (user_id,),
+            )
+            row = await cursor.fetchone()
+        return {**row, "id": str(row["id"]), "role": "member"} if row else None
+
+    async def create_token_family(self, tokens: IssuedTokens) -> bool:
         accepted = False
         async with self._connection() as connection:
             if await self._active_user(connection, tokens.user_id):

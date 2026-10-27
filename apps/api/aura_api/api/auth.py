@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from aura_api.core.auth import CurrentUser
+from aura_api.domain.identity import validate_registration
 from aura_api.identity.repository import AuthStorageUnavailable
 from aura_api.identity.service import AuthenticationRejected, AuthLifecycleService
 from aura_api.identity.tokens import IssuedTokens
@@ -41,6 +42,20 @@ class RefreshInput(BaseModel):
     refresh_token: SecretStr = Field(alias="refreshToken", min_length=1, max_length=512)
 
 
+class RegistrationInput(LoginInput):
+    name: str = Field(min_length=1, max_length=100)
+    marketing: bool = False
+
+
+class MemberResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    coupon: bool
+    marketing: bool
+    role: str = "member"
+
+
 class TokenResponse(BaseModel):
     accessToken: str = Field(repr=False)
     refreshToken: str = Field(repr=False)
@@ -63,6 +78,27 @@ def get_auth_service(request: Request) -> AuthLifecycleService:
 
 
 Service = Annotated[AuthLifecycleService, Depends(get_auth_service)]
+
+
+@router.post("/register", response_model=TokenResponse, status_code=201)
+async def register(body: RegistrationInput, service: Service):
+    registration = validate_registration(
+        body.name, body.email, body.password.get_secret_value(), body.marketing
+    )
+    try:
+        return token_response(await service.register(registration))
+    except AuthStorageUnavailable:
+        raise HTTPException(503) from None
+
+
+@router.get("/me", response_model=MemberResponse)
+async def me(user: CurrentUser, service: Service):
+    try:
+        return await service.me(user.user_id)
+    except AuthenticationRejected:
+        raise HTTPException(401, headers={"WWW-Authenticate": "Bearer"}) from None
+    except AuthStorageUnavailable:
+        raise HTTPException(503) from None
 
 
 @router.post("/login", response_model=TokenResponse)

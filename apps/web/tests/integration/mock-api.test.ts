@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { once } from "node:events";
 import type { Server } from "node:http";
@@ -23,7 +24,8 @@ afterAll(
 );
 
 function client() {
-  let cookie = "";
+  let token = "";
+  const guestId = randomUUID();
   return async function api(
     path: string,
     method = "GET",
@@ -32,13 +34,23 @@ function client() {
   ) {
     const response = await fetch(base + path, {
       method,
-      headers: { "Content-Type": "application/json", Cookie: cookie, ...headers },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Guest-ID": guestId,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
       body: data === undefined ? undefined : JSON.stringify(data),
     });
-    cookie = response.headers.get("set-cookie")?.split(";")[0] ?? cookie;
-    return { status: response.status, body: await response.json(), headers: response.headers };
+    const body = response.status === 204 ? null : await response.json();
+    if (body?.accessToken) {
+      token = body.accessToken;
+    }
+
+    return { status: response.status, body, guestId, headers: response.headers };
   };
 }
+
 const credentials = (name: string) => ({
   name,
   email: `${name}@example.com`,
@@ -82,22 +94,38 @@ describe("Mock API data ownership and validation", () => {
     expect(response.status).toBe(413);
     expect(await response.json()).toEqual({ error: { message: "입력 내용이 너무 길어요." } });
   });
-  it("preserves guest identity and uses an opaque HttpOnly session cookie", async () => {
+  it("issues JWT token pairs, accepts only Bearer, rotates refresh and revokes logout", async () => {
     const api = client();
-    const guest = await api("/api/session");
-    expect(guest.body).toEqual({ user: null, guestId: expect.any(String) });
-    const cookie = guest.headers.get("set-cookie")!;
-    expect(cookie).toMatch(/^aura_mock_session=/);
-    expect(cookie).toMatch(/HttpOnly/i);
-    expect(cookie).toMatch(/SameSite=Lax/i);
-    expect(cookie).toContain("Path=/");
-    expect(cookie).not.toContain(guest.body.guestId);
-    const member = await api("/api/auth/register", "POST", credentials("identity-owner"));
-    expect(member.body.guestId).toBe(guest.body.guestId);
-    const loggedOut = await api("/api/auth/logout", "POST");
-    expect(loggedOut.body).toEqual(guest.body);
-    const loggedIn = await api("/api/auth/login", "POST", credentials("identity-owner"));
-    expect(loggedIn.body.guestId).toBe(guest.body.guestId);
+    expect((await api("/api/auth/me")).status).toBe(401);
+    const registered = await api("/api/auth/register", "POST", credentials("identity-owner"));
+    expect(registered.body).toMatchObject({
+      accessToken: expect.stringMatching(/^[\w-]+\.[\w-]+\.[\w-]+$/),
+      refreshToken: expect.stringMatching(/^r1_/),
+      tokenType: "Bearer",
+    });
+    expect(registered.headers.get("set-cookie")).toBeNull();
+    expect((await api("/api/auth/me")).body.email).toBe("identity-owner@example.com");
+    const rotated = await api("/api/auth/refresh", "POST", {
+      refreshToken: registered.body.refreshToken,
+    });
+    expect(rotated.status).toBe(200);
+    expect(rotated.body.accessToken).not.toBe(registered.body.accessToken);
+    expect((await api("/api/auth/logout", "POST")).status).toBe(204);
+    expect((await api("/api/auth/me")).status).toBe(401);
+    expect(
+      (await api("/api/auth/refresh", "POST", { refreshToken: rotated.body.refreshToken })).status,
+    ).toBe(401);
+  });
+
+  it("revokes a whole token family when a consumed refresh token is replayed", async () => {
+    const api = client();
+    const registered = await api("/api/auth/register", "POST", credentials("refresh-replay"));
+    await api("/api/auth/refresh", "POST", { refreshToken: registered.body.refreshToken });
+    expect(
+      (await api("/api/auth/refresh", "POST", { refreshToken: registered.body.refreshToken }))
+        .status,
+    ).toBe(401);
+    expect((await api("/api/auth/me")).status).toBe(401);
   });
   it("serves catalog data, legacy slugs and explicit missing products", async () => {
     const api = client();
@@ -117,14 +145,14 @@ describe("Mock API data ownership and validation", () => {
     ).toBe(404);
     expect((await api("/api/cart/items/key", "PATCH", { quantity: 2 })).status).toBe(404);
   });
-  it("does not create an account when the session owner check rejects registration", async () => {
+  it("does not create an account when the account owner check rejects registration", async () => {
     const api = client();
-    const guest = await api("/api/session");
+    const guest = await api("/api/auth/me");
     const input = credentials("rejected-registration");
     expect(
-      (await api("/api/auth/register", "POST", input, { "X-Session-Owner": "stale-owner" })).status,
+      (await api("/api/auth/register", "POST", input, { "X-Account-Owner": "stale-owner" })).status,
     ).toBe(409);
-    expect((await api("/api/session")).body).toEqual(guest.body);
+    expect((await api("/api/auth/me")).body).toEqual(guest.body);
     expect((await api("/api/auth/login", "POST", input)).status).toBe(401);
     expect((await api("/api/auth/register", "POST", input)).status).toBe(201);
   });
@@ -198,7 +226,7 @@ describe("Mock API data ownership and validation", () => {
     expect(order.body.total).toBe(28000);
     expect(order.body.items[0].unitPrice).toBe(28000);
     expect((await api("/api/orders")).body).toEqual([order.body]);
-    expect((await api("/api/session")).body.user.coupon).toBe(false);
+    expect((await api("/api/auth/me")).body.coupon).toBe(false);
   });
   it("rechecks order stock and leaves orders and coupons intact on failure", async () => {
     const api = client();
@@ -241,7 +269,7 @@ describe("Mock API data ownership and validation", () => {
     }
 
     expect((await api("/api/orders")).body).toEqual([]);
-    expect((await api("/api/session")).body.user.coupon).toBe(true);
+    expect((await api("/api/auth/me")).body.coupon).toBe(true);
   });
   it("rebuilds custom order items from compositions and isolates order history", async () => {
     const first = client(),
@@ -305,22 +333,21 @@ describe("Mock API data ownership and validation", () => {
   });
 });
 
-it("prototype-like cookies never become sessions", async () => {
+it("never authenticates a user from a legacy session cookie", async () => {
   for (const token of ["__proto__", "constructor", "toString"]) {
-    const response = await fetch(`${base}/api/session`, {
+    const response = await fetch(`${base}/api/auth/me`, {
       headers: { Cookie: `aura_mock_session=${token}` },
     });
-    const session = await response.json();
-    expect(session.user).toBeNull();
-    expect(session.guestId).toEqual(expect.any(String));
+    expect(response.status).toBe(401);
+    expect(response.headers.get("set-cookie")).toBeNull();
   }
 });
 
 it("rejects recipe commands captured before an account change", async () => {
   const api = client();
-  const guest = await api("/api/session");
+  const guest = await api("/api/auth/me");
   await api("/api/auth/register", "POST", credentials("scope-owner"));
-  const headers = { "X-Session-Owner": guest.body.guestId };
+  const headers = { "X-Account-Owner": guest.guestId };
   expect(
     (await api("/api/recipes", "POST", { name: "Stale", counts: { rose: 1 } }, headers)).status,
   ).toBe(409);
