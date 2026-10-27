@@ -235,7 +235,7 @@ async def expire_unpaid_orders(
             async with session.begin():
                 order = await payment_repository.lock_order(session, order_id)
                 # Recheck under the lock: paid or cancelled meanwhile means nothing to do.
-                if order is None or order.status != "received" or order.created_at >= cutoff:
+                if order is None or order.status != "received" or order.created_at > cutoff:
                     counts["skipped"] += 1
                     continue
                 await _cancel(
