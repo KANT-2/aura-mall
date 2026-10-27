@@ -39,10 +39,11 @@ python apps/api/db/generate_seed.py
 
 `schema.sql`은 항상 **최신 전체 구조**입니다. Alembic은 같은 DDL을 단계별 파일로 적용합니다.
 
-| 리비전 | 실행하는 SQL                             | 내용                                                       |
-| ------ | ---------------------------------------- | ---------------------------------------------------------- |
-| `0001` | `migrations/sql/0001_initial_schema.sql` | #33 시점 `schema.sql` 고정 복사본(테이블 21개)             |
-| `0002` | `migrations/sql/0002_auth_tokens.sql`    | `auth_token_families`, `refresh_tokens`, `users.is_active` |
-| `0003` | `migrations/sql/0003_admin_sessions.sql` | `admin_sessions` (관리자 Access Token 기록)                |
+| 리비전 | 실행하는 SQL                                         | 내용                                                       |
+| ------ | ---------------------------------------------------- | ---------------------------------------------------------- |
+| `0001` | `migrations/sql/0001_initial_schema.sql`             | #33 시점 `schema.sql` 고정 복사본(테이블 21개)             |
+| `0002` | `migrations/sql/0002_auth_tokens.sql`                | `auth_token_families`, `refresh_tokens`, `users.is_active` |
+| `0003` | `migrations/sql/0003_admin_sessions.sql`             | `admin_sessions` (관리자 Access Token 기록)                |
+| `0004` | `migrations/sql/0004_partner_inquiry_rate_limit.sql` | 입점 문의 이메일·생성 시각 조회 인덱스                     |
 
 구조를 바꿀 때는 새 리비전 SQL을 추가하고 같은 내용을 `schema.sql`에도 반영합니다. 이미 적용된 리비전의 SQL은 고치지 않습니다. `tests/db`가 `schema.sql`로 만든 DB와 마이그레이션으로 만든 DB가 ORM 모델과 같은지 검사합니다. 사용법은 [API 개발 안내](../README.md#데이터베이스)를 참고합니다.
