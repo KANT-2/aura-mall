@@ -130,6 +130,30 @@ class AuthLifecycleService:
         if result is not True:
             raise InvalidInput("CURRENT_PASSWORD_INVALID", "현재 비밀번호를 확인해 주세요.")
 
+    async def deactivate(self, user_id: str, current_password: str):
+        if not isinstance(current_password, str) or not 1 <= len(current_password) <= PASSWORD_MAX:
+            raise InvalidInput("PASSWORD_INVALID", "비밀번호 입력을 확인해 주세요.")
+        try:
+            current_password.encode("utf-8")
+        except UnicodeEncodeError:
+            raise InvalidInput("PASSWORD_INVALID", "비밀번호 입력을 확인해 주세요.") from None
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise AuthenticationRejected() from None
+        user = await self.repository.find_user_by_id(user_uuid)
+        if user is None or user.is_active is not True:
+            raise AuthenticationRejected()
+        if not await run_sync(check_password, user.password_hash, current_password):
+            raise InvalidInput("CURRENT_PASSWORD_INVALID", "현재 비밀번호를 확인해 주세요.")
+        result = await self.repository.deactivate(
+            user_uuid, expected_password_hash=user.password_hash
+        )
+        if result is None:
+            raise AuthenticationRejected()
+        if result is not True:
+            raise InvalidInput("CURRENT_PASSWORD_INVALID", "현재 비밀번호를 확인해 주세요.")
+
     async def refresh(self, token: str) -> IssuedTokens:
         self._require_configured()
         if not re.fullmatch(r"r1_[A-Za-z0-9_-]{64}", token):

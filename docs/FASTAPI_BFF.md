@@ -160,6 +160,27 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
   실패 응답에서 성공으로 처리하거나 새 토큰을 자동 발급해서는 안 됩니다. 인증 Web Lock을
   사용해 Refresh 및 로그아웃과 브라우저 상태 변경을 직렬화하는 연결이 필요합니다.
 
+### 회원 계정 비활성화 — FastAPI CRA-34
+
+- `DELETE /api/v1/auth/me`는 회원 Bearer JWT와 JSON 본문
+  `{ currentPassword }`를 받습니다. 사용자 ID는 JWT의 `sub`에서만 얻으며 관리자
+  principal 또는 admin permission은 거절합니다. 비밀번호는 공백 제거·정규화 없이 검증합니다.
+- 성공은 **204, 본문 없음**입니다. 회원 행을 유지하며 `is_active=false`, `marketing=false`로
+  변경하고 현재 기기를 포함한 모든 로그인 계열의 Access/Refresh를 폐기합니다.
+- 본인 쿠폰 중 `AVAILABLE`, `used_order_id IS NULL`, 주문의 `coupon_id`에서도 참조하지 않는
+  쿠폰만 삭제합니다. 개인 저장 레시피는 삭제하고 향료 구성은 CASCADE, 다른 회원 레시피의
+  부모 연결은 기존 SET NULL을 적용합니다. 다른 회원 레시피와 주문·주문 스냅샷은 보존합니다.
+- 위 처리는 단일 트랜잭션이며 중간 실패 시 모두 롤백합니다. 현재 비밀번호 불일치·검증 후
+  비밀번호 변경은 400 `CURRENT_PASSWORD_INVALID`, 미인증·폐기 토큰·관리자·비활성 회원은
+  401, CSRF 차단은 403, 입력 오류는 422, 저장소 장애는 503입니다. 폐기 조회 장애는 기존
+  JWT 검증 정책에 따라 401로 거절합니다. 토큰이나 개인정보를 오류에 포함하지 않습니다.
+- **개인정보 완전 파기 API가 아닙니다.** 이름·이메일·비밀번호 해시와 주문 수령인·주소는
+  이번에 삭제하지 않습니다. 이메일 UNIQUE는 유지하며 재가입·계정 복구·정지와 탈퇴 구분·
+  개인정보 보존 범위와 기간은 미확정입니다. 개인정보 삭제 완료로 안내해서는 안 됩니다.
+- BFF DELETE 경로·쿠키·계정/주문/레시피 캐시·장바구니 초기화는 후속 작업입니다.
+  BFF는 백엔드 204 확인 후 회원 쿠키만 삭제하고, 기존 회원 인증 잠금에 DELETE를 연결해야
+  합니다. 관리자 쿠키는 유지하며 단순 401이나 응답 유실을 탈퇴 성공으로 간주하지 않습니다.
+
 ### 토큰 보관과 전달
 
 - Access 쿠키는 `aura_access; Path=/`, Refresh 쿠키는 `aura_refresh; Path=/api/auth`입니다. 모두 `HttpOnly; SameSite=Lax`이며 HTTPS 공개 origin에서는 `Secure`를 적용합니다. `Max-Age`는 발급 응답의 수명입니다. 운영은 `APP_ORIGIN=https://...`를 지정합니다.

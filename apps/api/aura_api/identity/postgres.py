@@ -179,13 +179,41 @@ class PostgresAuthRepository:
             await connection.execute(
                 "UPDATE users SET password_hash = %s WHERE id = %s", (new_password_hash, user_id)
             )
+            await self._revoke_user_families(connection, user_id)
+        # Password and all revocations have committed together before reporting success.
+        return True
+
+    async def _revoke_user_families(self, connection, user_id):
+        # Caller holds the user row lock; keep the common user -> family -> token order.
+        cursor = await connection.execute(
+            "SELECT id FROM auth_token_families WHERE user_id = %s ORDER BY id FOR UPDATE",
+            (user_id,),
+        )
+        for family in await cursor.fetchall():
+            await self._revoke_family(connection, family["id"])
+
+    async def deactivate(self, user_id: UUID, *, expected_password_hash: str) -> bool | None:
+        async with self._connection() as connection:
             cursor = await connection.execute(
-                "SELECT id FROM auth_token_families WHERE user_id = %s ORDER BY id FOR UPDATE",
+                "SELECT password_hash, is_active FROM users WHERE id = %s FOR UPDATE", (user_id,)
+            )
+            user = await cursor.fetchone()
+            if user is None or user["is_active"] is not True:
+                return None
+            if user["password_hash"] != expected_password_hash:
+                return False
+            await connection.execute(
+                "UPDATE users SET is_active = false, marketing = false WHERE id = %s", (user_id,)
+            )
+            await self._revoke_user_families(connection, user_id)
+            await connection.execute(
+                """DELETE FROM user_coupons c
+                   WHERE c.user_id = %s AND c.status = 'AVAILABLE' AND c.used_order_id IS NULL
+                     AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.coupon_id = c.id)""",
                 (user_id,),
             )
-            for family in await cursor.fetchall():
-                await self._revoke_family(connection, family["id"])
-        # Password and all revocations have committed together before reporting success.
+            # Ingredients cascade; other members' children retain their rows with parent_id NULL.
+            await connection.execute("DELETE FROM recipes WHERE user_id = %s", (user_id,))
         return True
 
     async def _revoke_family(self, connection, family_id):
