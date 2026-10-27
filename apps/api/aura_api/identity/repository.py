@@ -23,6 +23,10 @@ class AuthRepository(Protocol):
 
     async def profile(self, user_id: UUID) -> dict | None: ...
 
+    async def update_profile(
+        self, user_id: UUID, *, name: str | None = None, marketing: bool | None = None
+    ) -> dict | None: ...
+
     async def rotate(self, token_hash: str, issue: TokenIssuer) -> IssuedTokens | None: ...
 
     async def logout(self, user_id: UUID, jti: UUID) -> bool: ...
@@ -41,6 +45,9 @@ class UnavailableAuthRepository:
         raise AuthStorageUnavailable()
 
     async def profile(self, user_id):
+        raise AuthStorageUnavailable()
+
+    async def update_profile(self, user_id, *, name=None, marketing=None):
         raise AuthStorageUnavailable()
 
     async def rotate(self, token_hash, issue):
