@@ -87,7 +87,9 @@ e2e/
 
 BFF는 요청 출처·JSON 크기·허용 쿠키·제한시간을 처리하고, FastAPI의 `detail` 및 422 오류를 공통 오류 형식으로 변환합니다. 가격·소유권·인증·트랜잭션은 백엔드에서 검증합니다. FastAPI 업무 API는 `apps/api`에 순차적으로 구현하며 웹 개발의 기본 백엔드는 Mock입니다.
 
-카탈로그·입점 문의·레시피와 사용자 JWT 인증은 구현된 FastAPI API에 연결합니다. BFF는 요청 필드를 제한하고 응답을 공개 DTO로 검증합니다. FastAPI 오류를 Mock으로 우회하지 않습니다. 관리자 전용 JWT 로그인·등록·업무 API와 주문 중복 방지 키도 연결합니다. 초안 API는 후속 작업입니다.
+카탈로그·입점 문의·레시피·조향 초안과 사용자 JWT 인증은 구현된 FastAPI API에 연결합니다. BFF는 요청 필드를 제한하고 응답을 공개 DTO로 검증합니다. FastAPI 오류를 Mock으로 우회하지 않습니다. 관리자 전용 JWT 로그인·등록·업무 API와 주문 중복 방지 키도 연결합니다. 관리자는 `/admin/admins/new`에서 다른 관리자를 등록할 수 있습니다.
+
+`npm run check:contract`는 운영 OpenAPI로 TypeScript 타입을 생성해 공개 DTO 호환성과 경로·버전을 검사합니다. 루트 전체 검사에도 포함되며, 생성 파일은 커밋하지 않습니다. [계약 검사 안내](contracts/README.md)를 참고합니다.
 
 Mock과 FastAPI는 동일한 JWT 계약을 사용합니다. BFF는 TokenPair JSON을 `aura_access`·`aura_refresh` HttpOnly 쿠키에 보관하고 Access JWT만 Bearer로 전달합니다. 사용자 조회는 `/api/auth/me`, 갱신은 `/api/auth/refresh`입니다. 브라우저는 401에서 탭 간 Web Lock으로 갱신을 직렬화하고 한 번만 재시도합니다. 로그아웃은 백엔드의 계열 폐기 204를 확인한 뒤 쿠키를 삭제합니다. 서버 세션·`/api/session`·쿠키 인증 모드는 제거했습니다.
 

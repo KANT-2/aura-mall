@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "check:contract": "node scripts/check-api-contract.mjs",
     "dev": "concurrently -k -n api,web \"npm:mock:dev\" \"npm:dev:web\"",
     "build": "next build",
     "start": "next start",
@@ -42,6 +43,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "express": "^5.3.0",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.31",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",

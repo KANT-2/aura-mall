@@ -13,6 +13,7 @@ const menu = [
   ["/admin/products", "상품·재고"],
   ["/admin/orders", "주문 조회"],
   ["/admin/inquiries", "입점 문의"],
+  ["/admin/admins/new", "관리자 등록"],
 ] as const;
 
 /** Hiding the menu is only UX; every admin API checks the role again on the server. */

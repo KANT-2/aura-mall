@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from aura_api.api.deps import OptionalMember, Session, member_required
 from aura_api.core.errors import ErrorResponse
@@ -19,10 +19,29 @@ Member = Annotated[uuid.UUID, Depends(member_required("로그인이 필요해요
 
 
 class RecipeIn(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "required": ["name", "counts"],
+            "example": {"name": "오후의 향", "label": "paper", "counts": {"rose": 2}},
+        }
+    )
     # Name, label and counts are domain rules (AT-01~08); the raw values go to the domain.
-    name: Any = None
-    label: Any = None
-    counts: Any = None
+    name: Any = Field(default=None, json_schema_extra={"type": "string", "maxLength": 30})
+    label: Any = Field(
+        default=None,
+        json_schema_extra={
+            "type": "string",
+            "description": "classic / paper / minimal; 그 외 classic",
+        },
+    )
+    counts: Any = Field(
+        default=None,
+        json_schema_extra={
+            "type": "object",
+            "additionalProperties": {"type": "integer", "minimum": 0},
+            "description": "카탈로그 향료 ID별 방울 수, 합계 1~20",
+        },
+    )
     parent: str | None = None
 
 

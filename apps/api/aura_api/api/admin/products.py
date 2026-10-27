@@ -3,7 +3,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from aura_api.api.admin.deps import CurrentAdmin
 from aura_api.api.admin.schemas import (
@@ -23,22 +23,49 @@ ERRORS = {code: {"model": ErrorResponse} for code in (400, 401, 403, 404, 409)}
 
 
 class ProductUpdateIn(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={"required": ["version"], "example": {"version": 1, "price": 28000}}
+    )
     # Values are checked by the admin domain rules; raw values go there unchanged.
-    version: Any = None
-    name: Any = None
-    englishName: Any = None  # noqa: N815 - JSON field name from the contract
-    description: Any = None
-    price: Any = None
-    image: Any = None
-    featured: Any = None
-    isNew: Any = None  # noqa: N815
+    version: Any = Field(default=None, json_schema_extra={"type": "integer", "minimum": 1})
+    name: Any = Field(default=None, json_schema_extra={"type": "string"})
+    englishName: Any = Field(default=None, json_schema_extra={"type": "string"})  # noqa: N815
+    description: Any = Field(default=None, json_schema_extra={"type": "string"})
+    price: Any = Field(default=None, json_schema_extra={"type": ["integer", "null"], "minimum": 0})
+    image: Any = Field(
+        default=None,
+        json_schema_extra={"type": "string", "description": "상세 응답 imageOptions 중 선택"},
+    )
+    featured: Any = Field(default=None, json_schema_extra={"type": "boolean"})
+    isNew: Any = Field(default=None, json_schema_extra={"type": "boolean"})  # noqa: N815
 
 
 class StockAdjustmentIn(BaseModel):
-    version: Any = None
-    delta: Any = None
-    reason: Any = None
-    key: Any = None
+    model_config = ConfigDict(
+        json_schema_extra={
+            "required": ["version", "delta", "reason", "key"],
+            "example": {
+                "version": 1,
+                "delta": 3,
+                "reason": "정기 입고",
+                "key": "11111111-1111-4111-8111-111111111111",
+            },
+        }
+    )
+    version: Any = Field(default=None, json_schema_extra={"type": "integer", "minimum": 1})
+    delta: Any = Field(
+        default=None,
+        json_schema_extra={"type": "integer", "description": "0 제외, 변경 후 재고 0~99999"},
+    )
+    reason: Any = Field(default=None, json_schema_extra={"type": "string"})
+    key: Any = Field(
+        default=None,
+        json_schema_extra={
+            "type": "string",
+            "pattern": "^[A-Za-z0-9-]{8,64}$",
+            "description": "재전송 중복 적용 방지 키. 같은 키의 다른 조정은 409입니다.",
+        },
+    )
 
 
 @router.get("", response_model=AdminPage[AdminProductOut], responses=ERRORS)
@@ -92,7 +119,10 @@ async def update_product(
     status_code=201,
     response_model=AdminProductDetailOut,
     response_model_exclude_unset=True,
-    responses=ERRORS,
+    responses={
+        **ERRORS,
+        200: {"model": AdminProductDetailOut, "description": "같은 조정 키의 재요청"},
+    },
 )
 async def adjust_stock(
     product_id: str,

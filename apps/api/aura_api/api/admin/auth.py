@@ -4,7 +4,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from aura_api.api.admin.deps import CurrentAdmin
 from aura_api.api.auth import LoginInput
@@ -31,13 +31,26 @@ class AdminTokenOut(CamelModel):
 
 
 class AdminCreateIn(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"required": ["name", "email", "password"]})
     # Name, email and password follow the member registration rules (domain/identity.py).
-    email: Any = None
-    name: Any = None
-    password: Any = None
+    email: Any = Field(default=None, json_schema_extra={"type": "string", "maxLength": 254})
+    name: Any = Field(default=None, json_schema_extra={"type": "string", "maxLength": 100})
+    password: Any = Field(
+        default=None,
+        repr=False,
+        json_schema_extra={
+            "type": "string",
+            "format": "password",
+            "writeOnly": True,
+            "minLength": 8,
+            "maxLength": 256,
+        },
+    )
 
 
-@router.post("/auth/login", response_model=AdminTokenOut, responses=ERRORS)
+@router.post(
+    "/auth/login", response_model=AdminTokenOut, responses=ERRORS, summary="관리자 JWT 로그인"
+)
 async def login(body: LoginInput, request: Request, session: Session) -> AdminTokenOut:
     result = await service.login(
         session,
@@ -53,18 +66,26 @@ async def login(body: LoginInput, request: Request, session: Session) -> AdminTo
     )
 
 
-@router.post("/auth/logout", status_code=204, responses=ERRORS)
+@router.post("/auth/logout", status_code=204, responses=ERRORS, summary="관리자 JWT 폐기")
 async def logout(admin: CurrentAdmin, session: Session) -> Response:
     await service.logout(session, admin.id, admin.jti)
     return Response(status_code=204)
 
 
-@router.get("/session", response_model=AdminAccountOut, responses=ERRORS)
+@router.get(
+    "/session", response_model=AdminAccountOut, responses=ERRORS, summary="관리자 JWT 프로필 조회"
+)
 async def current_session(admin: CurrentAdmin) -> AdminAccountOut:
     return AdminAccountOut(id=admin.id, email=admin.email, name=admin.name)
 
 
-@router.post("/admins", status_code=201, response_model=AdminAccountOut, responses=ERRORS)
+@router.post(
+    "/admins",
+    status_code=201,
+    response_model=AdminAccountOut,
+    responses=ERRORS,
+    summary="관리자 계정 등록",
+)
 async def create_admin(
     body: AdminCreateIn, admin: CurrentAdmin, session: Session
 ) -> AdminAccountOut:

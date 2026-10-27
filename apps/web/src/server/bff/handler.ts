@@ -167,7 +167,7 @@ export function createBffHandler(
           clearTokens(headers, secure);
         }
 
-        if (adminAuthAction && adminAuthAction !== "login" && secure !== undefined) {
+        if (adminAuthAction === "logout" && secure !== undefined) {
           clearAdminToken(headers, secure);
         }
 
