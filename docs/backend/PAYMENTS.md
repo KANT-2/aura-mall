@@ -87,9 +87,49 @@ uv run --directory apps/api python -m aura_api.infra.reconcile_payments --older-
 | `AURA_PAYMENT_TIMEOUT_SECONDS` | 기본 30, 최대 60                                                      |
 | 웹                             | 테스트 클라이언트 키, 결제창 SDK, successUrl·failUrl 페이지, BFF 경로 |
 
+## 토스 테스트 결제 흐름 로컬 검증
+
+실제 토스 테스트 환경(실제 청구 없음)으로 승인까지 확인하는 최소 화면이 있습니다. 개발·검증용이며
+`/payments/test`는 색인에서 제외됩니다.
+
+| 경로                | 역할                                                                        |
+| ------------------- | --------------------------------------------------------------------------- |
+| `/payments/test`    | 로그인한 회원이 테스트 주문을 만들고 결제를 발급해 토스 결제위젯으로 결제   |
+| `/payments/success` | 토스가 돌려보낸 `paymentKey`·`orderId`·`amount`를 서버 승인 API로 전달·표시 |
+| `/payments/fail`    | 토스가 돌려보낸 오류 코드·메시지 표시. 결제 완료로 기록하지 않음            |
+
+BFF는 `POST /api/payments`, `POST /api/payments/confirm`, `GET /api/payments/{id}`를 FastAPI로 전달하며
+본문은 허용한 필드만 보냅니다. 결제위젯 SDK는 `https://js.tosspayments.com/v2/standard`입니다.
+
+로컬 실행에 필요한 설정(값은 저장소·로그·커밋에 넣지 않습니다):
+
+- FastAPI: `AURA_PAYMENT_PROVIDER=toss`, `AURA_TOSS_SECRET_KEY`(테스트 시크릿 키), DB·JWT 설정,
+  `AURA_BFF_SHARED_KEY`, `AURA_CSRF_ALLOWED_ORIGINS`
+- Next: `NEXT_PUBLIC_TOSS_CLIENT_KEY`(테스트 클라이언트 키, `.env.local`), `API_URL`, `API_PREFIX=/api/v1`,
+  `API_AUTH_MODE=jwt`, `API_BFF_SHARED_KEY`(FastAPI와 같은 값), `APP_ORIGIN`
+- `API_BFF_SHARED_KEY`가 없으면 FastAPI가 BFF 요청을 403으로 거절합니다.
+- 결제위젯 테스트 환경은 결제수단 선택 후 휴대폰 번호와 테스트 비밀번호(위젯 화면에 표시)를 안내합니다.
+
+2026-10-27 일회용 DB와 로컬 서버로 실제 토스 테스트 API를 호출해 확인한 결과입니다.
+
+| 확인 항목                        | 결과                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------- |
+| 위젯 결제 → 성공 URL → 서버 승인 | 결제 `DONE`(계좌이체, 31,000원), 주문 `paid`, 상태 이력 `system` 기록     |
+| 같은 확인 요청 재전송            | 200 `DONE`, 두 번째 승인 없음                                             |
+| 금액 100원·31,001원으로 확인     | 400 `PAYMENT_AMOUNT_MISMATCH`                                             |
+| 결제 완료 주문에 다른 paymentKey | 409 `ORDER_ALREADY_PAID`                                                  |
+| 미결제 주문에 변조 금액          | 400, PG 호출 없음                                                         |
+| 위조 paymentKey + 올바른 금액    | 토스가 거절(`NOT_FOUND_PAYMENT_SESSION`) → 결제 `FAILED`, 주문 `received` |
+| 존재하지 않는 결제 조회·승인     | `NOT_FOUND_PAYMENT`·`NOT_FOUND_PAYMENT_SESSION`으로 매핑                  |
+| 잘못된 시크릿 키                 | 401 `UNAUTHORIZED_KEY`(결제 실패가 아닌 인증 오류)                        |
+| 승인된 결제의 토스 조회          | 상태·금액·주문번호·paymentKey가 우리 기록과 일치                          |
+
+이 결과는 토스 **테스트** 환경 검증입니다. 운영 키·실결제는 검증하지 않았습니다. 타임아웃·승인 후 DB
+오류 복구와 동시 승인은 PG를 흉내 낸 테스트(Fake PG)로만 검증했고, 실제 토스에서는 재현하지 않았습니다.
+
 ## 남은 결제 개발
 
-1. BFF 경로(`/api/payments*`)와 결제창·성공/실패 페이지
+1. ~~BFF 경로와 결제창·성공/실패 페이지~~ (최소 테스트 화면 구현. 상품·주문 화면과 연결하는 정식 결제 화면은 남음)
 2. ~~주문 취소와 미결제 주문 자동 취소, 재고·쿠폰 복구~~ (0008에서 구현, 만료 시간 정책과 스케줄 등록은 남음)
 3. 결제 취소·환불 API(토스 `POST /v1/payments/{paymentKey}/cancel`, 멱등키 사용)와 `review_reason` 건 처리
 4. 재확인 작업 스케줄 등록과 관리자 화면의 결제 정보·검토 대상 표시
