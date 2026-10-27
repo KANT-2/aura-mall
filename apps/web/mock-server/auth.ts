@@ -38,6 +38,18 @@ export function issueTokens(
   };
 }
 
+/** Mock-only administrator Access JWT: no customer token family or Refresh is issued. */
+export function issueAdminToken(database: MockDatabase, userId: string) {
+  const now = Math.floor(Date.now() / 1000),
+    familyId = randomUUID();
+  database.state.tokenFamilies[familyId] = { userId, revoked: false, principal: "admin" };
+  const input = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ sub: userId, fid: familyId, jti: randomUUID(), iat: now, exp: now + 3600, iss: "aura-mock", aud: "aura-api", principal_type: "admin", permissions: ["admin"] })}`;
+  const accessToken = `${input}.${createHmac("sha256", signingKey).update(input).digest("base64url")}`;
+  database.persist();
+  const { id, name, email } = database.state.accounts[userId];
+  return { accessToken, tokenType: "Bearer", expiresIn: 3600, admin: { id, name, email } };
+}
+
 function claimsFor(request: Request, database: MockDatabase) {
   const authorization = request.get("Authorization");
   if (!authorization) {
@@ -67,12 +79,13 @@ function claimsFor(request: Request, database: MockDatabase) {
       !family ||
       family.revoked ||
       family.userId !== claims.sub ||
+      (family.principal ?? "member") !== (claims.principal_type ?? "member") ||
       !database.state.accounts[claims.sub]
     ) {
       throw new Error();
     }
 
-    return claims as { sub: string; fid: string };
+    return claims as { sub: string; fid: string; principal_type?: string };
   } catch {
     throw new HttpError(401, "다시 로그인해 주세요.");
   }
@@ -80,6 +93,10 @@ function claimsFor(request: Request, database: MockDatabase) {
 
 export function resolveIdentity(request: Request, _response: Response, database: MockDatabase) {
   const claims = claimsFor(request, database);
+  if (claims?.principal_type === "admin") {
+    throw new HttpError(401, "회원 로그인이 필요해요.");
+  }
+
   const value = request.get("X-Guest-ID");
   const guestId = value && /^[0-9a-f-]{36}$/i.test(value) ? value : randomUUID();
   const identity = { guestId, userId: claims?.sub };
@@ -129,15 +146,20 @@ export function revokeTokens(request: Request, database: MockDatabase) {
 }
 
 /** Roles are read from the stored account on every request. */
-export function requireAdmin(request: Request, response: Response, database: MockDatabase) {
-  const { user } = resolveIdentity(request, response, database);
-  if (!user) {
-    throw new HttpError(401, "로그인이 필요해요.");
+export function requireAdmin(request: Request, _response: Response, database: MockDatabase) {
+  const claims = claimsFor(request, database);
+  if (!claims) {
+    throw new HttpError(401, "관리자 로그인이 필요해요.");
   }
 
-  if (database.state.accounts[user.id].role !== "admin") {
+  if (claims.principal_type !== "admin") {
     throw new HttpError(403, "관리자 권한이 필요해요.");
   }
 
-  return user;
+  const account = database.state.accounts[claims.sub];
+  if (account.role !== "admin") {
+    throw new HttpError(401, "관리자 로그인이 필요해요.");
+  }
+
+  return publicMember(account);
 }

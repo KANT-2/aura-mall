@@ -3,8 +3,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { useNotify } from "@/components/feedback/notification-provider";
-import { useAuth } from "@/features/account/hooks/use-auth";
-import { useAccount } from "@/features/account/hooks/use-account";
+import { useAdminAuth, useAdminAccount } from "@/features/admin/hooks/use-admin-auth";
+import { AdminError } from "@/features/admin/components/admin-feedback";
 import styles from "@/features/admin/components/admin.module.css";
 import { testIds } from "@/lib/test-ids";
 
@@ -17,16 +17,35 @@ const menu = [
 
 /** Hiding the menu is only UX; every admin API checks the role again on the server. */
 export function AdminShell({ children }: { children: ReactNode }) {
-  const { user, ready } = useAccount();
-  const { signOut, pending } = useAuth();
+  const account = useAdminAccount();
+  const user = account.data?.admin;
+  const ready = account.isSuccess;
+  const { signOut, pending } = useAdminAuth();
   const path = usePathname();
   const router = useRouter();
   const notify = useNotify();
   const [seenAdmin, setSeenAdmin] = useState(false);
   const [leaving, setLeaving] = useState(false);
-  const admin = user?.role === "admin";
+  const admin = !!user;
   if (admin && !seenAdmin) {
     setSeenAdmin(true);
+  }
+
+  if (path === "/admin/login") {
+    return children;
+  }
+
+  if (account.error) {
+    return (
+      <main className={styles.gate}>
+        <AdminError
+          error={account.error}
+          retry={() => {
+            void account.refetch();
+          }}
+        />
+      </main>
+    );
   }
 
   if (!ready || leaving) {
@@ -42,30 +61,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return (
       <main className={styles.gate} data-testid={testIds.admin.gate}>
         <span className="eyebrow">AURA ADMIN</span>
-        <h1>
-          {expired
-            ? "세션이 만료되었어요."
-            : user
-              ? "관리자 권한이 없어요."
-              : "관리자 로그인이 필요해요."}
-        </h1>
+        <h1>{expired ? "로그인이 만료되었어요." : "관리자 로그인이 필요해요."}</h1>
         <p>
           {expired
-            ? "안전을 위해 다시 로그인한 뒤 작업을 이어가 주세요. 저장하지 않은 변경은 반영되지 않았어요."
-            : user
-              ? "이 계정으로는 관리자 페이지를 이용할 수 없어요. 권한이 필요하면 운영 책임자에게 문의해 주세요."
-              : "관리자 계정으로 로그인하면 상품·주문·입점 문의를 관리할 수 있어요."}
+            ? "다시 로그인한 뒤 작업을 이어가 주세요. 저장하지 않은 변경은 반영되지 않았어요."
+            : "관리자 계정으로 로그인하면 상품·주문·입점 문의를 관리할 수 있어요."}
         </p>
         <div className="actions">
-          {user ? (
-            <Link className="button" href="/">
-              쇼핑몰로 이동
-            </Link>
-          ) : (
-            <Link className="button" href={`/login?next=${encodeURIComponent(path)}`}>
-              로그인
-            </Link>
-          )}
+          <Link className="button" href={`/admin/login?next=${encodeURIComponent(path)}`}>
+            로그인
+          </Link>
         </div>
       </main>
     );

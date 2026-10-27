@@ -17,6 +17,7 @@ export type Order = {
   recipient: string;
   address: string;
   created: string;
+  idempotencyKey?: string;
 };
 export type Inquiry = {
   id: string;
@@ -36,7 +37,7 @@ export type Inquiry = {
 export type AuditRecord = AdminHistoryEntry & { actorId: string; target: string };
 export type Database = {
   accounts: Record<string, Account>;
-  tokenFamilies: Record<string, { userId: string; revoked: boolean }>;
+  tokenFamilies: Record<string, { userId: string; revoked: boolean; principal?: "admin" }>;
   refreshTokens: Record<string, { familyId: string; consumed: boolean; expires: number }>;
   recipes: Record<string, Recipe[]>;
   drafts: Record<string, AtelierDraft>;

@@ -1,14 +1,14 @@
 import { ApiError } from "@/lib/api/errors";
 
 let refreshing: Promise<boolean> | undefined;
-async function withAuthLock<T>(operation: () => Promise<T>): Promise<T> {
+async function withAuthLock<T>(operation: () => Promise<T>, name = "aura-jwt-auth"): Promise<T> {
   const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
   if (!locks) {
     return operation();
   }
 
   let result!: T;
-  await locks.request("aura-jwt-auth", async () => {
+  await locks.request(name, async () => {
     result = await operation();
   });
   return result;
@@ -59,11 +59,19 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
       ...options,
       headers,
     });
+  const admin = path.startsWith("/admin/");
+  const adminMutation = ["/admin/auth/login", "/admin/auth/logout"].includes(path);
   const authMutation = ["/auth/login", "/auth/register", "/auth/logout"].includes(path);
-  const send = () => (authMutation ? withAuthLock(sendRequest) : sendRequest());
+  const send = () =>
+    adminMutation
+      ? withAuthLock(sendRequest, "aura-admin-jwt-auth")
+      : authMutation
+        ? withAuthLock(sendRequest)
+        : sendRequest();
   let response = await send();
   if (
     response.status === 401 &&
+    !admin &&
     !["/auth/login", "/auth/register", "/auth/refresh"].includes(path)
   ) {
     const renewed = await refreshAccess();

@@ -93,3 +93,17 @@ it("propagates refresh outages without retrying protected writes", async () => {
   });
   expect(fetcher.mock.calls.filter(([url]) => url === "/api/orders")).toHaveLength(1);
 });
+
+it("never refreshes customer tokens or retries administrator requests", async () => {
+  for (const path of [
+    "/admin/products",
+    "/admin/auth/login",
+    "/admin/auth/logout",
+    "/admin/auth/me",
+  ]) {
+    const fetcher = vi.fn(async () => json({}, 401));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(request(path)).rejects.toMatchObject({ status: 401 });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  }
+});

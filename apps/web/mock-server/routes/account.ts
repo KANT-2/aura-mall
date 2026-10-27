@@ -26,7 +26,11 @@ export function accountRoutes(database: MockDatabase) {
       throw new HttpError(400, "회원 정보를 확인해 주세요.");
     }
 
-    if (Object.values(database.state.accounts).some((account) => account.email === email)) {
+    if (
+      Object.values(database.state.accounts).some(
+        (account) => account.role !== "admin" && account.email === email,
+      )
+    ) {
       throw new HttpError(409, "이미 가입된 이메일입니다.");
     }
 
@@ -54,7 +58,9 @@ export function accountRoutes(database: MockDatabase) {
       throw new HttpError(400, "비밀번호를 입력해 주세요.");
     }
 
-    const account = Object.values(database.state.accounts).find((item) => item.email === email);
+    const account = Object.values(database.state.accounts).find(
+      (item) => item.role !== "admin" && item.email === email,
+    );
     if (
       !account ||
       !timingSafeEqual(

@@ -50,6 +50,7 @@ services:
       API_PREFIX: /api/v1
       API_ACCESS_COOKIE: aura_access
       API_REFRESH_COOKIE: aura_refresh
+      API_ADMIN_ACCESS_COOKIE: aura_admin_access
       API_BFF_SHARED_KEY: ${AURA_BFF_SHARED_KEY:?Set AURA_BFF_SHARED_KEY in .env}
       APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN in .env}
     ports:

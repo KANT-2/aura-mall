@@ -1,6 +1,9 @@
 import type { Product } from "@/features/catalog/model/catalog";
 
 /** Admin DTOs are separate from consumer DTOs; never reuse them in public catalog or account APIs. */
+export type AdminAccount = { id: string; name: string; email: string };
+export type AdminAccountState = { admin: AdminAccount | null };
+
 export const ADMIN_PAGE_SIZE = 20;
 export const LOW_STOCK = 5;
 export const MAX_STOCK = 99_999;

@@ -58,9 +58,9 @@ function client() {
 
 async function adminClient() {
   const api = client();
-  const login = await api("/api/auth/login", "POST", admin);
+  const login = await api("/api/admin/auth/login", "POST", admin);
   expect(login.body.accessToken).toBeTruthy();
-  expect((await api("/api/auth/me")).body.role).toBe("admin");
+  expect((await api("/api/admin/session")).body.email).toBe(admin.email);
   return api;
 }
 const inquiry = {
@@ -116,14 +116,14 @@ describe("Mock admin API authorization", () => {
   it("rejects access after logout and after the role is revoked", async () => {
     const api = await adminClient();
     expect((await api("/api/admin/overview")).status).toBe(200);
-    await api("/api/auth/logout", "POST");
+    await api("/api/admin/auth/logout", "POST");
     expect((await api("/api/admin/overview")).status).toBe(401);
 
     const revoked = await adminClient();
     const account = Object.values(database.state.accounts).find((a) => a.email === admin.email)!;
     account.role = "member";
     try {
-      expect((await revoked("/api/admin/products")).status).toBe(403);
+      expect((await revoked("/api/admin/products")).status).toBe(401);
     } finally {
       account.role = "admin";
     }
