@@ -174,16 +174,15 @@ def test_only_the_owner_can_cancel(client):
     assert stock() == before and order_status(uuid.UUID(placed["id"])) == "received"
 
 
-def test_paid_orders_are_not_cancelled_here(client, pg):
+def test_paid_orders_are_refunded_not_cancelled_like_unpaid_ones(client, pg):
     member = new_customer()
     placed = order(client, member)
     payment = start(client, member, placed["id"]).json()
     assert confirm(client, member, payment).json()["status"] == "DONE"
-    before = stock()
     response = cancel(client, member, placed["id"])
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "ORDER_NOT_CANCELLABLE"
-    assert stock() == before and order_status(uuid.UUID(placed["id"])) == "paid"
+    # The PG refund comes first (see test_refunds.py); only then is the order cancelled.
+    assert response.status_code == 200 and response.json()["status"] == "cancelled"
+    assert pg.refund_count == 1 and order_status(uuid.UUID(placed["id"])) == "cancelled"
 
 
 def test_cancel_closes_an_unused_payment_attempt(client, pg):
@@ -229,7 +228,11 @@ def test_cancel_racing_payment_confirmation_keeps_one_outcome(client, pg, round_
         tasks.append(pool.submit(cancel, client, member, placed["id"]))
         paid, cancelled = (task.result(timeout=30) for task in tasks)
     final = order_status(order_id)
-    if final == "paid":
+    if final == "cancelled" and pg.approvals == 1:
+        # The payment finished before the cancel looked: the paid order was refunded in full.
+        assert paid.json()["status"] == "DONE" and cancelled.status_code == 200
+        assert pg.refund_count == 1
+    elif final == "paid":
         assert paid.json()["status"] == "DONE" and cancelled.status_code == 409
         assert pg.approvals == 1
         assert {key: before[key] - stock()[key] for key in TAKEN} == {key: 0 for key in TAKEN}

@@ -32,6 +32,16 @@ class GatewayResult:
     canceled: bool = False  # approved earlier, then canceled at the PG
 
 
+@dataclass(frozen=True)
+class RefundResult:
+    outcome: Literal["refunded", "failed", "pending"]
+    transaction_key: str | None = None
+    amount: int | None = None  # what the PG says was returned in total
+    refunded_at: datetime | None = None
+    code: str | None = None
+    message: str | None = None
+
+
 class GatewayUnavailable(Exception):
     """No definite answer (timeout, network, PG 5xx, request still processing). Retry later."""
 
@@ -44,6 +54,10 @@ class PaymentGateway(Protocol):
     ) -> GatewayResult: ...
 
     async def lookup(self, *, payment_key: str) -> GatewayResult: ...
+
+    async def cancel(
+        self, *, payment_key: str, amount: int, reason: str, idempotency_key: str
+    ) -> RefundResult: ...
 
 
 # Toss error codes that do not prove the payment failed: retry with the same idempotency key.
@@ -94,6 +108,44 @@ def toss_payment(data: dict) -> GatewayResult:
             canceled=status in TOSS_CANCELED,
             **common,
         )
+    raise GatewayUnavailable("Unexpected Toss payment status")
+
+
+def _time(value: object) -> datetime | None:
+    try:
+        return datetime.fromisoformat(value) if isinstance(value, str) else None
+    except ValueError:
+        return None
+
+
+def toss_cancellation(data: dict, amount: int) -> RefundResult:
+    """Map a Toss Payment object returned by a cancel request to a result.
+
+    A full refund counts only when the PG says CANCELED and the finished cancellations add up to
+    exactly the amount we asked for. Anything else that is not plainly unfinished needs a person.
+    """
+    status = data.get("status")
+    cancels = data.get("cancels") if isinstance(data.get("cancels"), list) else []
+    done = [
+        item
+        for item in cancels
+        if isinstance(item, dict) and item.get("cancelStatus", "DONE") == "DONE"
+    ]
+    total = sum(item["cancelAmount"] for item in done if type(item.get("cancelAmount")) is int)
+    if status == "CANCELED" and total == amount:
+        last = done[-1]
+        return RefundResult(
+            "refunded",
+            transaction_key=_text(last.get("transactionKey"), 64),
+            amount=total,
+            refunded_at=_time(last.get("canceledAt")),
+        )
+    if status in ("CANCELED", "PARTIAL_CANCELED"):
+        return RefundResult(
+            "pending", amount=total, code="REFUND_AMOUNT_MISMATCH", message=f"PG status {status}"
+        )
+    if status in TOSS_PENDING or status == "DONE":
+        return RefundResult("pending", amount=total)
     raise GatewayUnavailable("Unexpected Toss payment status")
 
 
@@ -163,3 +215,28 @@ class TossPaymentsGateway:
         if status == 200:
             return toss_payment(data)
         return self._error(status, data)
+
+    async def cancel(
+        self, *, payment_key: str, amount: int, reason: str, idempotency_key: str
+    ) -> RefundResult:
+        """Cancel (refund) the whole payment. The idempotency key makes a resend safe."""
+        status, data = await self._call(
+            "POST",
+            "/v1/payments/" + quote(payment_key, safe="") + "/cancel",
+            {"cancelReason": reason},  # no cancelAmount: the PG cancels the full balance
+            idempotency_key,
+        )
+        if status == 200:
+            return toss_cancellation(data, amount)
+        if data.get("code") == "ALREADY_CANCELED_PAYMENT":
+            # An earlier request refunded it (the answer was lost): read what the PG recorded.
+            lookup_status, found = await self._call(
+                "GET", "/v1/payments/" + quote(payment_key, safe="")
+            )
+            if lookup_status == 200:
+                return toss_cancellation(found, amount)
+            raise GatewayUnavailable("Toss Payments result is not final")
+        code = _text(data.get("code"), 100)
+        if status >= 500 or code in TOSS_RETRY_CODES or code is None:
+            raise GatewayUnavailable("Toss Payments result is not final")
+        return RefundResult("failed", code=code, message=_text(data.get("message"), MESSAGE_MAX))
