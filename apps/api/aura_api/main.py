@@ -16,6 +16,7 @@ from aura_api.identity.postgres import PostgresAuthRepository
 from aura_api.identity.repository import UnavailableAuthRepository
 from aura_api.identity.service import AuthLifecycleService
 from aura_api.infra.database import create_engine, create_sessionmaker
+from aura_api.openapi import DESCRIPTION, ERROR_RESPONSES, TAGS, configure_openapi
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -40,7 +41,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await engine.dispose()
 
     app = FastAPI(
-        title=settings.app_name, version="0.1.0", redirect_slashes=False, lifespan=lifespan
+        title=settings.app_name,
+        version="0.1.0",
+        redirect_slashes=False,
+        lifespan=lifespan,
+        description=DESCRIPTION,
+        openapi_tags=TAGS,
+        responses=ERROR_RESPONSES,
+        swagger_ui_parameters={
+            "persistAuthorization": False,
+            "displayRequestDuration": True,
+            "defaultModelsExpandDepth": 0,
+        },
     )
     app.state.sessionmaker = create_sessionmaker(engine) if engine is not None else None
     app.state.jwt_verifier = JWTVerifier(settings)
@@ -63,6 +75,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_domain_errors(app)
     app.include_router(health_router, include_in_schema=False)
     app.include_router(api_router, prefix=settings.api_prefix)
+    configure_openapi(app, settings.api_prefix)
     return app
 
 

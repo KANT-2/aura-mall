@@ -45,14 +45,15 @@ FastAPI는 `http://127.0.0.1:8000`에서 실행되며 `/health`, `/api/v1/health
 
 ## 검증과 빌드
 
-| 명령                 | 범위                                |
-| -------------------- | ----------------------------------- |
-| `npm run check:web`  | 웹 ESLint·CSS·TypeScript·Vitest     |
-| `npm run check:api`  | Python Ruff 린트·포맷·pytest        |
-| `npm run check`      | 공통 문서·코드 포맷과 두 앱 검사    |
-| `npm run build`      | Next.js 프로덕션 빌드               |
-| `npm run start:mock` | 프로덕션 웹과 Mock 동시 실행        |
-| `npm run format`     | 공통 Prettier·Python Ruff 포맷 적용 |
+| 명령                     | 범위                                           |
+| ------------------------ | ---------------------------------------------- |
+| `npm run check:web`      | 웹 ESLint·CSS·TypeScript·Vitest                |
+| `npm run check:api`      | Python Ruff 린트·포맷·pytest                   |
+| `npm run check:contract` | OpenAPI 타입 생성·공개 DTO·경로·버전 계약 검사 |
+| `npm run check`          | 공통 포맷·두 앱 검사·OpenAPI 계약 검사         |
+| `npm run build`          | Next.js 프로덕션 빌드                          |
+| `npm run start:mock`     | 프로덕션 웹과 Mock 동시 실행                   |
+| `npm run format`         | 공통 Prettier·Python Ruff 포맷 적용            |
 
 전체 검증과 공통 포맷 적용에는 Node·Python·uv가 모두 필요합니다. 웹 빌드는 Google Fonts에 접근할 수 있어야 합니다. 브라우저 검증 명령은 [웹 검증 안내](apps/web/README.md#검증)를 참고하세요.
 

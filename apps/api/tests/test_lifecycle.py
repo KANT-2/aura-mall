@@ -53,6 +53,27 @@ class MemoryRepository:
     async def find_user(self, email):
         return self.users.get(email)
 
+    async def find_user_by_id(self, user_id):
+        return next((user for user in self.users.values() if user.id == user_id), None)
+
+    async def change_password(self, user_id, *, expected_password_hash, new_password_hash):
+        with self.lock:
+            for email, user in self.users.items():
+                if user.id != user_id:
+                    continue
+                if not user.is_active:
+                    return None
+                if user.password_hash != expected_password_hash:
+                    return False
+                self.users[email] = replace(user, password_hash=new_password_hash)
+                families = {
+                    row["family"] for row in self.refreshes.values() if row["user"] == user_id
+                }
+                for family in families:
+                    self.revoke(family)
+                return True
+        return None
+
     async def register(self, registration, password_hash, pair):
         with self.lock:
             if registration.email in self.users:
@@ -90,9 +111,14 @@ class MemoryRepository:
             "access_expires_at": pair.access_expires_at,
         }
 
-    async def create_token_family(self, pair):
+    async def create_token_family(self, pair, *, expected_password_hash):
         with self.lock:
-            if not self.active(pair.user_id):
+            if not any(
+                user.id == pair.user_id
+                and user.is_active
+                and user.password_hash == expected_password_hash
+                for user in self.users.values()
+            ):
                 return False
             self.families[pair.family_id] = False
             self.save(pair)

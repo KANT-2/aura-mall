@@ -123,6 +123,37 @@ test("admin edits a product, adjusts stock, processes an inquiry and views an or
   expect((await page.request.get("/api/admin/overview")).status()).toBe(401);
 });
 
+test("an admin registers another operator while keeping the active identity", async ({ page }) => {
+  await page.goto("/admin/login");
+  await page.getByLabel("이메일", { exact: true }).fill("admin@aura.local");
+  await page.getByLabel("비밀번호", { exact: true }).fill("aura-admin-local");
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page.getByTestId(testIds.admin.shell)).toBeVisible();
+  const before = await (await page.request.get("/api/admin/auth/me")).json();
+  await page.getByRole("link", { name: "관리자 등록", exact: true }).click();
+  const email = `operator-${randomUUID()}@example.com`;
+  await page.getByLabel("이름", { exact: true }).fill("새 운영자");
+  await page.getByLabel("이메일", { exact: true }).fill(email);
+  await page.getByLabel("초기 비밀번호", { exact: true }).fill("new-operator-password");
+  await page.getByRole("button", { name: "관리자 등록", exact: true }).click();
+  await expect(page.locator("form").getByRole("status")).toContainText(
+    "새 운영자 관리자 계정을 등록했어요",
+  );
+  await expect(page.getByLabel("초기 비밀번호", { exact: true })).toHaveValue("");
+  expect(await (await page.request.get("/api/admin/auth/me")).json()).toEqual(before);
+  await page.getByLabel("이름", { exact: true }).fill("중복 운영자");
+  await page.getByLabel("이메일", { exact: true }).fill(email);
+  await page.getByLabel("초기 비밀번호", { exact: true }).fill("new-operator-password");
+  await page.getByRole("button", { name: "관리자 등록", exact: true }).click();
+  await expect(page.locator("form").getByRole("alert")).toBeVisible();
+  await page.getByTestId(testIds.admin.logout).click();
+  await page.goto("/admin/login");
+  await page.getByLabel("이메일", { exact: true }).fill(email);
+  await page.getByLabel("비밀번호", { exact: true }).fill("new-operator-password");
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page.getByTestId(testIds.admin.shell)).toContainText("새 운영자");
+});
+
 test("admin sign-in/out leaves the customer's JWT identity intact", async ({ page }) => {
   await seedMember(page, "member");
   const before = await (await page.request.get("/api/auth/me")).json();

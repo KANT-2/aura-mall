@@ -15,11 +15,25 @@ class AuthStorageUnavailable(RuntimeError):
 class AuthRepository(Protocol):
     async def find_user(self, email: str) -> UserRecord | None: ...
 
-    async def create_token_family(self, tokens: IssuedTokens) -> bool: ...
+    async def find_user_by_id(self, user_id: UUID) -> UserRecord | None: ...
+
+    async def create_token_family(
+        self, tokens: IssuedTokens, *, expected_password_hash: str
+    ) -> bool: ...
+
+    async def change_password(
+        self, user_id: UUID, *, expected_password_hash: str, new_password_hash: str
+    ) -> bool | None:
+        """True after commit; False for a stale hash; None for missing/inactive users."""
+        ...
 
     async def register(
         self, registration: Registration, password_hash: str, tokens: IssuedTokens
     ) -> bool: ...
+
+    async def deactivate(self, user_id: UUID, *, expected_password_hash: str) -> bool | None:
+        """True after commit; False for a stale hash; None for missing/inactive users."""
+        ...
 
     async def profile(self, user_id: UUID) -> dict | None: ...
 
@@ -38,10 +52,19 @@ class UnavailableAuthRepository:
     async def find_user(self, email):
         raise AuthStorageUnavailable()
 
-    async def create_token_family(self, tokens):
+    async def find_user_by_id(self, user_id):
+        raise AuthStorageUnavailable()
+
+    async def create_token_family(self, tokens, *, expected_password_hash):
+        raise AuthStorageUnavailable()
+
+    async def change_password(self, user_id, *, expected_password_hash, new_password_hash):
         raise AuthStorageUnavailable()
 
     async def register(self, registration, password_hash, tokens):
+        raise AuthStorageUnavailable()
+
+    async def deactivate(self, user_id, *, expected_password_hash):
         raise AuthStorageUnavailable()
 
     async def profile(self, user_id):

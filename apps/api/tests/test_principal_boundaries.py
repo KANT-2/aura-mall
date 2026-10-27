@@ -56,6 +56,9 @@ def boundary(monkeypatch):
         }
     )
     repository.update_profile = AsyncMock()
+    repository.find_user_by_id = AsyncMock()
+    repository.change_password = AsyncMock()
+    repository.deactivate = AsyncMock()
     session = SimpleNamespace(rollback=AsyncMock())
 
     async def test_session():
@@ -198,3 +201,42 @@ def test_admin_principal_cannot_patch_member_profile_with_shared_uuid(boundary, 
     assert response.status_code == 401
     boundary.repository.update_profile.assert_not_awaited()
     boundary.repository.profile.assert_not_awaited()
+
+
+@pytest.mark.parametrize("missing_marker", [None, "principal_type", "permissions"])
+def test_admin_cannot_change_member_password_with_shared_uuid(boundary, missing_marker):
+    token = boundary.operator.access_token
+    if missing_marker is not None:
+        claims = jwt.decode(
+            token, KEY, algorithms=["HS256"], issuer="cra22-test", audience="cra22-api"
+        )
+        del claims[missing_marker]
+        token = jwt.encode(claims, KEY, algorithm="HS256")
+    response = boundary.client.post(
+        "/api/v1/auth/change-password",
+        json={"currentPassword": "old-password", "newPassword": "new-password"},
+        headers={**bearer(token), "Origin": "https://cra31.test"},
+    )
+    assert response.status_code == 401
+    boundary.repository.find_user_by_id.assert_not_awaited()
+    boundary.repository.change_password.assert_not_awaited()
+
+
+@pytest.mark.parametrize("missing_marker", [None, "principal_type", "permissions"])
+def test_admin_cannot_deactivate_member_with_shared_uuid(boundary, missing_marker):
+    token = boundary.operator.access_token
+    if missing_marker is not None:
+        claims = jwt.decode(
+            token, KEY, algorithms=["HS256"], issuer="cra22-test", audience="cra22-api"
+        )
+        del claims[missing_marker]
+        token = jwt.encode(claims, KEY, algorithm="HS256")
+    response = boundary.client.request(
+        "DELETE",
+        "/api/v1/auth/me",
+        json={"currentPassword": "old-password"},
+        headers={**bearer(token), "Origin": "https://cra31.test"},
+    )
+    assert response.status_code == 401
+    boundary.repository.find_user_by_id.assert_not_awaited()
+    boundary.repository.deactivate.assert_not_awaited()

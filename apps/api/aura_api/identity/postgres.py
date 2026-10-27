@@ -52,6 +52,14 @@ class PostgresAuthRepository:
             row = await cursor.fetchone()
         return UserRecord(row["id"], row["password_hash"], row["is_active"]) if row else None
 
+    async def find_user_by_id(self, user_id: UUID) -> UserRecord | None:
+        async with self._connection() as connection:
+            cursor = await connection.execute(
+                "SELECT id, password_hash, is_active FROM users WHERE id = %s", (user_id,)
+            )
+            row = await cursor.fetchone()
+        return UserRecord(row["id"], row["password_hash"], row["is_active"]) if row else None
+
     async def _active_user(self, connection, user_id):
         cursor = await connection.execute(
             "SELECT is_active FROM users WHERE id = %s FOR SHARE", (user_id,)
@@ -136,10 +144,16 @@ class PostgresAuthRepository:
                 result = await self._profile(connection, user_id)
         return result
 
-    async def create_token_family(self, tokens: IssuedTokens) -> bool:
+    async def create_token_family(
+        self, tokens: IssuedTokens, *, expected_password_hash: str
+    ) -> bool:
         accepted = False
         async with self._connection() as connection:
-            if await self._active_user(connection, tokens.user_id):
+            cursor = await connection.execute(
+                "SELECT id FROM users WHERE id = %s AND is_active AND password_hash = %s FOR SHARE",
+                (tokens.user_id, expected_password_hash),
+            )
+            if await cursor.fetchone() is not None:
                 await connection.execute(
                     """INSERT INTO auth_token_families (id, user_id, created_at)
                        VALUES (%s, %s, %s)""",
@@ -148,6 +162,59 @@ class PostgresAuthRepository:
                 await self._insert_tokens(connection, tokens)
                 accepted = True
         return accepted
+
+    async def change_password(
+        self, user_id: UUID, *, expected_password_hash: str, new_password_hash: str
+    ) -> bool | None:
+        async with self._connection() as connection:
+            # Serialize against login/refresh before locking any family or token row.
+            cursor = await connection.execute(
+                "SELECT password_hash, is_active FROM users WHERE id = %s FOR UPDATE", (user_id,)
+            )
+            user = await cursor.fetchone()
+            if user is None or user["is_active"] is not True:
+                return None
+            if user["password_hash"] != expected_password_hash:
+                return False
+            await connection.execute(
+                "UPDATE users SET password_hash = %s WHERE id = %s", (new_password_hash, user_id)
+            )
+            await self._revoke_user_families(connection, user_id)
+        # Password and all revocations have committed together before reporting success.
+        return True
+
+    async def _revoke_user_families(self, connection, user_id):
+        # Caller holds the user row lock; keep the common user -> family -> token order.
+        cursor = await connection.execute(
+            "SELECT id FROM auth_token_families WHERE user_id = %s ORDER BY id FOR UPDATE",
+            (user_id,),
+        )
+        for family in await cursor.fetchall():
+            await self._revoke_family(connection, family["id"])
+
+    async def deactivate(self, user_id: UUID, *, expected_password_hash: str) -> bool | None:
+        async with self._connection() as connection:
+            cursor = await connection.execute(
+                "SELECT password_hash, is_active FROM users WHERE id = %s FOR UPDATE", (user_id,)
+            )
+            user = await cursor.fetchone()
+            if user is None or user["is_active"] is not True:
+                return None
+            if user["password_hash"] != expected_password_hash:
+                return False
+            await connection.execute(
+                "UPDATE users SET is_active = false, marketing = false WHERE id = %s", (user_id,)
+            )
+            await self._revoke_user_families(connection, user_id)
+            await connection.execute(
+                """DELETE FROM user_coupons c
+                   WHERE c.user_id = %s AND c.status = 'AVAILABLE' AND c.used_order_id IS NULL
+                     AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.coupon_id = c.id)""",
+                (user_id,),
+            )
+            # Ingredients cascade; other members' children retain their rows with parent_id NULL.
+            await connection.execute("DELETE FROM recipes WHERE user_id = %s", (user_id,))
+        return True
 
     async def _revoke_family(self, connection, family_id):
         await connection.execute(

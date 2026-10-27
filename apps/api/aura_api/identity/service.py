@@ -8,7 +8,7 @@ from argon2.exceptions import InvalidHashError, VerificationError
 
 from aura_api.config import Settings
 from aura_api.domain.errors import Conflict, InvalidInput
-from aura_api.domain.identity import Registration, validate_name
+from aura_api.domain.identity import PASSWORD_MAX, PASSWORD_MIN, Registration, validate_name
 from aura_api.identity.repository import AuthRepository, AuthStorageUnavailable
 from aura_api.identity.tokens import IssuedTokens, hash_refresh_token, issue_tokens
 
@@ -49,8 +49,10 @@ class AuthLifecycleService:
         if not valid or user is None or user.is_active is not True:
             raise AuthenticationRejected()
         tokens = self._issue(user.id, uuid4())
-        # Recheck active status inside the persistence transaction.
-        if not await self.repository.create_token_family(tokens):
+        # Recheck credentials under the user lock, not just before Argon2 verification.
+        if not await self.repository.create_token_family(
+            tokens, expected_password_hash=user.password_hash
+        ):
             raise AuthenticationRejected()
         return tokens
 
@@ -95,6 +97,62 @@ class AuthLifecycleService:
         if profile is None:
             raise AuthenticationRejected()
         return profile
+
+    async def change_password(self, user_id: str, current_password: str, new_password: str):
+        # Direct service callers receive the same length/encoding protection as the API.
+        if (
+            not isinstance(current_password, str)
+            or not 1 <= len(current_password) <= PASSWORD_MAX
+            or not isinstance(new_password, str)
+            or not PASSWORD_MIN <= len(new_password) <= PASSWORD_MAX
+        ):
+            raise InvalidInput("PASSWORD_INVALID", "비밀번호 입력을 확인해 주세요.")
+        try:
+            current_password.encode("utf-8")
+            new_password.encode("utf-8")
+        except UnicodeEncodeError:
+            raise InvalidInput("PASSWORD_INVALID", "비밀번호 입력을 확인해 주세요.") from None
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise AuthenticationRejected() from None
+        user = await self.repository.find_user_by_id(user_uuid)
+        if user is None or user.is_active is not True:
+            raise AuthenticationRejected()
+        if not await run_sync(check_password, user.password_hash, current_password):
+            raise InvalidInput("CURRENT_PASSWORD_INVALID", "현재 비밀번호를 확인해 주세요.")
+        new_hash = await run_sync(PASSWORD_HASHER.hash, new_password)
+        result = await self.repository.change_password(
+            user_uuid, expected_password_hash=user.password_hash, new_password_hash=new_hash
+        )
+        if result is None:
+            raise AuthenticationRejected()
+        if result is not True:
+            raise InvalidInput("CURRENT_PASSWORD_INVALID", "현재 비밀번호를 확인해 주세요.")
+
+    async def deactivate(self, user_id: str, current_password: str):
+        if not isinstance(current_password, str) or not 1 <= len(current_password) <= PASSWORD_MAX:
+            raise InvalidInput("PASSWORD_INVALID", "비밀번호 입력을 확인해 주세요.")
+        try:
+            current_password.encode("utf-8")
+        except UnicodeEncodeError:
+            raise InvalidInput("PASSWORD_INVALID", "비밀번호 입력을 확인해 주세요.") from None
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise AuthenticationRejected() from None
+        user = await self.repository.find_user_by_id(user_uuid)
+        if user is None or user.is_active is not True:
+            raise AuthenticationRejected()
+        if not await run_sync(check_password, user.password_hash, current_password):
+            raise InvalidInput("CURRENT_PASSWORD_INVALID", "현재 비밀번호를 확인해 주세요.")
+        result = await self.repository.deactivate(
+            user_uuid, expected_password_hash=user.password_hash
+        )
+        if result is None:
+            raise AuthenticationRejected()
+        if result is not True:
+            raise InvalidInput("CURRENT_PASSWORD_INVALID", "현재 비밀번호를 확인해 주세요.")
 
     async def refresh(self, token: str) -> IssuedTokens:
         self._require_configured()
