@@ -81,10 +81,12 @@ async def add_order(
     snapshots: list[dict[str, Any]],
     selection_names: dict[str, str],
     coupon_id: uuid.UUID | None,
+    idempotency_key: str | None = None,
 ) -> SavedOrder:
     """`snapshots[i]` is the product DTO for `priced.lines[i]`."""
     order = Order(
         user_id=user_id,
+        idempotency_key=idempotency_key,
         recipient=priced.recipient,
         address=priced.address,
         items_amount=priced.items_amount,
@@ -150,6 +152,20 @@ async def list_orders(session: AsyncSession, user_id: uuid.UUID) -> list[SavedOr
             .order_by(Order.created_at.desc(), Order.id)
         )
     )
+    return await _saved(session, orders)
+
+
+async def order_by_key(
+    session: AsyncSession, user_id: uuid.UUID, idempotency_key: str
+) -> SavedOrder | None:
+    """The member's earlier order sent with the same idempotency key."""
+    order = await session.scalar(
+        select(Order).where(Order.user_id == user_id, Order.idempotency_key == idempotency_key)
+    )
+    return (await _saved(session, [order]))[0] if order else None
+
+
+async def _saved(session: AsyncSession, orders: list[Order]) -> list[SavedOrder]:
     if not orders:
         return []
     order_ids = [order.id for order in orders]

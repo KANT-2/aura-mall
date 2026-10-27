@@ -6,6 +6,7 @@ about price, product details or totals is trusted: every line is rebuilt from th
 
 import hashlib
 import json
+import re
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ FREE_SHIPPING_MIN = 50_000
 BASIC_SHIPPING_FEE = 3_000
 RECIPIENT_MAX = 100
 ADDRESS_MAX = 500
+IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 
 LineKind = Literal["product", "gift_set", "custom"]
 
@@ -250,3 +252,12 @@ def price_order(
         use_coupon=use_coupon,
         stock_needs=needs,
     )
+
+
+def idempotency_key(value: object) -> str | None:
+    """Optional key that makes resending the same order safe (8–64 letters, digits, hyphens)."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or not IDEMPOTENCY_KEY.match(value):
+        raise InvalidInput("IDEMPOTENCY_KEY_INVALID", "요청 식별자를 확인해 주세요.")
+    return value
