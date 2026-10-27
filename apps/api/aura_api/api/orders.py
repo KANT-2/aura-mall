@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, Response
 from pydantic import BaseModel
 
 from aura_api.api.catalog import CamelModel, ProductOut
@@ -88,5 +88,16 @@ async def list_orders(member_id: Member, session: Session) -> list[OrderOut]:
     response_model_exclude_unset=True,
     responses={code: {"model": ErrorResponse} for code in (400, 401, 409)},
 )
-async def place_order(body: OrderIn, member_id: OrderMember, session: Session) -> OrderOut:
-    return order_out(await service.place_order(session, member_id, body.model_dump()))
+async def place_order(
+    body: OrderIn,
+    member_id: OrderMember,
+    session: Session,
+    response: Response,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> OrderOut:
+    order, created = await service.place_order(
+        session, member_id, body.model_dump(), idempotency_key
+    )
+    if not created:
+        response.status_code = 200  # same key sent again: the original order, nothing new
+    return order_out(order)

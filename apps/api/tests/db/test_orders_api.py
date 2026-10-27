@@ -279,3 +279,53 @@ def test_last_item_goes_to_exactly_one_of_two_simultaneous_orders(migrated):
     assert sorted(results) == ["OUT_OF_STOCK", "ok"]
     assert stock_of("warm-diffuser") == 0
     assert db(orders_for_buyers) == 1
+
+
+def test_same_idempotency_key_returns_the_first_order_once(client):
+    member_id = create_member()
+    before = stock_of("fresh-perfume-oil")
+    body = {**ADDRESS, "items": [{"productId": "fresh-perfume-oil", "quantity": 1}]}
+    key = {"Idempotency-Key": "order-key-0001"}
+
+    first = client.post("/api/v1/orders", json=body, headers={**bearer(member_id), **key})
+    again = client.post("/api/v1/orders", json=body, headers={**bearer(member_id), **key})
+    other_member = client.post(
+        "/api/v1/orders", json=body, headers={**bearer(create_member()), **key}
+    )
+    bad = client.post(
+        "/api/v1/orders", json=body, headers={**bearer(member_id), "Idempotency-Key": "short"}
+    )
+
+    assert first.status_code == 201 and again.status_code == 200
+    assert again.json() == first.json()
+    assert other_member.status_code == 201  # keys are per member
+    assert other_member.json()["id"] != first.json()["id"]
+    assert bad.status_code == 400
+    assert bad.json()["error"]["code"] == "IDEMPOTENCY_KEY_INVALID"
+    assert stock_of("fresh-perfume-oil") == before - 2  # once per member, not per request
+    assert len(client.get("/api/v1/orders", headers=bearer(member_id)).json()) == 1
+
+
+def test_simultaneous_resends_create_one_order(migrated):
+    member_id = create_member()
+    body = {**ADDRESS, "items": [{"productId": "soft-body-lotion", "quantity": 1}]}
+
+    async def resend(sessionmaker):
+        async def place():
+            async with sessionmaker() as session:
+                order, created = await service.place_order(
+                    session, member_id, body, "order-key-race"
+                )
+                return order.id, created
+
+        return await asyncio.gather(place(), place())
+
+    (first_id, first_new), (second_id, second_new) = db(resend)
+
+    async def count(sessionmaker):
+        async with sessionmaker() as session:
+            return len(list(await session.scalars(select(Order).where(Order.user_id == member_id))))
+
+    assert first_id == second_id
+    assert sorted([first_new, second_new]) == [False, True]
+    assert db(count) == 1
