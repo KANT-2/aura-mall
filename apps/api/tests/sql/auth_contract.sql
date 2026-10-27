@@ -61,3 +61,28 @@ CREATE TABLE admin_sessions (
     expires_at timestamptz NOT NULL,
     revoked_at timestamptz
 );
+
+-- Deletion grace period, login failure limits and purge runs (migration 0005).
+ALTER TABLE users
+    ADD COLUMN deletion_requested_at timestamptz,
+    ADD COLUMN deletion_scheduled_at timestamptz,
+    ADD COLUMN deleted_at timestamptz,
+    ADD CHECK ((deletion_requested_at IS NULL) = (deletion_scheduled_at IS NULL)),
+    ADD CHECK ((deletion_requested_at IS NULL AND deleted_at IS NULL) OR NOT is_active);
+CREATE TABLE login_failures (
+    email_hash varchar(64) PRIMARY KEY CHECK (email_hash ~ '^[0-9a-f]{64}$'),
+    failure_count integer NOT NULL DEFAULT 0 CHECK (failure_count >= 0),
+    locked_until timestamptz,
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE member_deletion_runs (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    started_at timestamptz NOT NULL DEFAULT now(),
+    finished_at timestamptz,
+    status varchar(20) NOT NULL DEFAULT 'running',
+    dry_run boolean NOT NULL,
+    eligible integer NOT NULL DEFAULT 0,
+    deleted integer NOT NULL DEFAULT 0,
+    failed integer NOT NULL DEFAULT 0,
+    failed_user_ids uuid[] NOT NULL DEFAULT '{}'
+);
