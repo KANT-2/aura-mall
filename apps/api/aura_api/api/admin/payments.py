@@ -62,7 +62,11 @@ class AdminRefundReviewOut(CamelModel):
 
 
 def _customer(user: User | None) -> AdminCustomerOut | None:
-    return AdminCustomerOut(id=user.id, name=user.name, email=user.email) if user else None
+    return (
+        AdminCustomerOut(id=user.id, name=user.name, email=user.email)
+        if user and user.deactivated_at is None
+        else None
+    )
 
 
 def _unresolved(status: str, since: datetime | None) -> bool:

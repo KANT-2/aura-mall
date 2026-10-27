@@ -32,7 +32,10 @@ CREATE TABLE users (
         CHECK ((deletion_requested_at IS NULL AND deleted_at IS NULL) OR NOT is_active)
 );
 -- Emails are stored lower-cased; the index also blocks case-only duplicates.
-CREATE UNIQUE INDEX users_email_lower_key ON users (lower(email));
+ALTER TABLE users ADD COLUMN deactivated_at TIMESTAMPTZ;
+ALTER TABLE users ADD CONSTRAINT users_deactivated_inactive_check
+    CHECK (deactivated_at IS NULL OR NOT is_active);
+CREATE UNIQUE INDEX users_email_lower_key ON users (lower(email)) WHERE deactivated_at IS NULL;
 CREATE INDEX users_deletion_due_idx ON users (deletion_scheduled_at)
     WHERE deletion_scheduled_at IS NOT NULL AND deleted_at IS NULL;
 

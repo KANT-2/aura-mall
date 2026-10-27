@@ -6,7 +6,6 @@ import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
-from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -209,13 +208,13 @@ def test_deactivate_revokes_all_devices_preserves_other_member_and_email(client,
             "SELECT is_active,marketing,email,deleted_at IS NULL,"
             "deletion_scheduled_at - deletion_requested_at FROM users WHERE id=%s",
             (ALICE,),
-        ) == [(False, False, "alice@example.com", True, timedelta(days=30))]
+        ) == [(False, False, "alice@example.com", True, None)]
         registration = client.post(
             "/api/v1/auth/register",
             json={"name": "New account", "email": "alice@example.com", "password": PASSWORD},
             headers={"Origin": ORIGIN},
         )
-        assert registration.status_code == 409
+        assert registration.status_code == 201
 
 
 def test_wrong_password_does_not_change_account_or_tokens(client):
@@ -336,7 +335,8 @@ def test_stale_password_check_is_rejected_without_deactivation(client, repositor
 def expire_grace(repository, user_id=ALICE):
     query(
         repository,
-        "UPDATE users SET deletion_requested_at=now()-interval '31 days',"
+        # Explicitly simulate a historical, scheduled account for legacy purge tests only.
+        "UPDATE users SET deactivated_at=NULL, deletion_requested_at=now()-interval '31 days',"
         "deletion_scheduled_at=now()-interval '1 day' WHERE id=%s",
         (user_id,),
     )

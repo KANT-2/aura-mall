@@ -205,7 +205,9 @@ def order_summary_out(view: OrderView) -> AdminOrderSummaryOut:
     return AdminOrderSummaryOut(
         id=order.id,
         created=order.created_at,
-        customer=AdminCustomerOut(id=user.id, name=user.name, email=user.email) if user else None,
+        customer=AdminCustomerOut(id=user.id, name=user.name, email=user.email)
+        if user and user.deactivated_at is None
+        else None,
         recipient=order.recipient,
         title=view.title,
         item_count=view.item_count,

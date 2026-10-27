@@ -95,9 +95,9 @@ FastAPI 내부 인증 응답은 TokenPair 또는 회원 프로필이며, BFF가 
 | GET    | `/api/auth/me`               | `AccountState { user: Member \| null, guestId: string }`                                          |
 | PATCH  | `/api/auth/me`               | `{ name?, marketing? }` → `AccountState`                                                          |
 | POST   | `/api/auth/change-password`  | `{ currentPassword, newPassword }` → 204, 회원 쿠키 삭제                                          |
-| DELETE | `/api/auth/me`               | `{ currentPassword }` → 204, 탈퇴 신청(30일 유예) 후 회원 쿠키 삭제                               |
+| DELETE | `/api/auth/me`               | `{ currentPassword }` → 204, 복구 없는 탈퇴 후 회원 쿠키 삭제 (0010)                              |
 | POST   | `/api/auth/register`         | `{ name, email, password, marketing? }` → 201 `AccountState`                                      |
-| POST   | `/api/auth/login`            | `{ email, password }` → `AccountState`, 유예 중 계정 복구, 연속 실패 시 429 `LOGIN_LOCKED`        |
+| POST   | `/api/auth/login`            | `{ email, password }` → `AccountState`, 탈퇴 계정은 401, 연속 실패 시 429 `LOGIN_LOCKED`          |
 | POST   | `/api/auth/logout`           | 본문 없음 → `AccountState`                                                                        |
 | POST   | `/api/auth/refresh`          | 본문 없음 → 204, 토큰 쿠키 회전                                                                   |
 | GET    | `/api/recipes`               | `Recipe[]`                                                                                        |
@@ -164,6 +164,8 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
   실패에서는 성공 처리를 하지 않으며 400은 Refresh나 재시도를 유발하지 않습니다.
 
 ### 회원 탈퇴 신청·30일 유예 — FastAPI CRA-34 후속
+
+> **0010으로 대체됨:** 새 탈퇴는 30일 유예·로그인 복구·예약 삭제 없이 영구 비활성화이고 같은 이메일은 새 회원 ID로 재가입합니다. [복구 없는 비활성화 문서](backend/MEMBER_PERMANENT_DEACTIVATION.md)가 기준이며, 아래 유예·복구 설명은 0010 이전 동작입니다.
 
 - `DELETE /api/v1/auth/me`는 회원 Bearer JWT와 JSON 본문
   `{ currentPassword }`를 받습니다. 사용자 ID는 JWT의 `sub`에서만 얻으며 관리자
