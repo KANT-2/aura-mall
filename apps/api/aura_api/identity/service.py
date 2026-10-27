@@ -7,10 +7,15 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 
 from aura_api.config import Settings
-from aura_api.domain.errors import Conflict, InvalidInput
+from aura_api.domain.errors import Conflict, InvalidInput, RateLimited
 from aura_api.domain.identity import PASSWORD_MAX, PASSWORD_MIN, Registration, validate_name
 from aura_api.identity.repository import AuthRepository, AuthStorageUnavailable
-from aura_api.identity.tokens import IssuedTokens, hash_refresh_token, issue_tokens
+from aura_api.identity.tokens import (
+    IssuedTokens,
+    hash_login_email,
+    hash_refresh_token,
+    issue_tokens,
+)
 
 PASSWORD_HASHER = PasswordHasher()
 # A timing substitute for nonexistent accounts, not a usable account or password.
@@ -44,15 +49,38 @@ class AuthLifecycleService:
 
     async def login(self, email: str, password: str) -> IssuedTokens:
         self._require_configured()
-        user = await self.repository.find_user(email.strip().lower())
+        email = email.strip().lower()
+        email_hash = hash_login_email(email)
+        # Unknown emails are limited the same way, so the lock never reveals an account.
+        wait = await self.repository.reserve_login_attempt(email_hash)
+        if wait > 0:
+            raise RateLimited(
+                "LOGIN_LOCKED", "로그인 시도가 많아요. 잠시 후 다시 시도해 주세요.", wait
+            )
+        user = await self.repository.find_user(email)
         valid = await run_sync(check_password, user.password_hash if user else None, password)
-        if not valid or user is None or user.is_active is not True:
+        if (
+            not valid
+            or user is None
+            or (user.is_active is not True and user.restorable is not True)
+        ):
             raise AuthenticationRejected()
+        await self.repository.clear_login_failures(email_hash)
         tokens = self._issue(user.id, uuid4())
         # Recheck credentials under the user lock, not just before Argon2 verification.
-        if not await self.repository.create_token_family(
-            tokens, expected_password_hash=user.password_hash
-        ):
+        if user.is_active is True:
+            saved = await self.repository.create_token_family(
+                tokens, expected_password_hash=user.password_hash
+            )
+        else:
+            # A correct password inside the grace period cancels the pending deletion. The
+            # request time must match, so a check made before deactivation cannot restore.
+            saved = await self.repository.restore_token_family(
+                tokens,
+                expected_password_hash=user.password_hash,
+                expected_deletion_requested_at=user.deletion_requested_at,
+            )
+        if not saved:
             raise AuthenticationRejected()
         return tokens
 

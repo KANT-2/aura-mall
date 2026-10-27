@@ -56,6 +56,9 @@ erDiagram
         boolean marketing
         timestamptz created_at
         boolean is_active
+        timestamptz deletion_requested_at
+        timestamptz deletion_scheduled_at
+        timestamptz deleted_at
     }
     user_coupons {
         uuid id PK
@@ -286,15 +289,21 @@ erDiagram
 
 **users** — 회원
 
-| 컬럼          | 타입         | 제약                         | 설명                                     |
-| ------------- | ------------ | ---------------------------- | ---------------------------------------- |
-| id            | UUID         | PK                           | 회원 ID (`Member.id`)                    |
-| email         | VARCHAR(254) | NOT NULL, UK(`lower(email)`) | 소문자로 저장, 대소문자 무관 중복 금지   |
-| name          | VARCHAR(100) | NOT NULL                     | 이름                                     |
-| password_hash | VARCHAR(255) | NOT NULL                     | 서버 해시값(Argon2id 등). 평문 저장 금지 |
-| marketing     | BOOLEAN      | NOT NULL DEFAULT false       | 마케팅 수신 동의                         |
-| created_at    | TIMESTAMPTZ  | NOT NULL DEFAULT now()       | 가입 시각                                |
-| is_active     | BOOLEAN      | NOT NULL DEFAULT true        | false면 로그인 거절 (마이그레이션 0002)  |
+| 컬럼                  | 타입         | 제약                         | 설명                                     |
+| --------------------- | ------------ | ---------------------------- | ---------------------------------------- |
+| id                    | UUID         | PK                           | 회원 ID (`Member.id`)                    |
+| email                 | VARCHAR(254) | NOT NULL, UK(`lower(email)`) | 소문자로 저장, 대소문자 무관 중복 금지   |
+| name                  | VARCHAR(100) | NOT NULL                     | 이름                                     |
+| password_hash         | VARCHAR(255) | NOT NULL                     | 서버 해시값(Argon2id 등). 평문 저장 금지 |
+| marketing             | BOOLEAN      | NOT NULL DEFAULT false       | 마케팅 수신 동의                         |
+| created_at            | TIMESTAMPTZ  | NOT NULL DEFAULT now()       | 가입 시각                                |
+| is_active             | BOOLEAN      | NOT NULL DEFAULT true        | false면 로그인 거절 (마이그레이션 0002)  |
+| deletion_requested_at | TIMESTAMPTZ  | NULL                         | 탈퇴 신청 시각 (0005)                    |
+| deletion_scheduled_at | TIMESTAMPTZ  | NULL, 부분 INDEX             | 신청 + 30일. 이전 로그인 시 복구 (0005)  |
+| deleted_at            | TIMESTAMPTZ  | NULL                         | 예약 삭제 완료 시각. 행은 익명화 (0005)  |
+
+> 0005 CHECK: 신청·예정 시각은 함께 NULL이거나 함께 값이 있고, 탈퇴 신청·삭제된 회원은 `is_active=false`다.
+> 예약 삭제는 주문 보존을 위해 행을 지우지 않고 이메일·이름·비밀번호 해시를 익명 값으로 바꾼다.
 
 **user_coupons** — 신규 회원 배송비 쿠폰
 
@@ -353,6 +362,29 @@ erDiagram
 | issued_at  | TIMESTAMPTZ | NOT NULL DEFAULT now()                 | 발급 시각              |
 | expires_at | TIMESTAMPTZ | NOT NULL, INDEX, CHECK > issued_at     | 만료 시각 (기본 1시간) |
 | revoked_at | TIMESTAMPTZ | NULL                                   | 로그아웃 시각          |
+
+**login_failures** — 회원 로그인 연속 실패 기록 (마이그레이션 0005)
+
+| 컬럼          | 타입        | 제약                          | 설명                                        |
+| ------------- | ----------- | ----------------------------- | ------------------------------------------- |
+| email_hash    | VARCHAR(64) | PK, CHECK 소문자 hex 64자     | 정규화 이메일의 SHA-256. 이메일 원문 미저장 |
+| failure_count | INTEGER     | NOT NULL DEFAULT 0, CHECK ≥0  | 연속 시도 수 (성공 시 행 삭제)              |
+| locked_until  | TIMESTAMPTZ | NULL                          | 3회째부터 10분 제한 종료 시각               |
+| updated_at    | TIMESTAMPTZ | NOT NULL DEFAULT now(), INDEX | 하루 지난 미잠금 행은 예약 작업이 정리      |
+
+**member_deletion_runs** — 회원 예약 삭제 실행 기록 (마이그레이션 0005)
+
+| 컬럼            | 타입        | 제약                                   | 설명                          |
+| --------------- | ----------- | -------------------------------------- | ----------------------------- |
+| id              | UUID        | PK                                     | 실행 ID                       |
+| started_at      | TIMESTAMPTZ | NOT NULL DEFAULT now()                 | 시작 시각                     |
+| finished_at     | TIMESTAMPTZ | NULL                                   | 종료 시각 (NULL이면 중단)     |
+| status          | VARCHAR(20) | CHECK running·succeeded·partial·failed | 실행 결과                     |
+| dry_run         | BOOLEAN     | NOT NULL                               | 건수만 확인한 실행 여부       |
+| eligible        | INTEGER     | NOT NULL DEFAULT 0                     | 삭제 예정 시각이 지난 회원 수 |
+| deleted         | INTEGER     | NOT NULL DEFAULT 0                     | 익명화 완료 수                |
+| failed          | INTEGER     | NOT NULL DEFAULT 0                     | 롤백된 회원 수                |
+| failed_user_ids | UUID[]      | NOT NULL DEFAULT '{}'                  | 다음 실행에서 재시도할 회원   |
 
 > 인증은 JWT로 결정했다(쿠키 값 = 서명된 JWT). 비회원 식별값 `guestId`는 별도 비인증 방문자 쿠키에 두며 JWT·회원 인증에 사용하지 않는다.
 > 토큰 검증기는 **발급 기록이 있는 토큰만** 통과시킨다. 회원 Access Token은 `refresh_tokens.access_jti`, 관리자 Access Token은 `admin_sessions`에 기록되고, 로그아웃한 jti는 `revoked_tokens`에 들어간다. Refresh Token은 재발급할 때마다 새것으로 바꾸고(회전), 이미 쓰인 토큰이 다시 오면 같은 계열 전체를 폐기한다. 관리자는 Refresh 없이 Access Token만 받는다.

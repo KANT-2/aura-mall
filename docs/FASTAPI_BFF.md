@@ -95,9 +95,9 @@ FastAPI 내부 인증 응답은 TokenPair 또는 회원 프로필이며, BFF가 
 | GET    | `/api/auth/me`               | `AccountState { user: Member \| null, guestId: string }`                                          |
 | PATCH  | `/api/auth/me`               | `{ name?, marketing? }` → `AccountState`                                                          |
 | POST   | `/api/auth/change-password`  | `{ currentPassword, newPassword }` → 204, 회원 쿠키 삭제                                          |
-| DELETE | `/api/auth/me`               | `{ currentPassword }` → 204, 계정 비활성화 후 회원 쿠키 삭제                                      |
+| DELETE | `/api/auth/me`               | `{ currentPassword }` → 204, 탈퇴 신청(30일 유예) 후 회원 쿠키 삭제                               |
 | POST   | `/api/auth/register`         | `{ name, email, password, marketing? }` → 201 `AccountState`                                      |
-| POST   | `/api/auth/login`            | `{ email, password }` → `AccountState`                                                            |
+| POST   | `/api/auth/login`            | `{ email, password }` → `AccountState`, 유예 중 계정 복구, 연속 실패 시 429 `LOGIN_LOCKED`        |
 | POST   | `/api/auth/logout`           | 본문 없음 → `AccountState`                                                                        |
 | POST   | `/api/auth/refresh`          | 본문 없음 → 204, 토큰 쿠키 회전                                                                   |
 | GET    | `/api/recipes`               | `Recipe[]`                                                                                        |
@@ -163,23 +163,44 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
   뒤 회원 쿠키만 삭제하고 현재 회원의 계정·주문·레시피 캐시를 정리해 재로그인을 안내합니다.
   실패에서는 성공 처리를 하지 않으며 400은 Refresh나 재시도를 유발하지 않습니다.
 
-### 회원 계정 비활성화 — FastAPI CRA-34
+### 회원 탈퇴 신청·30일 유예 — FastAPI CRA-34 후속
 
 - `DELETE /api/v1/auth/me`는 회원 Bearer JWT와 JSON 본문
   `{ currentPassword }`를 받습니다. 사용자 ID는 JWT의 `sub`에서만 얻으며 관리자
   principal 또는 admin permission은 거절합니다. 비밀번호는 공백 제거·정규화 없이 검증합니다.
-- 성공은 **204, 본문 없음**입니다. 회원 행을 유지하며 `is_active=false`, `marketing=false`로
-  변경하고 현재 기기를 포함한 모든 로그인 계열의 Access/Refresh를 폐기합니다.
-- 본인 쿠폰 중 `AVAILABLE`, `used_order_id IS NULL`, 주문의 `coupon_id`에서도 참조하지 않는
-  쿠폰만 삭제합니다. 개인 저장 레시피는 삭제하고 향료 구성은 CASCADE, 다른 회원 레시피의
-  부모 연결은 기존 SET NULL을 적용합니다. 다른 회원 레시피와 주문·주문 스냅샷은 보존합니다.
-- 위 처리는 단일 트랜잭션이며 중간 실패 시 모두 롤백합니다. 현재 비밀번호 불일치·검증 후
-  비밀번호 변경은 400 `CURRENT_PASSWORD_INVALID`, 미인증·폐기 토큰·관리자·비활성 회원은
-  401, CSRF 차단은 403, 입력 오류는 422, 저장소 장애는 503입니다. 폐기 조회 장애는 기존
-  JWT 검증 정책에 따라 401로 거절합니다. 토큰이나 개인정보를 오류에 포함하지 않습니다.
-- **개인정보 완전 파기 API가 아닙니다.** 이름·이메일·비밀번호 해시와 주문 수령인·주소는
-  이번에 삭제하지 않습니다. 이메일 UNIQUE는 유지하며 재가입·계정 복구·정지와 탈퇴 구분·
-  개인정보 보존 범위와 기간은 미확정입니다. 개인정보 삭제 완료로 안내해서는 안 됩니다.
+- 성공은 **204, 본문 없음**입니다. 계정은 탈퇴 대기 상태(`is_active=false`)가 되고
+  `deletion_requested_at`과 30일 뒤 `deletion_scheduled_at`을 DB 시각으로 기록합니다.
+  `marketing=false`로 바꾸며 현재 기기를 포함한 모든 로그인 계열의 Access/Refresh를 폐기합니다.
+- 유예 기간에는 레시피·쿠폰·주문을 삭제하지 않습니다. 대기 회원의 기존 토큰과 업무 API는
+  비활성 회원과 같이 401입니다. 계정·토큰 처리는 단일 트랜잭션이며 실패 시 모두 롤백합니다.
+- 현재 비밀번호 불일치·검증 후 비밀번호 변경은 400 `CURRENT_PASSWORD_INVALID`,
+  미인증·폐기 토큰·관리자·비활성 회원은 401, CSRF 차단은 403, 입력 오류는 422,
+  저장소 장애는 503입니다. 토큰이나 개인정보를 오류에 포함하지 않습니다.
+- **계정 복구는 기존 `POST /auth/login`을 사용합니다.** 유예 기간 안에 기존 비밀번호로 로그인하면
+  같은 트랜잭션에서 탈퇴 신청을 취소하고 활성 상태로 되돌린 뒤 새 Access/Refresh를 발급합니다.
+  보존한 데이터는 그대로이며 탈퇴 시 폐기한 토큰과 `marketing=false`는 복구하지 않습니다.
+  비밀번호를 탈퇴 신청 전에 검증한 요청은 복구하지 못합니다. 유예 기간이 끝났거나 삭제된
+  계정은 없는 계정과 같은 401입니다. 응답 형식은 일반 로그인과 같으며 복구 여부 필드는 없습니다.
+- 30일이 지난 계정은 예약 삭제 작업(`python -m aura_api.infra.purge_members --execute`)이
+  계정별 트랜잭션으로 처리합니다. 토큰 계열·레시피·주문과 무관한 미사용 쿠폰·로그인 실패 기록을
+  삭제하고, 회원 행은 주문 보존을 위해 남기되 이메일·이름·비밀번호 해시를 익명 값으로 바꿉니다.
+  주문·주문 스냅샷과 주문이 참조하는 쿠폰은 보존합니다. 삭제 작업과 복구 로그인은 같은 회원
+  행 잠금으로 직렬화되어 한쪽만 전체 반영됩니다. 실행 결과는 `member_deletion_runs`에 남습니다.
+- **예약 실행 환경이 배포되기 전에는 30일 후 삭제가 보장되지 않습니다.** 주문 개인정보의 보존
+  기간·분리 보관과 삭제 후 같은 이메일의 재가입·혜택 재지급 정책은 별도 합의 대상입니다.
+
+### 회원 로그인 실패 제한
+
+- 회원 `POST /api/v1/auth/login`은 정규화한 이메일(앞뒤 공백 제거·소문자)별로 연속 실패를
+  서버 DB에 기록합니다. 이메일 원문 대신 SHA-256 값만 저장합니다.
+- 연속 3회째 시도부터 10분 동안 같은 이메일의 로그인을 비밀번호 검증 없이
+  **429 `LOGIN_LOCKED`**와 `Retry-After`(초)로 거절합니다. 제한이 끝난 뒤 다시 실패하면
+  곧바로 10분 제한이 다시 걸립니다. 로그인 성공 시 실패 기록을 지웁니다.
+- 존재하지 않는 이메일도 같은 방식으로 제한하므로 401·429 응답으로 계정 존재를 구분할 수 없습니다.
+  같은 이메일의 동시 시도는 DB 행 잠금으로 직렬화되어 한도를 넘지 못합니다.
+- BFF는 429 상태와 `LOGIN_LOCKED` 코드·메시지를 그대로 전달합니다(`Retry-After` 헤더는 전달하지
+  않음). 관리자 로그인(`/admin/auth/login`)에는 적용하지 않습니다. IP 기반 제한과 CAPTCHA는
+  이번 범위가 아닙니다.
 - CRA-36에서 BFF DELETE·확인 UI·회원 쿠키·해당 회원의 주문/레시피 캐시 정리를 연결했습니다.
   백엔드 204만 성공으로 처리하고 관리자 쿠키·다른 회원 캐시는 유지합니다. 단순 401이나
   응답 유실을 성공으로 간주하지 않습니다. 장바구니는 공용 `aura_cart_v1`에 소유자 정보가

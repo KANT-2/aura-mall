@@ -9,6 +9,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from math import ceil
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -23,7 +24,11 @@ from aura_api.api.auth import TokenResponse
 from aura_api.config import Settings
 from aura_api.core.auth import CurrentUser
 from aura_api.identity.postgres import PostgresAuthRepository
-from aura_api.identity.repository import AuthStorageUnavailable
+from aura_api.identity.repository import (
+    LOGIN_FAILURE_LIMIT,
+    LOGIN_LOCK,
+    AuthStorageUnavailable,
+)
 from aura_api.identity.service import (
     PASSWORD_HASHER,
     AuthenticationRejected,
@@ -49,12 +54,28 @@ class MemoryRepository:
         }
         self.families, self.refreshes, self.revoked = {}, {}, {}
         self.lock = threading.RLock()
+        self.login_failures = {}
 
     async def find_user(self, email):
         return self.users.get(email)
 
     async def find_user_by_id(self, user_id):
         return next((user for user in self.users.values() if user.id == user_id), None)
+
+    async def reserve_login_attempt(self, email_hash):
+        with self.lock:
+            failures, until = self.login_failures.get(email_hash, (0, None))
+            now = datetime.now(UTC)
+            if until is not None and until > now:
+                return ceil((until - now).total_seconds())
+            failures += 1
+            locked = now + LOGIN_LOCK if failures >= LOGIN_FAILURE_LIMIT else None
+            self.login_failures[email_hash] = (failures, locked)
+            return 0
+
+    async def clear_login_failures(self, email_hash):
+        with self.lock:
+            self.login_failures.pop(email_hash, None)
 
     async def change_password(self, user_id, *, expected_password_hash, new_password_hash):
         with self.lock:
