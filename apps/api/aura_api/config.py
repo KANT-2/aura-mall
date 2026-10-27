@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     jwt_audience: str | None = None
     database_url: SecretStr | None = None
     database_url_file: Path | None = None
+    database_runtime_dir: Path | None = None
     jwt_access_ttl_seconds: int = Field(default=900, ge=1, le=86400)
     refresh_token_ttl_seconds: int = Field(default=604800, ge=1, le=7776000)
     # Admins get no refresh token, so their access token lives a little longer.

@@ -16,6 +16,7 @@ from aura_api.identity.postgres import PostgresAuthRepository
 from aura_api.identity.repository import UnavailableAuthRepository
 from aura_api.identity.service import AuthLifecycleService
 from aura_api.infra.database import create_engine, create_sessionmaker
+from aura_api.infra.database_rotation import RotatingDatabase
 from aura_api.openapi import DESCRIPTION, ERROR_RESPONSES, TAGS, configure_openapi
 
 
@@ -24,19 +25,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     database_url = (
         make_url(settings.database_url.get_secret_value()) if settings.database_url else None
     )
+    runtime = (
+        RotatingDatabase(settings.database_url_file, settings.database_runtime_dir)
+        if settings.database_url_file is not None
+        else None
+    )
     engine = (
         create_engine(
             database_url.set(drivername="postgresql+asyncpg").render_as_string(hide_password=False)
         )
-        if database_url is not None
+        if database_url is not None and runtime is None
         else None
     )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
+            if runtime is not None:
+                await runtime.start()
             yield
         finally:
+            if runtime is not None:
+                await runtime.close()
             if engine is not None:
                 await engine.dispose()
 
@@ -55,11 +65,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         },
     )
     app.state.sessionmaker = create_sessionmaker(engine) if engine is not None else None
+    app.state.database_runtime = runtime
     app.state.jwt_verifier = JWTVerifier(settings)
     app.state.auth_repository = (
         PostgresAuthRepository(
             database_url.set(drivername="postgresql").render_as_string(hide_password=False),
             settings.jwt_issuer or "",
+            runtime=runtime,
         )
         if database_url is not None
         else UnavailableAuthRepository()
