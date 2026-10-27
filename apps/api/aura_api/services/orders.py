@@ -4,11 +4,12 @@ import uuid
 from collections.abc import Mapping
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aura_api.domain.catalog import CUSTOM_PRODUCT_TYPE
 from aura_api.domain.errors import Conflict
-from aura_api.domain.ordering import OrderLine, price_order
+from aura_api.domain.ordering import OrderLine, idempotency_key, price_order
 from aura_api.infra.models import Product
 from aura_api.infra.repositories import catalog as catalog_repository
 from aura_api.infra.repositories import orders as repository
@@ -81,9 +82,34 @@ async def list_orders(session: AsyncSession, member_id: uuid.UUID) -> list[Saved
 
 
 async def place_order(
-    session: AsyncSession, member_id: uuid.UUID, raw: Mapping[str, object]
-) -> SavedOrder:
+    session: AsyncSession,
+    member_id: uuid.UUID,
+    raw: Mapping[str, object],
+    key: object = None,
+) -> tuple[SavedOrder, bool]:
+    """Returns the order and whether it was created now (False: same key sent again)."""
+    request_key = idempotency_key(key)
+    try:
+        return await _place(session, member_id, raw, request_key)
+    except IntegrityError:
+        # The same key committed by a concurrent request: answer with that order.
+        if request_key is None:
+            raise
+        await session.rollback()
+        earlier = await repository.order_by_key(session, member_id, request_key)
+        if earlier is None:
+            raise
+        return earlier, False
+
+
+async def _place(
+    session: AsyncSession, member_id: uuid.UUID, raw: Mapping[str, object], key: str | None
+) -> tuple[SavedOrder, bool]:
     async with session.begin():
+        if key is not None:
+            earlier = await repository.order_by_key(session, member_id, key)
+            if earlier is not None:
+                return earlier, False
         catalog = await catalog_repository.load_rule_catalog(session)
         coupon = await repository.lock_available_coupon(session, member_id)
         priced = price_order(
@@ -107,8 +133,8 @@ async def place_order(
         }
         coupon_id = coupon.id if priced.use_coupon and coupon else None
         order = await repository.add_order(
-            session, member_id, priced, snapshots, selection_names, coupon_id
+            session, member_id, priced, snapshots, selection_names, coupon_id, key
         )
         if coupon_id and not await repository.use_coupon(session, coupon_id, order.id):
             raise Conflict("COUPON_UNAVAILABLE", "사용할 수 없는 쿠폰이에요.")
-        return order
+        return order, True
