@@ -31,6 +31,10 @@ class AuthRepository(Protocol):
         self, registration: Registration, password_hash: str, tokens: IssuedTokens
     ) -> bool: ...
 
+    async def deactivate(self, user_id: UUID, *, expected_password_hash: str) -> bool | None:
+        """True after commit; False for a stale hash; None for missing/inactive users."""
+        ...
+
     async def profile(self, user_id: UUID) -> dict | None: ...
 
     async def update_profile(
@@ -58,6 +62,9 @@ class UnavailableAuthRepository:
         raise AuthStorageUnavailable()
 
     async def register(self, registration, password_hash, tokens):
+        raise AuthStorageUnavailable()
+
+    async def deactivate(self, user_id, *, expected_password_hash):
         raise AuthStorageUnavailable()
 
     async def profile(self, user_id):

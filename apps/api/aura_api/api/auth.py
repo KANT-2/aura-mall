@@ -57,6 +57,22 @@ class ChangePasswordInput(BaseModel):
         return value
 
 
+class DeactivationInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, hide_input_in_errors=True)
+    current_password: SecretStr = Field(
+        alias="currentPassword", min_length=1, max_length=PASSWORD_MAX
+    )
+
+    @field_validator("current_password")
+    @classmethod
+    def validate_encoding(cls, value: SecretStr) -> SecretStr:
+        try:
+            value.get_secret_value().encode("utf-8")
+        except UnicodeEncodeError:
+            raise ValueError("Invalid password input") from None
+        return value
+
+
 class RefreshInput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, hide_input_in_errors=True)
     refresh_token: SecretStr = Field(alias="refreshToken", min_length=1, max_length=512)
@@ -170,6 +186,25 @@ async def update_me(
         raise HTTPException(401, headers={"WWW-Authenticate": "Bearer"}) from None
     except AuthStorageUnavailable:
         raise HTTPException(503) from None
+
+
+@router.delete("/me", status_code=204)
+async def deactivate_me(
+    body: DeactivationInput,
+    request: Request,
+    user: CurrentUser,
+    service: Service,
+    verifier: Annotated[JWTVerifier, Depends(get_jwt_verifier)],
+):
+    if not is_member_principal(bearer_claims(request, verifier)):
+        raise HTTPException(401, headers={"WWW-Authenticate": "Bearer"})
+    try:
+        await service.deactivate(user.user_id, body.current_password.get_secret_value())
+    except AuthenticationRejected:
+        raise HTTPException(401, headers={"WWW-Authenticate": "Bearer"}) from None
+    except AuthStorageUnavailable:
+        raise HTTPException(503) from None
+    return Response(status_code=204)
 
 
 @router.post("/change-password", status_code=204)
