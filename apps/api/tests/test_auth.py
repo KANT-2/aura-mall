@@ -403,6 +403,7 @@ def test_production_app_has_no_test_routes_and_exposes_lifecycle_routes():
             "/api/v1/partner",
             "/api/v1/recipes",
             "/api/v1/recipes/{recipe_id}",
+            "/api/v1/orders",
         }
         assert client.get("/test/me").status_code == 404
 

@@ -1,7 +1,8 @@
-"""Initial schema: the 21 tables of db/schema.sql.
+"""Initial schema: the 21 tables of db/schema.sql as of PR #33.
 
-The migration runs the shared SQL file itself, so the DDL the team reviews and the DDL
-Alembic applies cannot drift apart. tests/db checks the ORM models against the result.
+Runs migrations/sql/0001_initial_schema.sql, a frozen copy of that schema.sql, so later
+edits to db/schema.sql never change what this revision creates. tests/db checks the ORM
+models and db/schema.sql against the migrated result.
 
 Revision ID: 0001
 Revises:
@@ -18,7 +19,7 @@ down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-SCHEMA = Path(__file__).resolve().parents[2] / "db" / "schema.sql"
+SCHEMA = Path(__file__).resolve().parents[1] / "sql" / "0001_initial_schema.sql"
 
 # Reverse dependency order for downgrade.
 TABLES = [
@@ -47,7 +48,7 @@ TABLES = [
 
 
 def schema_script() -> str:
-    """schema.sql without its own BEGIN/COMMIT: Alembic owns the transaction."""
+    """The SQL without its own BEGIN/COMMIT: Alembic owns the transaction."""
     lines = [
         line
         for line in SCHEMA.read_text(encoding="utf-8").splitlines()
