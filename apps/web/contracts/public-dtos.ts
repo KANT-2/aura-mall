@@ -2,6 +2,7 @@ import type { components, paths } from "@/contracts/generated/fastapi";
 import type { Catalog, Product } from "@/features/catalog/model/catalog";
 import type { AtelierDraft, Recipe } from "@/features/atelier/model/recipes";
 import type { Order } from "@/features/checkout/model/order";
+import type { Payment, PaymentConfirmation } from "@/features/payments/model/payment";
 import type {
   AdminAccount,
   AdminProduct,
@@ -53,6 +54,8 @@ export type PublicDTOContract = [
   Assert<Fits<ProductDetailDTO, AdminProductDetail>>,
   Assert<Fits<InquiryDTO, AdminInquiry>>,
   Assert<Fits<OrderDTO, Order>>,
+  Assert<Fits<Schemas["PaymentOut"], Payment>>,
+  Assert<Fits<PaymentConfirmation, Schemas["PaymentConfirmIn"]>>,
   Assert<Fits<Schemas["AdminOverviewOut"], AdminOverview>>,
   Assert<Fits<Credentials, Schemas["LoginInput"]>>,
   Assert<Fits<{ name: string; email: string; password: string }, Schemas["AdminCreateIn"]>>,
