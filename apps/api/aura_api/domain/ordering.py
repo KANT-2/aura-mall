@@ -147,6 +147,10 @@ def _custom(raw: object, catalog: Catalog) -> CustomComposition:
     if not isinstance(name, str) or not name.strip():
         raise InvalidInput("CUSTOM_INVALID", "상품과 향료 구성을 확인해 주세요.")
     try:
+        name.encode("utf-8")
+    except UnicodeEncodeError:
+        raise InvalidInput("CUSTOM_INVALID", "상품과 향료 구성을 확인해 주세요.") from None
+    try:
         counts = validate_counts(raw.get("counts"), catalog.ingredients)
     except InvalidInput as error:
         raise InvalidInput("CUSTOM_INVALID", "상품과 향료 구성을 확인해 주세요.") from error

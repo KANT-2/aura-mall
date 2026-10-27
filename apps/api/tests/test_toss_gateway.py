@@ -12,7 +12,11 @@ from pydantic import ValidationError
 from aura_api.config import Settings
 from aura_api.domain.errors import InvalidInput
 from aura_api.domain.payments import confirm_input, ensure_amount, order_name, pg_order_id
-from aura_api.infra.payment_gateway import GatewayUnavailable, TossPaymentsGateway
+from aura_api.infra.payment_gateway import (
+    PUBLIC_FAILURE_MESSAGE,
+    GatewayUnavailable,
+    TossPaymentsGateway,
+)
 
 SECRET = "test_sk_FAKE0000000000000000aura"
 DONE = {
@@ -90,14 +94,13 @@ def test_confirm_request_matches_the_toss_contract(sent):
     "status,code",
     [
         (403, "REJECT_CARD_PAYMENT"),
-        (404, "NOT_FOUND_PAYMENT_SESSION"),
         (400, "INVALID_CARD_NUMBER"),
     ],
 )
 def test_definite_rejections_fail(sent, status, code):
     sent[1].append((status, {"code": code, "message": "거절"}))
     result = confirm()
-    assert (result.outcome, result.code, result.message) == ("failed", code, "거절")
+    assert (result.outcome, result.code, result.message) == ("failed", code, PUBLIC_FAILURE_MESSAGE)
 
 
 @pytest.mark.parametrize(
@@ -293,15 +296,13 @@ def test_already_canceled_with_another_amount_needs_review(sent):
     "status,code",
     [
         (400, "NOT_CANCELABLE_PAYMENT"),
-        (404, "NOT_FOUND_PAYMENT"),
         (400, "INVALID_REFUND_ACCOUNT_INFO"),
-        (401, "UNAUTHORIZED_KEY"),
     ],
 )
 def test_definite_cancel_rejections_fail(sent, status, code):
     sent[1].append((status, {"code": code, "message": "거절"}))
     result = cancel()
-    assert (result.outcome, result.code, result.message) == ("failed", code, "거절")
+    assert (result.outcome, result.code, result.message) == ("failed", code, PUBLIC_FAILURE_MESSAGE)
 
 
 @pytest.mark.parametrize(
@@ -322,3 +323,60 @@ def test_unknown_cancel_results_are_never_reported_as_failed(sent, answers):
     sent[1].extend(answers)
     with pytest.raises(GatewayUnavailable):
         cancel()
+
+
+@pytest.mark.parametrize("operation", ["confirm", "lookup", "cancel"])
+@pytest.mark.parametrize(
+    "status,code",
+    [
+        (401, "UNAUTHORIZED_KEY"),
+        (403, "INCORRECT_BASIC_AUTH_FORMAT"),
+        (403, "FORBIDDEN_CONSECUTIVE_REQUEST"),
+        (404, "NOT_FOUND_PAYMENT"),
+        (404, "NOT_FOUND_PAYMENT_SESSION"),
+        (429, "TOO_MANY_REQUESTS"),
+        (400, "UNRECOGNIZED_ERROR"),
+    ],
+)
+def test_access_or_lookup_errors_do_not_prove_a_payment_failed(sent, operation, status, code):
+    sent[1].append((status, {"code": code, "message": SECRET}))
+    with pytest.raises(GatewayUnavailable) as error:
+        if operation == "lookup":
+            anyio.run(lambda: gateway().lookup(payment_key=DONE["paymentKey"]))
+        else:
+            {"confirm": confirm, "cancel": cancel}[operation]()
+    assert SECRET not in str(error.value)
+
+
+@pytest.mark.parametrize("operation", ["confirm", "lookup", "cancel"])
+@pytest.mark.parametrize("body", [None, [], "text", 42, {"status": []}])
+def test_invalid_success_bodies_are_unknown_results(sent, operation, body):
+    sent[1].append((200, body))
+    with pytest.raises(GatewayUnavailable):
+        if operation == "lookup":
+            anyio.run(lambda: gateway().lookup(payment_key=DONE["paymentKey"]))
+        else:
+            {"confirm": confirm, "cancel": cancel}[operation]()
+
+
+def test_pg_failure_message_is_not_forwarded(sent):
+    sent[1].append((403, {"code": "REJECT_CARD_PAYMENT", "message": SECRET}))
+    assert SECRET not in (confirm().message or "")
+
+
+@pytest.mark.parametrize("raw", [b"not-json", b'{"status":', b"\xff"])
+def test_unreadable_json_never_escapes_as_an_internal_error(monkeypatch, raw):
+    def urlopen(*args, **kwargs):
+        response = io.BytesIO(raw)
+        response.status = 200
+        return response
+
+    monkeypatch.setattr("urllib.request.urlopen", urlopen)
+    with pytest.raises(GatewayUnavailable):
+        confirm()
+
+
+def test_lookup_business_error_is_not_a_confirmed_payment_failure(sent):
+    sent[1].append((403, {"code": "REJECT_CARD_PAYMENT", "message": SECRET}))
+    with pytest.raises(GatewayUnavailable):
+        anyio.run(lambda: gateway().lookup(payment_key=DONE["paymentKey"]))

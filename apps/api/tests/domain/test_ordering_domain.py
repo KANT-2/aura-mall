@@ -122,6 +122,20 @@ def test_custom_composition_uses_eau_de_parfum_price_and_server_color(catalog):
     assert line.custom.color == "#a5ad68"
 
 
+@pytest.mark.parametrize("name", ["\ud800", "이름\udfff"])
+def test_custom_name_rejects_unencodable_unicode(catalog, name):
+    with pytest.raises(InvalidInput) as error:
+        build_line({"custom": {"name": name, "counts": {"bergamot": 1}}, "quantity": 1}, catalog)
+    assert error.value.code == "CUSTOM_INVALID"
+    assert name not in error.value.message
+
+
+@pytest.mark.parametrize("name", ["한국어 조향", "향수 🌸✨"])
+def test_custom_name_preserves_korean_and_emoji(catalog, name):
+    line = build_line({"custom": {"name": name, "counts": {"bergamot": 1}}, "quantity": 1}, catalog)
+    assert line.custom.name == name
+
+
 def test_custom_composition_rules(catalog):
     with pytest.raises(InvalidInput) as error:
         build_line(

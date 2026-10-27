@@ -15,6 +15,7 @@ from aura_api.infra.models import (
     OrderItem,
     OrderItemSelection,
     OrderStatusHistory,
+    Payment,
     Product,
     ProductType,
     UserCoupon,
@@ -250,11 +251,17 @@ async def give_back_coupon(
 
 
 async def unpaid_before(session: AsyncSession, cutoff: datetime, limit: int) -> list[uuid.UUID]:
-    """`received` orders placed before `cutoff`, oldest first."""
+    """Eligible `received` orders, excluding unknown/approved payments before LIMIT."""
     return list(
         await session.scalars(
             select(Order.id)
-            .where(Order.status == "received", Order.created_at < cutoff)
+            .where(
+                Order.status == "received",
+                Order.created_at < cutoff,
+                ~select(Payment.id)
+                .where(Payment.order_id == Order.id, Payment.status.in_(("IN_PROGRESS", "DONE")))
+                .exists(),
+            )
             .order_by(Order.created_at, Order.id)
             .limit(limit)
         )
