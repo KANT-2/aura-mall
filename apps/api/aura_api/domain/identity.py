@@ -1,7 +1,7 @@
 """Identity domain: signup/login input rules, request owner, shipping coupon.
 
-Authentication is JWT: the cookie the BFF forwards is named "session", but its value is a
-signed JWT (member id, guest id, jti). There is no server-side session table.
+Authentication uses a signed Access JWT in the Bearer header. The BFF stores tokens
+in HttpOnly cookies; guest IDs never authenticate users. There is no server session.
 """
 
 import re
@@ -75,11 +75,11 @@ class RequestOwner:
 
     @property
     def raw_id(self) -> str:
-        # Value the web client sends back in X-Session-Owner.
+        # Value the web client sends back in X-Account-Owner.
         return self.user_id or self.guest_id
 
     def ensure_expected(self, expected: str | None) -> None:
-        """Reject a request started under another account (X-Session-Owner mismatch)."""
+        """Reject a request started under another account (X-Account-Owner mismatch)."""
         if expected and expected != self.raw_id:
             raise Conflict("OWNER_CHANGED", "계정이 변경되었어요. 다시 시도해 주세요.")
 

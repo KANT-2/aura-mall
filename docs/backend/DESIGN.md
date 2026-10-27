@@ -90,11 +90,11 @@ FastAPI 경로 = BFF 경로의 `/api` → `/api/v1`. trailing slash 리다이렉
 | ------ | ------------------------------- | -------- | --------------------------------------------------------------------------------------- | --------------- |
 | GET    | `/api/v1/catalog`               | catalog  | → `Catalog`                                                                             | —               |
 | GET    | `/api/v1/catalog/products/{id}` | catalog  | → `Product`, 없으면 404 (별칭 ID 지원)                                                  | —               |
-| GET    | `/api/v1/session`               | identity | → `Session { user, guestId }`, 토큰 없으면 익명 토큰 발급                               | —               |
-| POST   | `/api/v1/auth/register`         | identity | `{ name, email, password, marketing? }` → 201 `Session`                                 | —               |
-| POST   | `/api/v1/auth/login`            | identity | `{ email, password }` → `Session`                                                       | —               |
-| POST   | `/api/v1/auth/logout`           | identity | → `Session`(user: null, 같은 guestId)                                                   | 회원            |
-| POST   | 재발급 (경로 확정 필요)         | identity | Refresh Token → 새 Access Token + 새 Refresh Token                                      | Refresh Token   |
+| GET    | `/api/v1/auth/me`               | identity | → Bearer JWT로 확인한 `Member`, 토큰 없으면 401                                         | —               |
+| POST   | `/api/v1/auth/register`         | identity | `{ name, email, password, marketing? }` → 201 `TokenPair`                               | —               |
+| POST   | `/api/v1/auth/login`            | identity | `{ email, password }` → `TokenPair`                                                     | —               |
+| POST   | `/api/v1/auth/logout`           | identity | → 204 (계열 폐기 후)                                                                    | 회원            |
+| POST   | `/api/v1/auth/refresh`          | identity | Refresh Token → 새 Access Token + 새 Refresh Token                                      | Refresh Token   |
 | GET    | `/api/v1/recipes`               | atelier  | → `Recipe[]` (비회원은 `[]`)                                                            | 선택            |
 | POST   | `/api/v1/recipes`               | atelier  | `{ name, label, counts, parent? }` → 201 `Recipe`                                       | 회원            |
 | DELETE | `/api/v1/recipes/{id}`          | atelier  | → `Recipe[]`                                                                            | 회원            |
@@ -111,7 +111,7 @@ FastAPI 경로 = BFF 경로의 `/api` → `/api/v1`. trailing slash 리다이렉
 | ------ | ----------------------------------------------- | ----------------------------------------------------------------------------------- |
 | POST   | `/api/v1/admin/auth/login`                      | `{ email, password }` → 관리자 세션                                                 |
 | POST   | `/api/v1/admin/auth/logout`                     | → 관리자 토큰 폐기                                                                  |
-| GET    | `/api/v1/admin/session`                         | → 현재 관리자 또는 401                                                              |
+| GET    | `/api/v1/admin/auth/me`                         | → 현재 관리자 또는 401                                                              |
 | POST   | `/api/v1/admin/admins`                          | `{ email, name, password }` → 201 (로그인한 관리자만)                               |
 | GET    | `/api/v1/admin/overview`                        | → `AdminOverview`                                                                   |
 | GET    | `/api/v1/admin/products`                        | 쿼리 `q`, `collection`, `stock=low\|out`, `page` → `AdminPage<AdminProduct>`        |
@@ -131,7 +131,7 @@ FastAPI 경로 = BFF 경로의 `/api` → `/api/v1`. trailing slash 리다이렉
 | DTO          | 필드                                                                                   | 정의 위치(웹)                       |
 | ------------ | -------------------------------------------------------------------------------------- | ----------------------------------- |
 | Catalog      | products, collections, types, ingredients, scentFamilies, atelier.suggestedNames, home | `features/catalog/model/catalog.ts` |
-| Session      | `user: { id, email, name, coupon, marketing? } \| null`, `guestId`                     | `features/account/model/account.ts` |
+| AccountState | `user: { id, email, name, coupon, marketing? } \| null`, `guestId`                     | `features/account/model/account.ts` |
 | Recipe       | id, parent?, version, name, label, counts, color, created                              | `features/atelier/model/recipes.ts` |
 | AtelierDraft | counts, name, label, step                                                              | `features/atelier/model/recipes.ts` |
 | Order        | id, items(`CartItem[]` + 서버 `unitPrice`), total, recipient, address, created         | `features/checkout/model/order.ts`  |
@@ -141,52 +141,46 @@ FastAPI 경로 = BFF 경로의 `/api` → `/api/v1`. trailing slash 리다이렉
 
 ### 4.1 토큰 전달
 
-BFF는 브라우저 쿠키 중 `API_SESSION_COOKIE`(예: `aura_session`) 하나만 읽어, JWT 모드에서는 그 값을 `Authorization: Bearer <JWT>`로 FastAPI에 보낸다(#37). 브라우저가 보낸 `Authorization`은 전달하지 않는다. FastAPI는 `Set-Cookie: aura_session=<JWT>; Max-Age=...`로 발급·회전하고, BFF가 `Path=/`, `HttpOnly`, `SameSite=Lax`, HTTPS면 `Secure`를 적용한다.
+BFF는 HttpOnly `aura_access` 쿠키의 Access JWT만 `Authorization: Bearer <JWT>`로 FastAPI에 전달한다. FastAPI는 TokenPair JSON을 반환하며 BFF가 Access와 Refresh를 별도 쿠키에 보관한다. 브라우저 Authorization·사용자 ID·백엔드 쿠키는 전달하지 않는다. 서버 세션은 없다.
 
-| 항목   | 값                                                                                         |
-| ------ | ------------------------------------------------------------------------------------------ |
-| 클레임 | 필수 `sub`, `jti`(UUID), `iat`, `exp`, `iss`, `aud` + `gid`(guestId, UUID)                 |
-| 검증   | HS256, 서버 설정의 키·issuer·audience. 서명·필수 클레임 확인 후 `revoked_tokens` 조회(#31) |
-| 실패   | 누락·위조·만료·폐기·폐기 조회 불가는 401 + `WWW-Authenticate: Bearer`. BFF가 쿠키를 삭제   |
-| 금지   | 이메일·이름 등 개인정보를 클레임에 넣지 않음 (JWT payload는 암호화되지 않음)               |
+| 항목        | 값                                                                                  |
+| ----------- | ----------------------------------------------------------------------------------- |
+| 클레임      | 필수 `sub`, `jti`, `iat`, `exp`, `iss`, `aud`. 방문자 ID와 개인정보를 포함하지 않음 |
+| 검증        | HS256·명시적 키·issuer·audience·만료·발급 기록·폐기·활성 회원                       |
+| 사용자 조회 | FastAPI `/auth/me`는 Member, BFF `/api/auth/me`는 화면용 AccountState               |
+| 실패        | 보호 API 401에서는 쿠키 유지, Refresh 401에서는 두 쿠키 삭제                        |
 
 ### 4.2 Refresh Token
 
-| 항목        | 설계                                                                            |
-| ----------- | ------------------------------------------------------------------------------- |
-| 저장        | `refresh_tokens`에 토큰 원문이 아닌 **해시**와 회원·만료·사용·폐기 상태를 저장  |
-| 회전        | 재발급할 때마다 쓰인 Refresh Token을 "사용됨"으로 바꾸고 새 Refresh Token 발급  |
-| 재사용 감지 | 이미 쓰인 토큰이 다시 오면 같은 `family_id`의 토큰을 모두 폐기 → 다시 로그인    |
-| 로그아웃    | Access Token `jti`는 `revoked_tokens`에, Refresh Token 계열은 폐기 상태로       |
-| BFF         | 아직 Refresh를 전달하지 않음(#37). 웹은 Access 만료 시 다시 로그인. 연결은 후속 |
+Refresh 원문은 BFF의 HttpOnly `aura_refresh`(Path=/api/auth), 해시는 DB에 보관한다. 회전마다 기존 Refresh를 소비하고 재사용 감지 시 계열 전체를 폐기한다. `auth_token_families`와 `refresh_tokens`는 마이그레이션 0002의 구조를 사용한다. Access 발급 기록은 `refresh_tokens`에 통합하며 `auth_access_tokens`는 사용하지 않는다.
 
-테이블·컬럼은 공통 모듈이 구현 기준으로 정리한 뒤 마이그레이션 0002로 반영한다. 별도 `auth_token_families`·`auth_access_tokens` 테이블은 두지 않는 방향이다(`family_id` 컬럼, 기존 `revoked_tokens` 활용).
+브라우저는 Web Lock으로 갱신·로그인·로그아웃을 직렬화하고 401에서 갱신 후 최초 요청을 한 번만 재시도한다. BFF는 백엔드 쓰기를 재시도하지 않는다. 상세 규칙은 [BFF JWT 계약](../FASTAPI_BFF.md#jwt-인증)을 따른다.
 
 ### 4.3 흐름
 
-1. **첫 방문:** 토큰이 없으면 새 `guestId`로 익명 토큰 발급 → `Session { user: null, guestId }`
-2. **가입·로그인:** 비밀번호 검증(서버 해시) 후 회원 Access Token(**같은 `gid`**) + Refresh Token 발급. 이전 익명 토큰의 `jti`는 폐기
-3. **요청마다:** 서명·만료·`iss`/`aud` 확인 → `revoked_tokens`에 `jti`가 있으면 401 → 회원·익명을 구별해 요청 주인 구성
-4. **재발급:** Refresh Token 확인 → 회전 → 새 Access Token
-5. **로그아웃:** `jti` 폐기 + Refresh 계열 폐기 → 같은 `gid`의 익명 토큰 발급 → 조향 초안 유지
-6. **정리:** 만료가 지난 `revoked_tokens`·`refresh_tokens` 행은 주기적으로 삭제
+1. **첫 방문:** 비인증 방문자 UUID 쿠키 생성. 서버 인증 세션·익명 JWT는 발급하지 않음.
+2. **가입·로그인:** 계정 생성 또는 비밀번호 검증 후 Access JWT·Refresh 발급. BFF가 `/auth/me`로 회원 조회.
+3. **보호 요청:** JWT와 발급·폐기·활성 회원 검증 후 `sub`를 기준으로 업무 인가.
+4. **갱신:** 일회용 Refresh 회전, 새 토큰 쿠키 적용. 기존 Access는 자체 만료 또는 계열 폐기까지 유효.
+5. **로그아웃:** 계열의 Access·Refresh 폐기 커밋 후 204. BFF가 두 토큰 쿠키 삭제. 방문자 UUID와 로컬 장바구니 유지.
+6. **정리:** 만료 토큰·폐기 기록 정리는 별도 운영 과제.
 
 ### 4.4 관리자 인증
 
-관리자는 `admins` 테이블 계정으로 `/api/v1/admin/auth/login`에서 로그인하고, BFF가 관리자 쿠키를 따로 전달한다(팀 결정). 고객 토큰으로는 관리자 API를 쓸 수 없다. FastAPI는 관리자 요청마다 `admins.status = 'active'`를 다시 확인해 비활성화·로그아웃을 즉시 반영한다. 첫 관리자는 CLI 명령으로 만들고, 이후 관리자는 로그인한 관리자가 등록한다.
+운영 관리자 로그인·등록·발급 저장소는 후속 구현 범위다. 설계상 관리자는 `admins` 테이블 계정으로 `/api/v1/admin/auth/login`에서 로그인하고, BFF가 관리자 쿠키를 따로 전달한다(팀 결정). 고객 토큰으로는 관리자 API를 쓸 수 없다. FastAPI는 관리자 요청마다 `admins.status = 'active'`를 다시 확인해 비활성화·로그아웃을 즉시 반영한다. 첫 관리자는 CLI 명령으로 만들고, 이후 관리자는 로그인한 관리자가 등록한다.
 
 ### 4.5 인가
 
 | 리소스      | 기준                                                                                  |
 | ----------- | ------------------------------------------------------------------------------------- |
 | 레시피·주문 | 토큰의 회원 ID(`sub`)로만 조회·변경. 남의 ID는 404. 요청 본문의 사용자 ID는 쓰지 않음 |
-| 조향 초안   | 토큰의 `gid`                                                                          |
+| 조향 초안   | 비인증 방문자 `guestId` (회원 인증·권한과 분리)                                       |
 | 관리자 API  | 활성 `admins` 계정 토큰만. 미인증 401, 고객 토큰 403                                  |
-| 계정 전환   | `X-Session-Owner`가 실제 주인과 다르면 409 (보조 확인, 소유권 판단에 쓰지 않음)       |
+| 계정 전환   | `X-Account-Owner`가 실제 주인과 다르면 409 (보조 확인, 소유권 판단에 쓰지 않음)       |
 
 ## 5. 데이터
 
-테이블·컬럼·제약은 [ERD](ERD.md)와 `apps/api/db/schema.sql`을 따른다. 테이블 21개: 회원 4(users·admins·user_coupons·revoked_tokens), 상품 8, 조향 3, 주문 3, 문의 1, 관리자 운영 2(stock_adjustments·admin_audit_logs). 장바구니 테이블 없음.
+테이블·컬럼·제약은 [ERD](ERD.md)와 `apps/api/db/schema.sql`을 따른다. 테이블 23개: 회원·인증 6(users·admins·user_coupons·revoked_tokens·auth_token_families·refresh_tokens), 상품 8, 조향 3, 주문 3, 문의 1, 관리자 운영 2(stock_adjustments·admin_audit_logs). 장바구니 테이블 없음.
 
 | 원칙              | 내용                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------- |
@@ -194,14 +188,14 @@ BFF는 브라우저 쿠키 중 `API_SESSION_COOKIE`(예: `aura_session`) 하나�
 | 스냅샷            | 주문 항목에 주문 당시 상품명·단가·Gift Set 구성 복사, 상품 FK 없음                                  |
 | 계산값 저장 안 함 | 비중, 쿠폰 보유 여부, 유형 이름                                                                     |
 | 금액              | 원 단위 정수, 가격 미정은 `NULL`                                                                    |
-| 마이그레이션      | Alembic 0001이 `db/schema.sql`을 그대로 실행 → SQL과 ORM이 어긋나지 않음(테스트로 검사)             |
+| 마이그레이션      | Alembic 0001·0002가 리비전별 고정 SQL을 실행 → SQL과 ORM이 어긋나지 않음(테스트로 검사)             |
 | 시드              | `python -m aura_api.infra.seed`로 `db/seed.sql` 적재(반복 실행해도 중복 없음)                       |
 
 ## 6. 트랜잭션·동시성
 
 | 유스케이스            | 트랜잭션  | 묶는 작업                                                                   |
 | --------------------- | --------- | --------------------------------------------------------------------------- |
-| 가입                  | 필요      | users + user_coupons + refresh_tokens + 이전 익명 토큰 폐기                 |
+| 가입                  | 필요      | users + user_coupons + auth_token_families + refresh_tokens                 |
 | 레시피 저장           | 필요      | recipes + recipe_ingredients                                                |
 | **주문 접수**         | **필수**  | 재고 조건부 차감 + orders + order_items + order_item_selections + 쿠폰 사용 |
 | Refresh 재발급        | 필요      | 기존 토큰 사용 처리 + 새 토큰 저장 (재사용이면 계열 폐기)                   |
@@ -244,7 +238,7 @@ BFF는 브라우저 쿠키 중 `API_SESSION_COOKIE`(예: `aura_session`) 하나�
 ### 8.1 로컬·CI (구현됨)
 
 - PostgreSQL 16 (Docker)
-- 실행 순서: DB → `alembic upgrade head` → `python -m aura_api.infra.seed` → `npm run dev:api` → `npm run dev:web`(`API_URL`·`API_PREFIX`·`API_SESSION_COOKIE`·`API_AUTH_MODE=jwt`)
+- 실행 순서: DB → `alembic upgrade head` → `python -m aura_api.infra.seed` → `npm run dev:api` → `npm run dev:web`(`API_URL`·`API_PREFIX`·`API_ACCESS_COOKIE`·`API_REFRESH_COOKIE`)
 - 설정: `AURA_DATABASE_URL`(`postgresql+asyncpg://`), JWT 설정(`AURA_JWT_*`), `AURA_BFF_SHARED_KEY`. `apps/api/.env`(Git 제외), 예시는 `.env.example`
 - CI: PR마다 백엔드 검사·테스트, 프론트 검사·빌드, Docker 이미지 빌드(#34)
 - Docker 이미지에 마이그레이션 파일(`alembic.ini`·`migrations/`·`db/`) 포함은 인프라 담당이 반영 예정
@@ -292,6 +286,6 @@ BFF는 브라우저 쿠키 중 `API_SESSION_COOKIE`(예: `aura_session`) 하나�
 2. 맞춤 조향 주문 허용(현재 허용)과 재고 차감 대상(현재 단품 + 구성품 + Gift Set 상품)
 3. 도메인 오류 메시지를 응답에 담는 방식 (공통 모듈)
 4. Access·Refresh 수명, 재발급 경로, Refresh 전달 방식, 관리자도 Refresh를 쓰는지
-5. 익명 토큰의 `sub` 표현 (검증기는 `sub` 필수 — 회원·익명 구별 방식)
+5. 익명 방문자 초안의 저장·보존 범위 (방문자 UUID는 사용자 인증에 사용하지 않음)
 6. 관리자 인증의 BFF 계약 갱신 (현재 [BFF 계약](../FASTAPI_BFF.md) 관리자 절은 회원 `role` 방식)
 7. 회원 정지(`users.is_active`) 정책

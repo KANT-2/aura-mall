@@ -1,9 +1,9 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
-import { sessionQueryOptions } from "@/features/account/api/session";
+import { accountQueryOptions } from "@/features/account/api/account";
 
-export function useSession() {
-  const query = useQuery({ ...sessionQueryOptions, throwOnError: true });
+export function useAccount() {
+  const query = useQuery({ ...accountQueryOptions, throwOnError: true });
   return {
     user: query.data?.user ?? null,
     guestId: query.data?.guestId,

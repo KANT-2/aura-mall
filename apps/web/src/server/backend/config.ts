@@ -6,8 +6,8 @@ export function backendConfig() {
   try {
     const baseUrl = new URL(process.env.API_URL ?? "http://127.0.0.1:4000");
     const prefix = process.env.API_PREFIX ?? "/api";
-    const sessionCookie = process.env.API_SESSION_COOKIE ?? "aura_mock_session";
-    const authMode = process.env.API_AUTH_MODE ?? "cookie";
+    const accessCookie = process.env.API_ACCESS_COOKIE ?? "aura_access";
+    const refreshCookie = process.env.API_REFRESH_COOKIE ?? "aura_refresh";
     const timeoutMs = Number(process.env.API_TIMEOUT_MS ?? 10000);
     const appOrigin = process.env.APP_ORIGIN ? new URL(process.env.APP_ORIGIN).origin : undefined;
     const bffSharedKey = process.env.API_BFF_SHARED_KEY || undefined;
@@ -18,8 +18,9 @@ export function backendConfig() {
       baseUrl.search ||
       baseUrl.hash ||
       !/^\/(?:[a-zA-Z0-9_-]+\/?)*$/.test(prefix) ||
-      !/^[!#$%&'*+.^_`|~a-zA-Z0-9-]+$/.test(sessionCookie) ||
-      !["cookie", "jwt"].includes(authMode) ||
+      ![accessCookie, refreshCookie].every((name) => /^[A-Za-z0-9_-]+$/.test(name)) ||
+      new Set([accessCookie, refreshCookie, "aura_guest"]).size !== 3 ||
+      (process.env.API_AUTH_MODE !== undefined && process.env.API_AUTH_MODE !== "jwt") ||
       !Number.isInteger(timeoutMs) ||
       timeoutMs < 1 ||
       timeoutMs > 60000 ||
@@ -32,8 +33,8 @@ export function backendConfig() {
     const base = baseUrl.href.replace(/\/$/, "");
     return {
       apiUrl: `${base}${prefix.replace(/\/$/, "")}`,
-      sessionCookie,
-      authMode,
+      accessCookie,
+      refreshCookie,
       timeoutMs,
       appOrigin,
       bffSharedKey,

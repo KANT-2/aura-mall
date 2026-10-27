@@ -16,7 +16,7 @@ docs/
   archive/             # 과거 구현·QA 기록
 ```
 
-웹은 장바구니를 브라우저 로컬 스토리지에 저장하고, 상품·회원·조향·주문·문의 흐름은 Mock API로 제공합니다. FastAPI에는 헬스 체크·환경 설정·라우터·테스트 골격이 준비되어 있습니다. 업무 API 구현은 [BFF 계약](docs/FASTAPI_BFF.md)에 따라 진행합니다.
+웹은 장바구니를 브라우저 로컬 스토리지에 저장하고, 상품·회원·조향·주문·문의 흐름은 Mock API로 제공합니다. FastAPI에는 JWT 인증과 카탈로그·문의·레시피·주문·관리자 업무 API가 구현되어 있습니다. 웹과 API의 연결은 [BFF 계약](docs/FASTAPI_BFF.md)에 따라 진행합니다.
 
 Node 의존성은 npm workspaces와 루트 `package-lock.json`, Python 의존성은 `apps/api/pyproject.toml`과 `apps/api/uv.lock`으로 관리합니다. 공통 포맷 설정은 루트, 앱 전용 설정과 생성 파일은 각 앱 디렉터리에 둡니다.
 

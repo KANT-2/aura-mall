@@ -1,5 +1,7 @@
 # JWT 생명주기 최종 리뷰 및 Draft PR 미완료 항목
 
+> 최초 JWT 구현 시점의 리뷰 기록입니다. 현재 BFF 통합은 완료되었으며 TokenPair·쿠키·갱신 정책은 [BFF JWT 계약](../FASTAPI_BFF.md#jwt-인증)을 따릅니다.
+
 검토일: 2026-10-26. 브랜치: `feature/backend-jwt-lifecycle-yejin`.
 **코드·오프라인 테스트 준비와 실제 DB·BFF 연계 완료를 구분합니다. 현재 배포 준비 완료 상태는 아닙니다.**
 

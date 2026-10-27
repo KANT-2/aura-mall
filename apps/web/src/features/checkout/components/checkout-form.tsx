@@ -9,12 +9,12 @@ import { useState } from "react";
 import { money } from "@/lib/format";
 import { itemPrice, shippingFee } from "@/features/cart/model/pricing";
 import { useCart } from "@/features/cart/hooks/use-cart";
-import { useSession } from "@/features/account/hooks/use-session";
+import { useAccount } from "@/features/account/hooks/use-account";
 
 export function Checkout() {
   const { products } = useCatalog();
   const { cart, ready } = useCart(),
-    { user } = useSession(),
+    { user } = useAccount(),
     [coupon, setCoupon] = useState(false);
   const known = cart.every((x) => itemPrice(x, products) !== null),
     total = cart.reduce((sum, x) => sum + (itemPrice(x, products) ?? 0) * x.quantity, 0);

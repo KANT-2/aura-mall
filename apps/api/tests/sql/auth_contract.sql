@@ -12,7 +12,7 @@ CREATE UNIQUE INDEX users_email_test_unique ON users (lower(email));
 CREATE TABLE revoked_tokens (jti uuid PRIMARY KEY, expires_at timestamptz NOT NULL);
 CREATE INDEX revoked_expiry_test ON revoked_tokens (expires_at);
 -- Everything below is a pending extension, NOT part of merged PR #33.
-ALTER TABLE users ADD COLUMN is_active boolean NOT NULL;
+ALTER TABLE users ADD COLUMN is_active boolean NOT NULL DEFAULT true;
 CREATE TABLE auth_token_families (
     id uuid PRIMARY KEY,
     user_id uuid NOT NULL REFERENCES users(id),
@@ -41,3 +41,11 @@ CREATE INDEX refresh_expiry_test ON refresh_tokens(expires_at);
 CREATE INDEX access_expiry_test ON refresh_tokens(access_expires_at);
 CREATE UNIQUE INDEX refresh_one_unused_per_family_test ON refresh_tokens(family_id)
     WHERE consumed_at IS NULL AND revoked_at IS NULL;
+
+CREATE TABLE user_coupons (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES users(id),
+    type varchar(30) NOT NULL,
+    status varchar(20) NOT NULL DEFAULT 'AVAILABLE',
+    UNIQUE (user_id, type)
+);

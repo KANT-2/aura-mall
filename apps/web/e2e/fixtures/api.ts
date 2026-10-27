@@ -4,9 +4,35 @@ import { CART_STORAGE_KEY } from "@/features/cart/storage/cart-storage";
 
 export async function seedApi(page: Page, data: Record<string, unknown>) {
   const port = process.env.AURA_E2E_MOCK_PORT ?? "4000";
-  const response = await page.request.post(`http://127.0.0.1:${port}/__test__/seed`, { data });
+  const guest = await (await page.request.get("/api/auth/me")).json();
+  const response = await page.request.post(`http://127.0.0.1:${port}/__test__/seed`, {
+    data,
+    headers: { "X-Guest-ID": guest.guestId },
+  });
   if (!response.ok()) {
     throw new Error(`Mock API fixture failed: ${await response.text()}`);
+  }
+
+  const tokens = await response.json();
+  if (tokens.accessToken) {
+    await page.context().addCookies([
+      {
+        name: "aura_access",
+        value: tokens.accessToken,
+        domain: "127.0.0.1",
+        path: "/",
+        httpOnly: true,
+        sameSite: "Lax",
+      },
+      {
+        name: "aura_refresh",
+        value: tokens.refreshToken,
+        domain: "127.0.0.1",
+        path: "/api/auth",
+        httpOnly: true,
+        sameSite: "Lax",
+      },
+    ]);
   }
 }
 export const seedDraft = (page: Page) => seedApi(page, { draft: resumedDraft });

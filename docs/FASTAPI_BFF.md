@@ -4,11 +4,9 @@
 
 장바구니는 브라우저 로컬 스토리지에 저장하며 로그인·로그아웃과 관계없이 같은 브라우저에서 유지합니다. 그 외 서버 데이터는 Next.js BFF를 통해 기본적으로 독립 Mock API에 연결됩니다.
 
-FastAPI에는 카탈로그 조회·입점 문의·레시피 API가 구현되어 있으며, BFF는 해당 리소스를 기존 화면 계약에 맞게 연결합니다. BFF에는 쿠키 모드와 JWT→Bearer 전송 어댑터가 있습니다.
+Mock과 FastAPI의 사용자 인증은 JWT로 통일합니다. FastAPI가 Access JWT를 발급·검증하고 BFF는 토큰을 HttpOnly 쿠키에 보관해 Bearer 헤더로 전달합니다. 서버 세션 ID·세션 저장소·`/session` API는 사용하지 않습니다.
 
-JWT 브랜치에는 로그인·Refresh Token 회전·로그아웃 API와 PostgreSQL 인증 저장소가 구현되어 있습니다. 인증 DB 마이그레이션 0002는 PR #46을 통해 develop에 병합되었습니다. 전용 PostgreSQL 테스트 DB에서 인증 마이그레이션 및 JWT 생명주기 검증을 통과했습니다. 다만 운영 환경과 실제 BFF Session·쿠키 연동은 아직 검증되지 않았습니다.
-
-회원가입·Session 조회 및 BFF의 Session·쿠키 계약과 백엔드 TokenPair JSON·로그아웃 204 응답 간 연동은 후속 작업입니다. 아래에서는 구현된 기능과 미완료 연동 사항을 구분합니다.
+회원가입·로그인·사용자 조회·Refresh 회전·로그아웃을 같은 계약으로 연결합니다. 브라우저에 반환하는 `AccountState { user, guestId }`는 화면 데이터이며 인증 자격 증명이 아닙니다. 운영 DB 마이그레이션·환경 설정과 실제 배포 검증은 환경별로 수행해야 합니다.
 
 ## 경계
 
@@ -23,11 +21,11 @@ flowchart LR
 ```
 
 - `apps/web/src/app/api/**/route.ts`: 공개할 경로와 메서드를 명시합니다. 포괄적인 catch-all 프록시나 rewrite를 사용하지 않습니다.
-- `apps/web/src/server/bff`: 요청 출처·JSON 본문·세션 쿠키·브라우저 응답을 처리합니다.
+- `apps/web/src/server/bff`: 요청 출처·JSON 본문·토큰 쿠키·브라우저 응답을 처리합니다.
 - `apps/web/src/server/backend`: 서버 환경 설정과 백엔드 HTTP 요청·제한시간·오류 해석을 담당합니다.
 - `apps/web/src/lib/api/client.ts`: 브라우저는 기존 `/api` 계약만 사용합니다.
 - `apps/web/src/lib/api/server.ts`: Server Components는 같은 서버 전용 연결로 데이터 원본을 직접 조회합니다. Next Route Handler를 HTTP로 재호출하지 않습니다.
-- FastAPI: 인증·인가·가격·재고·레시피 버전·트랜잭션과 DB를 담당합니다. BFF의 출처 검사나 `X-Session-Owner`를 인증으로 간주하지 않습니다.
+- FastAPI: 인증·인가·가격·재고·레시피 버전·트랜잭션과 DB를 담당합니다. BFF의 출처 검사나 `X-Account-Owner`를 인증으로 간주하지 않습니다.
 
 장바구니 추가·수량 변경·삭제는 브라우저에서 처리하고 장바구니 API를 공개하지 않습니다. 브라우저 저장 키는 `aura_cart_v1`이며 상품 ID·수량·선택 구성만 저장합니다. 가격·상품 정보는 현재 카탈로그로 복원하고, 새로고침과 같은 출처의 다른 탭에서도 유지합니다. 기존 서버 장바구니는 자동 이전하지 않습니다.
 
@@ -39,15 +37,15 @@ BFF는 요청 사이에 사용자 상태를 메모리로 보관하지 않습니�
 
 ## 현재 FastAPI 연결 범위
 
-| 경로                                                       | 현재 상태                                                                             |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `GET /api/v1/catalog`, `GET /api/v1/catalog/products/{id}` | 실제 카탈로그 API·공개 DTO 연결                                                       |
-| `POST /api/v1/partner`                                     | 실제 서비스·도메인 검증·오류 코드 연결                                                |
-| `GET/POST /api/v1/recipes`, `DELETE /api/v1/recipes/{id}`  | 실제 레시피 API 연결. 회원 쓰기는 검증 가능한 JWT와 폐기 저장소 필요                  |
-| `/session`, `/auth/**`                                     | 기존 BFF Session 계약의 운영 API 미연결. 인증 PR의 TokenPair·Refresh 계약은 후속 조율 |
-| `/atelier/draft`, `/orders`, `/admin/**`                   | FastAPI 미구현. 기본 Mock으로 개발                                                    |
+| 경로                                                                         | 현재 상태                                                         |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `/catalog`, `/catalog/products/{id}`, `/partner`, `/recipes`                 | 실제 라우터·공개 DTO 연결                                         |
+| `/auth/register`, `/auth/login`, `/auth/me`, `/auth/refresh`, `/auth/logout` | JWT 인증 연결. PostgreSQL 인증 저장소 사용                        |
+| `/orders`                                                                    | 회원 주문 API 구현, 웹 결제 버튼 비활성                           |
+| `/admin/**`                                                                  | 업무 API 구현. 운영 관리자 토큰 발급·인증 저장소 연결은 별도 작업 |
+| `/atelier/draft`                                                             | Mock 제공, FastAPI 미구현                                         |
 
-`API_URL`은 한 백엔드를 선택합니다. FastAPI 오류나 미구현 경로를 Mock으로 자동 우회하지 않습니다. 전체 회원·조향 화면 개발의 기본값은 계속 Mock이며, FastAPI로 설정을 바꾸면 아직 없는 경로는 사용할 수 없습니다. 실제 DB를 마이그레이션·시드한 환경에서 공개 카탈로그·문의·익명 레시피 목록을 사용할 수 있습니다. 기본 폐기 조회 저장소는 미연결이므로 서명된 JWT도 회원 보호 API에서 거절되며, 회원 쓰기는 인증 담당자의 운영 저장소 연결 후 사용할 수 있습니다.
+`API_URL`은 한 백엔드를 선택합니다. FastAPI 오류나 미구현 경로를 Mock으로 자동 우회하지 않습니다. 웹 개발의 기본값은 Mock입니다. FastAPI 사용 시 인증 DB 마이그레이션 0002·시드를 적용하고 JWT 발급자·서명 키·DB·BFF 공유 키를 설정합니다. 미설정 저장소를 성공으로 간주하지 않습니다.
 
 ## 실행 환경
 
@@ -58,34 +56,33 @@ BFF는 요청 사이에 사용자 상태를 메모리로 보관하지 않습니�
 | `API_URL`            | `http://127.0.0.1:4000` | 백엔드 주소. 내부 네트워크 주소 사용 가능                                            |
 | `API_PREFIX`         | `/api`                  | 백엔드 API 접두사. FastAPI 예: `/api/v1`                                             |
 | `API_TIMEOUT_MS`     | `10000`                 | 헤더 수신부터 JSON 본문 읽기까지의 제한시간. 1~60000ms                               |
-| `API_SESSION_COOKIE` | `aura_mock_session`     | 전달을 허용하는 백엔드 세션 쿠키 한 개의 이름                                        |
-| `API_AUTH_MODE`      | `cookie`                | `cookie`: Mock 쿠키 전달, `jwt`: 허용 쿠키의 JWT를 Bearer로 변환                     |
+| `API_ACCESS_COOKIE`  | `aura_access`           | Access JWT를 보관하는 HttpOnly 쿠키 이름                                             |
+| `API_REFRESH_COOKIE` | `aura_refresh`          | Refresh Token을 보관하는 HttpOnly 쿠키 이름                                          |
+| `API_AUTH_MODE`      | 미설정                  | 선택적으로 `jwt`만 허용. 이전 `cookie` 값은 설정 오류                                |
 | `API_BFF_SHARED_KEY` | 미설정                  | FastAPI `AURA_BFF_SHARED_KEY`와 같은 서버 전용 공유 키. 변경 요청의 CSRF 경계에 사용 |
 | `APP_ORIGIN`         | 요청 URL의 origin       | 브라우저의 정식 공개 origin. 프록시·HTTPS 종료 환경에서는 명시                       |
 
-FastAPI가 아래 계약을 제공하는 경우의 `apps/web/.env.local` 예:
+FastAPI에 연결할 때의 `apps/web/.env.local` 예:
 
 ```dotenv
 API_URL=http://127.0.0.1:8000
 API_PREFIX=/api/v1
 API_TIMEOUT_MS=10000
-API_SESSION_COOKIE=aura_session
-API_AUTH_MODE=jwt
+API_ACCESS_COOKIE=aura_access
+API_REFRESH_COOKIE=aura_refresh
 # API_BFF_SHARED_KEY=<FastAPI AURA_BFF_SHARED_KEY와 같은 무작위 서버 비밀값>
 APP_ORIGIN=http://localhost:3000
 ```
 
 `npm run setup:api` 후 [API 안내](../apps/api/README.md)에 따라 DB 마이그레이션·시드를 적용하고 `npm run dev:api`로 FastAPI를 실행합니다. 위 환경 변수로 Next를 설정하고 `npm run dev:web`으로 웹 서버를 실행합니다. 변경 요청에는 Next의 `API_BFF_SHARED_KEY`와 FastAPI의 `AURA_BFF_SHARED_KEY`에 같은 서버 비밀값이 필요합니다. Mock을 함께 쓰는 기본 개발은 `npm run dev`입니다. 프로덕션 Next 서버만 실행하려면 `npm run build` 후 `npm start`를 사용합니다.
 
-Docker Compose는 JWT 전송 모드를 사용하고 루트 `.env`의 `AURA_BFF_SHARED_KEY`를 Next·FastAPI 양쪽에 주입합니다. [환경 예제](../.env.example)의 DB 설정 외에 `openssl rand -hex 32`로 만든 공유 키와 실제 `APP_ORIGIN`을 지정해야 합니다. 기본 origin은 직접 로컬 접속용 `http://localhost:13000`이며 Caddy·HTTPS 환경에서는 공개 주소로 바꿉니다. 필수 설정이 비어 있으면 Compose가 시작을 거절합니다. 기존 Caddy 설정과 운영 인증 구현은 변경하지 않습니다.
+Docker Compose는 JWT 전송 모드를 사용하고 루트 `.env`의 `AURA_BFF_SHARED_KEY`를 Next·FastAPI 양쪽에 주입합니다. [환경 예제](../.env.example)의 DB 설정 외에 `openssl rand -hex 32`로 만든 공유 키와 실제 `APP_ORIGIN`을 지정해야 합니다. 기본 origin은 직접 로컬 접속용 `http://localhost:13000`이며 Caddy·HTTPS 환경에서는 공개 주소로 바꿉니다. 필수 설정이 비어 있으면 Compose가 시작을 거절합니다. Compose는 FastAPI에 `AURA_JWT_SIGNING_KEY`, `AURA_JWT_ISSUER`, `AURA_JWT_AUDIENCE`도 필수로 주입합니다. JWT 키와 BFF 공유 키는 별도로 생성합니다.
 
 서버 설정은 요청 시점에 읽습니다. 따라서 같은 Next 빌드에 다른 백엔드 환경 변수를 주입할 수 있습니다. `.env.local` 파일 변경 후에는 Next 서버를 재시작합니다. `API_URL`에는 프로토콜·호스트 및 필요한 배포 기본 경로를, `API_PREFIX`에는 API 접두사를 둡니다. 접두사가 없다면 `/`로 설정합니다. 브라우저의 쿼리·본문·헤더로 목적지 호스트나 경로를 선택할 수 없습니다.
 
 ## FastAPI가 제공할 리소스
 
-아래 표의 Session 기반 로그인·로그아웃은 현재 Mock/BFF 화면 계약입니다.
-새 FastAPI JWT API는 TokenPair·204를 반환하므로 BFF 어댑터 없이 호환되지 않습니다.
-구현·요청·응답·DB 미연결 범위는 [JWT 생명주기](backend/JWT_LIFECYCLE.md)를 참고합니다.
+FastAPI 내부 인증 응답은 TokenPair 또는 회원 프로필이며, BFF가 브라우저용 응답과 토큰 쿠키를 구성합니다. [JWT 생명주기](backend/JWT_LIFECYCLE.md)를 함께 참고합니다.
 
 공개 BFF 경로의 `/api` 부분이 백엔드에서는 `API_PREFIX`로 바뀝니다. 예: `/api/catalog` → FastAPI `/api/v1/catalog`. 경로 끝에 `/`를 추가하지 않습니다. FastAPI의 trailing-slash redirect를 포함한 백엔드 3xx는 따라가지 않고 502로 처리합니다.
 
@@ -93,10 +90,11 @@ Docker Compose는 JWT 전송 모드를 사용하고 루트 `.env`의 `AURA_BFF_S
 | ------ | ---------------------------- | ------------------------------------------------------------------------------------------------- |
 | GET    | `/api/catalog`               | `Catalog`                                                                                         |
 | GET    | `/api/catalog/products/{id}` | `Product`, 없는 상품은 404                                                                        |
-| GET    | `/api/session`               | `Session { user: Member \| null, guestId: string }`                                               |
-| POST   | `/api/auth/register`         | `{ name, email, password, marketing? }` → 201 `Session`                                           |
-| POST   | `/api/auth/login`            | `{ email, password }` → `Session`                                                                 |
-| POST   | `/api/auth/logout`           | 본문 없음 → `Session`                                                                             |
+| GET    | `/api/auth/me`               | `AccountState { user: Member \| null, guestId: string }`                                          |
+| POST   | `/api/auth/register`         | `{ name, email, password, marketing? }` → 201 `AccountState`                                      |
+| POST   | `/api/auth/login`            | `{ email, password }` → `AccountState`                                                            |
+| POST   | `/api/auth/logout`           | 본문 없음 → `AccountState`                                                                        |
+| POST   | `/api/auth/refresh`          | 본문 없음 → 204, 토큰 쿠키 회전                                                                   |
 | GET    | `/api/recipes`               | `Recipe[]`                                                                                        |
 | POST   | `/api/recipes`               | `{ name, label, counts, parent? }` → 201 `Recipe`                                                 |
 | DELETE | `/api/recipes/{id}`          | `Recipe[]`                                                                                        |
@@ -110,7 +108,7 @@ Docker Compose는 JWT 전송 모드를 사용하고 루트 `.env`의 `AURA_BFF_S
 JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내부 이름은 snake_case를 사용할 수 있으나 요청과 응답의 JSON 별칭을 계약에 맞춰야 합니다. 정의 위치:
 
 - [상품·컬렉션·향료·프로모션·추천 이름](../apps/web/src/features/catalog/model/catalog.ts)
-- [회원·세션·인증 입력](../apps/web/src/features/account/model/account.ts)
+- [회원·화면 상태·인증 입력](../apps/web/src/features/account/model/account.ts)
 - [장바구니·맞춤 조향 구성](../apps/web/src/features/cart/model/cart.ts)
 - [레시피·초안](../apps/web/src/features/atelier/model/recipes.ts)
 - [주문](../apps/web/src/features/checkout/model/order.ts)
@@ -119,55 +117,32 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
 
 소비자 API에는 쿼리 매개변수가 필요하지 않아 BFF가 전달하지 않습니다. 관리자 목록처럼 페이지네이션·필터가 필요한 경로는 Route Handler의 `query` 옵션에 허용할 이름을 명시하며, BFF는 그 이름의 첫 값만(공백 제거, 100자 이하, 제어 문자 제외) 전달합니다. 그 외 매개변수는 버립니다. FastAPI `/docs`·`/openapi.json`·테스트 시드 경로를 BFF에 공개하지 않습니다.
 
-## 세션
+## JWT 인증
 
-### 쿠키 모드와 공통 규칙
+### 발급과 사용자 조회
 
-`API_AUTH_MODE=cookie`는 기존 Mock의 불투명 세션 쿠키를 그대로 전달합니다.
-FastAPI용 `API_AUTH_MODE=jwt`에서는 HttpOnly 쿠키를 Bearer로 변환합니다. 브라우저의 공개 경로·본문·`Session` DTO는 두 모드에서 같습니다. 이 전송 어댑터가 구현됐다는 것이 아래 TokenPair API와 로그인·로그아웃까지 연결됐다는 뜻은 아닙니다.
+- FastAPI `POST /auth/register`는 `{ name, email, password, marketing? }`를 받아 계정·배송비 쿠폰·토큰 계열을 한 트랜잭션으로 생성하고 201 TokenPair를 반환합니다. 중복 이메일은 409입니다. 공개 회원가입은 관리자 권한을 부여하지 않습니다.
+- `POST /auth/login`의 `{ email, password }`, `POST /auth/refresh`의 `{ refreshToken }`은 `{ accessToken, refreshToken, tokenType: "Bearer", expiresIn, refreshExpiresIn }`을 반환합니다. Access는 서명 JWT이며 Refresh는 일회용 불투명 토큰입니다.
+- FastAPI `GET /auth/me`는 검증된 Bearer JWT로 회원 프로필 `Member`를 조회합니다. 쿠폰은 DB 상태에서 계산합니다. 토큰 없이 호출하면 401입니다. 로그인·조회는 쿠키나 세션 DTO를 발급하지 않습니다.
+- BFF 로그인·회원가입은 TokenPair를 검증한 뒤 새 Access로 `/auth/me`를 조회해 공개 회원 필드만 반환합니다. TokenPair JSON·비밀번호·해시는 브라우저 응답에 포함하지 않습니다. 잘못된 토큰·프로필 응답은 502입니다.
+- 브라우저 `GET /api/auth/me`는 `AccountState`를 반환합니다. 토큰이 전혀 없으면 `user: null`이며 서버에 인증 세션을 생성하지 않습니다. Access가 만료돼 사라졌고 Refresh가 남아 있으면 401로 갱신을 요구합니다.
 
-- 브라우저에서 받은 쿠키 중 `API_SESSION_COOKIE`만 사용합니다. 쿠키 모드는 `Cookie`, JWT 모드는 `Authorization: Bearer <쿠키 값>`으로 전달합니다. 브라우저의 `Authorization`, 임의 사용자 ID, `X-Forwarded-*`는 전달하지 않습니다.
-- 응답에서도 허용한 쿠키만 전달합니다. 백엔드 `Domain`과 `Path`를 제거하고 BFF 호스트의 `Path=/`, `HttpOnly`, `SameSite=Lax`를 적용합니다. 공개 origin이 HTTPS이면 `Secure`도 적용합니다.
-- `Expires`·`Max-Age`를 보존해 회전·만료·로그아웃 삭제를 지원합니다. 401 응답에서 세션 삭제를 보내는 경우도 전달합니다.
-- 회원과 익명 방문자를 구분하고, 로그인·로그아웃 중에도 `guestId`를 유지해야 현재 방문자 조향 초안 정책을 보존할 수 있습니다.
-- `X-Session-Owner`는 계정 변경 중 시작한 레시피 요청을 거절하기 위한 보조 값입니다. 쿠키로 확인한 실제 소유자와 다르면 409를 반환합니다. 소유권을 이 헤더로 결정하면 안 됩니다.
+### 토큰 보관과 전달
 
-### JWT 어댑터와 백엔드 발급 계약
+- Access 쿠키는 `aura_access; Path=/`, Refresh 쿠키는 `aura_refresh; Path=/api/auth`입니다. 모두 `HttpOnly; SameSite=Lax`이며 HTTPS 공개 origin에서는 `Secure`를 적용합니다. `Max-Age`는 발급 응답의 수명입니다. 운영은 `APP_ORIGIN=https://...`를 지정합니다.
+- BFF는 Access 쿠키의 JWT 형식과 3,800자 상한만 검사하고 `Authorization: Bearer <JWT>`로 전달합니다. FastAPI만 서명·issuer·audience·필수 클레임·만료·발급 기록·폐기·활성 회원을 검증합니다. 웹에는 서명 키를 주입하지 않습니다.
+- 브라우저의 `Authorization`, 임의 사용자 ID, `Cookie`, Refresh Token을 업무 API로 전달하지 않습니다. 백엔드의 `Set-Cookie`도 전달하지 않고 BFF가 검증한 TokenPair로 쿠키를 만듭니다. 공개 카탈로그와 RSC는 사용자 토큰을 전달하지 않습니다.
+- `aura_guest`는 로그인 전후 초안을 유지하기 위한 별도 방문자 UUID입니다. `guestId`는 사용자 JWT·Refresh에 포함하지 않으며 회원 API의 인증·인가 근거가 될 수 없습니다. Mock의 익명 초안은 민감한 회원 데이터를 저장하지 않습니다.
+- `X-Account-Owner`는 계정 변경 중 시작된 레시피 요청의 409 충돌 검사에만 사용합니다. 실제 소유자는 검증된 JWT의 `sub`로 결정합니다.
 
-구현한 흐름은 `브라우저의 HttpOnly 쿠키 → Next.js BFF → Authorization: Bearer <JWT> → FastAPI`입니다.
-FastAPI는 서버에 명시한 HS256·키·issuer·audience로 서명과 필수 `sub`, `jti`, `iat`, `exp`, `iss`, `aud`를
-검증하고, 401에는 기존 오류 JSON과 `WWW-Authenticate: Bearer`를 반환합니다.
-설정이 없으면 인증을 거절하며, 쿠키나 BFF 공유 키를 사용자 인증으로 사용하지 않습니다.
-서명 검증 후에는 jti 폐기 조회도 필요합니다.PostgreSQL 인증 저장소와 마이그레이션 0002가 구현되었으며, 전용 테스트 DB에서 검증했습니다. 실제 배포 환경에는 별도로 마이그레이션과 저장소 설정을 적용해야 합니다. 미설정·스키마 불일치·폐기·조회 실패는 정상 서명 JWT라도 401입니다.
-실제 로그아웃은 jti를 만료시각까지 폐기 목록에 기록해야 하며 쿠키 삭제만으로 완료할 수 없습니다.
+### 갱신·동시성·로그아웃
 
-- 아래는 현재 BFF가 기대하는 후속 FastAPI 계약입니다. 실제 백엔드 발급 API는 아래 TokenPair 응답이므로 아직 호환되지 않습니다. FastAPI 업무 API는 `Set-Cookie: aura_session=<JWT>; Max-Age=...`처럼 설정한 이름으로 토큰을 발급·회전합니다. 본문은 기존 `Session`이며 JSON 토큰 발급 응답을 사용하는 경우에는 별도 어댑터가 필요합니다. BFF는 인증 경로의 응답을 `Session`·`Member` 공개 필드로 제한해 추가 토큰·비밀번호 필드를 제거합니다. 잘못된 DTO·JWT 쿠키는 502입니다.
-- 쿠키의 `Domain`·백엔드 `Path`를 제거하고 `Path=/; HttpOnly; SameSite=Lax`를 적용합니다. HTTPS 공개 origin에서는 `Secure`를 적용합니다. 운영에서는 `APP_ORIGIN=https://...`를 지정합니다. 수명은 발급자가 `exp`와 일치하도록 `Max-Age`/`Expires`로 정하며 BFF는 이를 보존합니다.
-- BFF는 쿠키 값의 JWT 세 부분 형식과 3,800자 상한만 검사합니다. 브라우저 쿠키 4KiB 제한에 여유를 두기 위한 전송 상한이며 FastAPI 검증기의 8,192자 상한보다 작습니다. 중복·빈 값·잘못된 형식은 백엔드를 호출하기 전에 401입니다. 서명·클레임·권한·폐기 검증이나 JWT 발급은 BFF에서 하지 않습니다. JWT 서명키를 웹 환경에 설정하지 않습니다.
-- JWT 모드에서는 백엔드에 `Cookie`를 보내지 않습니다. 토큰이 없으면 Bearer도 보내지 않으며 브라우저 `Authorization`을 대체값으로 사용하지 않습니다. 공개 카탈로그와 공용 RSC 조회는 사용자 토큰을 전달하지 않습니다.
-- 백엔드 401 또는 BFF의 잘못된 JWT 쿠키 401은 같은 호스트·경로·보안 속성의 쿠키를 `Max-Age=0`으로 삭제하고 고정 `WWW-Authenticate: Bearer`를 반환합니다. 백엔드 challenge의 임의 설명은 노출하지 않습니다. 로그인 실패의 401도 쿠키를 삭제하므로 이후 `/session`에서 익명 세션을 다시 발급해야 합니다.
-- JWT 모드의 오류 응답에 포함된 백엔드 쿠키는 적용하지 않습니다. 403·409·502·504에서는 현재 쿠키를 유지합니다. 로그아웃은 현재 JWT를 백엔드에 보내고 폐기 기록의 성공 응답을 기다립니다. BFF가 쿠키만 지우고 성공 응답을 만들지 않습니다.
-- `guestId`는 서명된 토큰 안에 보관하며 로그인·회전·로그아웃 때 유지합니다. 로그아웃 API는 회원 토큰을 폐기한 뒤 같은 `guestId`를 담은 익명 토큰과 `Session { user: null, guestId }`를 반환해야 합니다. 익명 토큰을 회원용 `CurrentUser`로 허용하지 않도록 업무 API에서 회원·익명을 구별해야 합니다. 익명 토큰 발급·검증 업무 구현은 후속 범위입니다.
-- 현재 BFF에는 Refresh Token 보관·자동 갱신·자동 재시도가 없습니다. 백엔드 Refresh API는 구현되어 있으며 BFF 연결은 후속 작업입니다. 만료 시 401로 세션을 다시 확인하고 로그인합니다. 계정 변경 409와 관리자 권한 검증은 FastAPI가 담당합니다.
-
-회원가입·Session 조회 및 BFF 응답 변환이 미완료이므로 현재 설정만 변경해 실제 화면의 회원가입·로그인을 사용할 수는 없습니다.
-
-테스트 전용 FastAPI 앱에서는 실제 JWT 검증기·CSRF 미들웨어·오류 처리를 사용해 서명·만료·위조·폐기 후 재접근·회원 분리 등을 검증합니다. 별도의 실제 리소스 테스트 앱에서는 운영 카탈로그·문의·레시피 라우터와 서비스·도메인 및 공통 보안 처리를 사용합니다.
-
-PostgreSQL 기반 JWT 발급·회전·폐기 저장소와 인증 확장 마이그레이션 0002를 구현했습니다. 전용 PostgreSQL 테스트 DB에서 DB 연결·토큰 회전·동시 요청·트랜잭션 롤백 검증을 통과했습니다. BFF Session·쿠키 연동 및 운영 환경 검증은 별도 작업입니다.
-
-JWT API의 TokenPair JSON과 로그아웃 204 응답은 현재 BFF의 Session·쿠키 계약과 다르므로 설정만 변경하여 직접 연결해서는 안 됩니다. Refresh 자동 갱신과 안전한 쿠키 관리 정책은 별도 통합 작업에서 확정해야 합니다.
-
-구체적인 검증 정책은 [JWT 인증·인가 기반](backend/AUTHORIZATION_CORE.md)을 참고합니다.
-
-#### 구현된 백엔드 생명주기 API와 연결 차이
-
-- `POST /api/v1/auth/login`의 `{email,password}`, `POST /api/v1/auth/refresh`의 `{refreshToken}` 요청은 `{accessToken,refreshToken,tokenType,expiresIn,refreshExpiresIn}` JSON을 반환합니다. 쿠키나 `Session` DTO는 발급하지 않습니다.
-- `POST /api/v1/auth/logout`은 유효한 Bearer Access JWT로 인증하고 연결 계열의 Refresh·Access 폐기 커밋 뒤 204를 반환합니다. 익명 JWT나 `guestId`는 발급하지 않습니다.
-- 현재 BFF의 `publicSession()`은 Session DTO를 요구하므로 TokenPair를 그대로 연결하면 502가 됩니다. TokenPair를 안전한 HttpOnly·Secure 쿠키와 공개 Session으로 변환하는 어댑터, Refresh 쿠키의 Path·수명, 로그아웃 204 처리·익명 방문자 유지 정책을 정민님과 합의해야 합니다. 토큰 JSON을 브라우저에 그대로 전달해서는 안 됩니다.
-- 기존 BFF는 JWT 쿠키→Bearer, 401 쿠키 삭제·고정 Bearer challenge, 출처 검사를 제공합니다. 자동 갱신은 별개이며 현재 미구현입니다. 백엔드 재사용 감지 시 계열 전체가 폐기되므로 BFF 갱신 직렬화와 재시도 정책도 필요합니다.
-- 사용자 JWT에는 현재 여섯 필수 클레임만 발급합니다. `guestId`, 관리자 권한, 계정 변경 409 정책은 임의로 추가하지 않았습니다. 기존 Mock 성공이나 테스트 전용 FastAPI 앱의 성공은 운영 DB 연결 완료를 뜻하지 않습니다.
-- `AURA_DATABASE_URL`의 PostgreSQL 저장소와 인증 확장 스키마가 필요합니다. 기본 스키마에 대한 인증 확장은 PR #46의 마이그레이션 0002로 develop에 반영되었습니다. 실제 환경에서는 해당 마이그레이션을 적용해야 합니다. 저장소 미연결·조회 실패는 보호 요청 401, 로그인·갱신·로그아웃 저장 실패는 503이며 쿠키 삭제만으로 폐기 완료를 보고하지 않습니다.
+- 보호 요청의 401에서는 새로 갱신된 쿠키를 뒤늦게 지우지 않도록 인증 쿠키를 유지합니다. 브라우저는 탭 안의 공유 Promise와 같은 출처의 Web Lock(`aura-jwt-auth`)으로 갱신을 직렬화합니다. Lock 안에서 `/auth/me`를 재확인해 다른 탭이 갱신했으면 재사용합니다. Web Locks가 없는 환경은 같은 탭의 병합만 지원합니다.
+- BFF `POST /api/auth/refresh`는 HttpOnly Refresh 쿠키만 사용합니다. 브라우저 본문의 토큰은 사용하지 않습니다. FastAPI의 회전 성공 후 두 쿠키를 교체하고 204를 반환합니다. Refresh 재사용 탐지로 계열이 폐기되거나 Refresh가 잘못된 경우 401과 두 쿠키 삭제를 반환합니다.
+- 브라우저는 갱신 성공 후 최초 요청을 한 번만 재시도합니다. 인증·인가 검사는 업무 실행 전에 수행합니다. 로그인 실패·403·409·5xx·네트워크 오류를 자동 갱신이나 쓰기 재시도로 우회하지 않습니다. 갱신 장애에서도 기존 쿠키를 보존합니다.
+- 로그인·회원가입·로그아웃도 갱신과 같은 Web Lock을 사용해 늦은 갱신 응답이 로그아웃을 되돌리지 않도록 합니다.
+- FastAPI 로그아웃은 검증된 JWT 계열의 Refresh와 미만료 Access 폐기를 커밋한 뒤 204를 반환합니다. BFF는 이 성공을 확인한 뒤 두 쿠키를 삭제하고 `AccountState { user: null, guestId }`를 반환합니다. Access가 만료됐다면 브라우저가 먼저 갱신한 뒤 로그아웃을 한 번 재시도합니다. Refresh가 이미 거절돼 삭제된 상태의 익명 로그아웃은 멱등 처리합니다.
+- JWT 검증 설정·DB가 없거나 폐기 조회가 실패하면 보호 API는 401로 거절합니다. 저장 실패는 성공으로 응답하지 않습니다. 운영 환경의 DB 적용과 배포 검증은 별도입니다.
 
 변경 요청에는 동일 출처 `Origin` 또는 출처 헤더 없는 서버 API 호출을 허용하고, 다른 `Origin`과 `Sec-Fetch-Site: cross-site`는 403으로 차단합니다. `APP_ORIGIN`을 실제 공개 주소로 설정하며 클라이언트가 보낸 forwarded host로 허용 출처를 바꾸지 않습니다.
 
@@ -175,15 +150,15 @@ JWT API의 TokenPair JSON과 로그아웃 204 응답은 현재 BFF의 Session·�
 
 ## 관리자 API (1단계 제안)
 
-운영자가 상품·재고, 주문, 입점 문의를 관리하는 계약입니다. 아래 경로·DTO·저장 구조는 Mock으로 먼저 검증한 **제안**이며, 1단계 합의(CRA-5 모델, CRA-6 DB·초기 관리자 발급, CRA-8 인증·인가)에서 확정합니다. FastAPI에는 아직 구현되지 않았습니다.
+운영자가 상품·재고, 주문, 입점 문의를 관리하는 계약입니다. 아래 경로·DTO·저장 구조는 Mock으로 먼저 검증한 **제안**이며, 1단계 합의(CRA-5 모델, CRA-6 DB·초기 관리자 발급, CRA-8 인증·인가)에서 확정합니다. FastAPI 업무 API는 구현되었으며 운영 관리자 발급·인증 저장소 연결은 남아 있습니다.
 
 ### 권한
 
-- 별도 로그인 없이 기존 세션 쿠키를 사용합니다. `Member`에 `role: "member" | "admin"`을 추가하며 `Session.user.role`은 화면 표시용 힌트입니다.
-- FastAPI는 모든 `/api/v1/admin/**` 요청마다 세션의 실제 계정 역할을 다시 조회합니다. 미인증은 401, 일반 회원은 403입니다. 로그아웃·세션 만료·역할 회수 즉시 거절해야 합니다.
+- 관리자 API도 Bearer JWT를 검증합니다. `Member.role`은 화면 표시용 힌트이며 권한 근거가 아닙니다. 운영 `admins`는 고객 `users`와 별도 테이블입니다. 고객 로그인으로 관리자 토큰을 발급하지 않습니다.
+- FastAPI는 모든 `/api/v1/admin/**` 요청마다 JWT subject에 해당하는 활성 관리자을 다시 조회합니다. 미인증은 401, 일반 회원은 403입니다. 로그아웃·JWT 만료·역할 회수 즉시 거절해야 합니다.
 - 요청 본문·헤더·쿼리의 `role`, 사용자 ID를 신뢰하지 않습니다. 회원가입 본문의 `role`은 무시하고 항상 `member`로 생성합니다.
 - 관리자 발급·회수는 운영 절차(CLI 또는 마이그레이션 시드)로만 수행하며 이번 범위에 권한 편집 UI는 없습니다. Mock은 개발용 계정을 자동 생성합니다([웹 개발 안내](../apps/web/README.md#데이터-소유권과-mock-api)).
-- 웹은 `/admin` 레이아웃에서 비회원·일반 회원·세션 만료 화면을 구분하지만, 이는 접근 통제가 아닙니다. 관리자 API가 401/403을 반환하면 웹은 세션을 다시 조회해 해당 화면으로 전환합니다.
+- 웹은 `/admin` 레이아웃에서 비회원·일반 회원·인증 만료 화면을 구분하지만, 이는 접근 통제가 아닙니다. 관리자 API가 401/403을 반환하면 웹은 `/auth/me`를 다시 조회해 해당 화면으로 전환합니다.
 
 ### 경로
 
@@ -216,7 +191,7 @@ DTO는 [관리자 모델](../apps/web/src/features/admin/model/admin.ts)에 정�
 
 [ERD](backend/ERD.md) 기준 추가 제안입니다. 이름과 타입은 CRA-5에서 확정합니다.
 
-- `members.role`: `VARCHAR(20) NOT NULL DEFAULT 'member'`, `CHECK IN ('member', 'admin')`
+- `admins`: 고객 `users`와 분리된 관리자 계정. 고객 회원가입에서는 생성하지 않음
 - `products.version`, `products.updated_at`: 낙관적 잠금과 최근 수정 표시
 - `stock_adjustments`: `id`, `product_id`, `delta`, `stock_before`, `stock_after`, `reason`, `request_key UNIQUE`, `actor_id`, `created_at`
 - `partner_inquiries.status`(`received`·`reviewing`·`done`), `internal_memo`, `version`, `updated_at`
@@ -226,7 +201,7 @@ DTO는 [관리자 모델](../apps/web/src/features/admin/model/admin.ts)에 정�
 ### 1단계에서 결정할 사항
 
 - 초기 관리자 발급·회수 절차와 운영·테스트 계정 분리 방식
-- 세션 쿠키 유지 여부(JWT 채택 시 폐기·역할 회수 즉시 반영 방법)
+- 운영 관리자 JWT 발급·폐기 저장소와 활성 관리자 확인 연결
 - 감사 기록 보존 기간, 관리자 화면의 고객 개인정보 노출 범위
 - 주문 처리 상태 모델과 취소 시 재고 복구 정책
 
@@ -237,7 +212,7 @@ DTO는 [관리자 모델](../apps/web/src/features/admin/model/admin.ts)에 정�
 FastAPI는 변경 요청에서 서버 설정의 허용 Origin·Referer를 검사하고, cross-site 요청을
 거절합니다. 출처 없는 내부 요청은 기본 차단하며, BFF가 서버 전용 `API_BFF_SHARED_KEY`를
 설정한 경우에만 `X-Aura-BFF-Key`를 추가합니다. FastAPI의 `AURA_BFF_SHARED_KEY`에 같은 값을
-설정해야 합니다. 브라우저가 보낸 키는 전달하지 않습니다. 이 값은 사용자 인증이나 세션
+설정해야 합니다. 브라우저가 보낸 키는 전달하지 않습니다. 이 값은 사용자 인증이나 사용자별
 CSRF 토큰이 아니며 공개 API 계약은 유지합니다. 기존 Mock 개발에는 설정이 필요 없습니다.
 설정·방어 범위·후속 협의 사항은 [CSRF·XSS 공통 보안](backend/SECURITY_CSRF_XSS.md)을 참고합니다.
 
@@ -256,8 +231,8 @@ BFF는 성공 시 기존 DTO를 유지하고 오류를 다음 형태로 반환�
 - 정상 삭제의 204를 지원합니다. 그 외 응답은 `application/json` 또는 `application/*+json`이어야 합니다.
 - 요청 JSON은 객체만 허용하고 최대 32KiB입니다. 잘못된 JSON은 400, 비 JSON 본문은 415, 초과 본문은 413입니다. 실제 읽은 바이트도 제한하므로 잘못된 Content-Length로 우회할 수 없습니다.
 - BFF가 만든 `X-Request-ID`를 백엔드 요청과 브라우저 응답에 함께 넣습니다. 브라우저가 보낸 요청 ID는 신뢰하지 않습니다.
-- 응답은 `Cache-Control: private, no-store`이며 세션 경로에는 `Vary: Cookie`를 적용합니다. 공용 카탈로그만 프런트 쿼리 캐시에 유지합니다.
-- 쓰기 요청을 자동 재시도하지 않습니다. 중복 주문 방지를 위한 idempotency 계약은 실제 주문·결제 연결 시 FastAPI와 함께 정해야 합니다.
+- 응답은 `Cache-Control: private, no-store`이며 인증 경로에는 `Vary: Cookie`를 적용합니다. 공용 카탈로그만 프런트 쿼리 캐시에 유지합니다.
+- BFF는 쓰기 요청을 재시도하지 않습니다. 브라우저는 업무 실행 전 401 거절에 한해 JWT 갱신 후 한 번 재시도합니다. 중복 주문 방지를 위한 idempotency 계약은 실제 주문·결제 연결 시 FastAPI와 함께 정해야 합니다.
 
 ## Mock으로 먼저 검증하는 계약
 
@@ -267,14 +242,16 @@ Mock API는 본문이 필요한 경로에서 JSON 객체를 검사하고, 누락
 
 Mock 주문의 재고 검사는 전달된 전체 주문 항목과 고정 fixture를 기준으로 합니다. 사용자 간 재고 예약·차감과 운영 트랜잭션은 FastAPI·DB 구현에서 검증해야 합니다. 계정 변경으로 회원가입이 거절된 경우에도 계정이 생성되지 않는지 HTTP 테스트로 확인합니다.
 
-실제 Mock HTTP 서버를 사용하는 통합 테스트와 Next 프로덕션 서버를 통과하는 BFF E2E로 이 계약을 검증합니다. FastAPI 전환 전에도 세션의 `guestId` 유지, 로그인·로그아웃 후 로컬 장바구니 유지, 레시피·초안·주문 흐름을 같은 공개 경로로 확인할 수 있습니다.
+실제 Mock HTTP 서버를 사용하는 통합 테스트와 Next 프로덕션 서버를 통과하는 BFF E2E로 이 계약을 검증합니다. FastAPI 전환 전에도 비인증 방문자의 `guestId` 유지, 로그인·로그아웃 후 로컬 장바구니 유지, 레시피·초안·주문 흐름을 같은 공개 경로로 확인할 수 있습니다.
 
 ## OpenAPI 인계
 
-FastAPI `/openapi.json`에는 현재 헬스 체크·카탈로그·문의·레시피 경로가 포함됩니다. 위 DTO와 차이가 있다면 서버 응답 모델 또는 BFF 리소스 어댑터로 맞춥니다. 스키마 버전 관리·TypeScript 타입 생성·CI 계약 자동 검사는 후속 작업입니다.
+FastAPI `/openapi.json`에는 현재 헬스 체크·JWT 인증·카탈로그·문의·레시피·주문·관리자 경로가 포함됩니다. 위 DTO와 차이가 있다면 서버 응답 모델 또는 BFF 리소스 어댑터로 맞춥니다. 스키마 버전 관리·TypeScript 타입 생성·CI 계약 자동 검사는 후속 작업입니다.
 
-BFF HTTP 통합 테스트는 실제 서버 응답으로 FastAPI 형태의 오류·쿠키·제한시간·리다이렉트·헤더 경계를 검증합니다. Playwright는 Mock 백엔드에 연결한 실제 Next 프로덕션 서버를 통해 세션·인증·장바구니·초안과 BFF 경로를 검증합니다. FastAPI가 준비되면 같은 계약 검증을 해당 서버에서도 실행하고 DB 트랜잭션·운영 인증을 추가 검증해야 합니다.
+BFF HTTP 통합 테스트는 실제 서버 응답으로 FastAPI 형태의 오류·쿠키·제한시간·리다이렉트·헤더 경계를 검증합니다. Playwright는 Mock 백엔드에 연결한 실제 Next 프로덕션 서버를 통해 JWT 인증·장바구니·초안과 BFF 경로를 검증합니다. FastAPI가 준비되면 같은 계약 검증을 해당 서버에서도 실행하고 DB 트랜잭션·운영 인증을 추가 검증해야 합니다.
 
-`npm run build && npm run test:e2e:fastapi`는 실제 Next 서버와 [테스트 전용 리소스 앱](../apps/api/tests/fixtures/storefront_app.py)을 실행합니다. 운영 라우터·서비스·도메인을 사용하고 DB 저장소·세션과 폐기 저장소만 대체해 RSC 카탈로그·상품, 문의 검증, 레시피 저장·다시 만들기·회원 분리·409·삭제를 검증합니다. 토큰은 테스트에서만 서명하며 브라우저 로그인이나 PostgreSQL의 영속성·트랜잭션 검증을 대신하지 않습니다. 기존 `test:e2e:jwt`는 별도의 전송 경계 테스트로 유지합니다.
+`npm run build && npm run test:e2e:fastapi`는 실제 Next 서버와 [테스트 전용 리소스 앱](../apps/api/tests/fixtures/storefront_app.py)을 실행합니다. 운영 라우터·서비스·도메인을 사용하고 DB 저장소·DB 세션과 폐기 저장소만 대체해 RSC 카탈로그·상품, 문의 검증, 레시피 저장·다시 만들기·회원 분리·409·삭제를 검증합니다. 토큰은 테스트에서만 서명하며 브라우저 로그인이나 PostgreSQL의 영속성·트랜잭션 검증을 대신하지 않습니다. 기존 `test:e2e:jwt`는 별도의 전송 경계 테스트로 유지합니다.
 
 참고: [Next.js BFF](https://nextjs.org/docs/app/guides/backend-for-frontend), [FastAPI 오류 처리](https://fastapi.tiangolo.com/tutorial/handling-errors/), [응답 쿠키](https://fastapi.tiangolo.com/advanced/response-cookies/), [프록시 뒤의 FastAPI](https://fastapi.tiangolo.com/advanced/behind-a-proxy/).
+
+`npm run test:e2e:jwt`는 운영 회원가입·로그인·조회·갱신·로그아웃 라우터와 서비스를 사용하고 인증 저장소만 테스트 대역으로 바꿉니다. TokenPair·204 계약, 만료·위조·재사용·계열 폐기, 브라우저 탭 간 갱신을 검증합니다. 실제 PostgreSQL 검증은 `AURA_TEST_DATABASE_URL` 및 명시적 DDL 동의가 필요한 API 테스트에서 수행합니다.

@@ -13,11 +13,11 @@ import { Asset } from "@/components/ui/asset";
 import { totalCount } from "@/features/atelier/model/recipes";
 import { useNotify } from "@/components/feedback/notification-provider";
 import { useRecipes } from "@/features/atelier/hooks/use-recipes";
-import { useSession } from "@/features/account/hooks/use-session";
+import { useAccount } from "@/features/account/hooks/use-account";
 export function MyPage() {
   const { ingredients } = useCatalog();
   const { signOut } = useAuth();
-  const { user, ready } = useSession(),
+  const { user, ready } = useAccount(),
     { recipes, ready: recipesReady } = useRecipes(),
     notify = useNotify(),
     [tab, setTab] = useState("scents"),
