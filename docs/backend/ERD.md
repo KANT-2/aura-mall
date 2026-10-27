@@ -40,6 +40,7 @@ erDiagram
 
     orders ||--o{ order_items : "주문 항목"
     orders ||--o{ order_status_history : "상태 변경"
+    orders ||--o{ payments : "결제 시도"
     order_items ||--o{ order_item_selections : "Gift Set 구성"
     user_coupons |o--o| orders : "사용"
 
@@ -219,6 +220,15 @@ erDiagram
         varchar idempotency_key
         timestamptz created_at
         varchar status
+    }
+    payments {
+        uuid id PK
+        uuid order_id FK
+        varchar pg_order_id UK
+        varchar payment_key UK
+        int amount
+        varchar status
+        timestamptz approved_at
     }
     order_status_history {
         uuid id PK
@@ -581,6 +591,29 @@ erDiagram
 | changed_at  | TIMESTAMPTZ  | NOT NULL DEFAULT now()                    | 0006 이전 주문은 주문 시각으로 기록 |
 
 > 상태: `received` 접수(결제 없음) · `paid` 결제 완료 · `preparing` 제작·출고 준비 · `shipped` 배송 중 · `delivered` 배송 완료 · `cancelled` 취소. 전이 규칙은 [주문 상태 문서](ORDER_STATUS.md).
+
+**payments** — 주문별 PG 결제 시도 (마이그레이션 0007)
+
+| 컬럼               | 타입         | 제약                                                    | 설명                                |
+| ------------------ | ------------ | ------------------------------------------------------- | ----------------------------------- |
+| id                 | UUID         | PK                                                      | PG 멱등키로도 사용                  |
+| order_id           | UUID         | FK → orders, INDEX                                      | 주문 삭제 시 함께 지우지 않음       |
+| provider           | VARCHAR(20)  | NOT NULL                                                | `toss`                              |
+| pg_order_id        | VARCHAR(64)  | NOT NULL, UK, CHECK 영문·숫자·`-`·`_` 6~64자            | PG에 보낸 주문번호(`aura-<id hex>`) |
+| payment_key        | VARCHAR(200) | UK, NULL                                                | PG paymentKey. 승인 요청 시 기록    |
+| amount             | INTEGER      | NOT NULL, CHECK > 0                                     | 발급 시점의 `orders.total`          |
+| status             | VARCHAR(20)  | CHECK `READY`·`IN_PROGRESS`·`DONE`·`FAILED`             |                                     |
+| method             | VARCHAR(30)  | NULL                                                    | PG 결제수단 (카드 등)               |
+| failure_code       | VARCHAR(100) | NULL                                                    | PG 실패 코드                        |
+| failure_message    | VARCHAR(500) | NULL                                                    | PG 실패 사유                        |
+| review_reason      | VARCHAR(100) | NULL                                                    | 승인됐지만 수동 처리가 필요한 사유  |
+| confirm_started_at | TIMESTAMPTZ  | `READY`가 아니면 paymentKey와 함께 필수 (CHECK)         | 승인 요청 시각, 재확인 기준         |
+| approved_at        | TIMESTAMPTZ  | `DONE`일 때만 값 (CHECK)                                | PG 승인 시각                        |
+| created_at         | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                  |                                     |
+| updated_at         | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                  |                                     |
+|                    |              | UNIQUE(order_id) WHERE status IN READY·IN_PROGRESS·DONE | 주문당 진행·완료 결제는 1건         |
+
+> 카드 번호 등 결제수단 정보는 저장하지 않습니다. 브라우저가 PG 결제창과 직접 통신합니다.
 
 **order_item_selections** — Gift Set 구성 3개 (스냅샷)
 
