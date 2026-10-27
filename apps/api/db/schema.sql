@@ -3,7 +3,7 @@
 -- contract in docs/FASTAPI_BFF.md. Run once on an empty database (PostgreSQL 13+):
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/schema.sql
 -- Then load initial catalog data with db/seed.sql. The cart is not stored (browser only).
--- This file is the latest full schema (migrations 0001 through 0007). Alembic applies the same
+-- This file is the latest full schema (migrations 0001 through 0008). Alembic applies the same
 -- DDL step by step from migrations/sql/; tests/db checks that both give the same tables.
 
 BEGIN;
@@ -314,6 +314,8 @@ CREATE TABLE orders (
 );
 CREATE INDEX orders_user_created_idx ON orders (user_id, created_at DESC);
 CREATE INDEX orders_created_idx ON orders (created_at DESC);
+-- Unpaid orders oldest first, for the expiry job (0008).
+CREATE INDEX orders_unpaid_created_idx ON orders (created_at) WHERE status = 'received';
 
 ALTER TABLE user_coupons
     ADD CONSTRAINT user_coupons_used_order_fkey
@@ -385,12 +387,14 @@ CREATE TABLE payments (
     updated_at         TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT payments_pg_order_id_key UNIQUE (pg_order_id),
     CONSTRAINT payments_payment_key_key UNIQUE (payment_key),
+    -- CANCELED (0008): a READY attempt closed because its order was cancelled.
     CONSTRAINT payments_status_check
-        CHECK (status IN ('READY', 'IN_PROGRESS', 'DONE', 'FAILED')),
+        CHECK (status IN ('READY', 'IN_PROGRESS', 'DONE', 'FAILED', 'CANCELED')),
     CONSTRAINT payments_amount_check CHECK (amount > 0),
     CONSTRAINT payments_pg_order_id_check CHECK (pg_order_id ~ '^[A-Za-z0-9_-]{6,64}$'),
     CONSTRAINT payments_claimed_check
-        CHECK (status = 'READY' OR (payment_key IS NOT NULL AND confirm_started_at IS NOT NULL)),
+        CHECK (status IN ('READY', 'CANCELED')
+               OR (payment_key IS NOT NULL AND confirm_started_at IS NOT NULL)),
     CONSTRAINT payments_approved_check CHECK ((status = 'DONE') = (approved_at IS NOT NULL))
 );
 -- One open or approved attempt per order: a second approval for the same order cannot exist.

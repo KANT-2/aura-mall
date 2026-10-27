@@ -26,11 +26,14 @@ class Payment(Base):
     __table_args__ = (
         UniqueConstraint("pg_order_id", name="payments_pg_order_id_key"),
         UniqueConstraint("payment_key", name="payments_payment_key_key"),
-        CheckConstraint("status IN ('READY', 'IN_PROGRESS', 'DONE', 'FAILED')", name="status"),
+        CheckConstraint(
+            "status IN ('READY', 'IN_PROGRESS', 'DONE', 'FAILED', 'CANCELED')", name="status"
+        ),
         CheckConstraint("amount > 0", name="amount"),
         CheckConstraint("pg_order_id ~ '^[A-Za-z0-9_-]{6,64}$'", name="pg_order_id"),
         CheckConstraint(
-            "status = 'READY' OR (payment_key IS NOT NULL AND confirm_started_at IS NOT NULL)",
+            "status IN ('READY', 'CANCELED') "
+            "OR (payment_key IS NOT NULL AND confirm_started_at IS NOT NULL)",
             name="claimed",
         ),
         CheckConstraint("(status = 'DONE') = (approved_at IS NOT NULL)", name="approved"),
