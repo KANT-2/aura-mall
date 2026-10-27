@@ -1,7 +1,6 @@
 """Exercise the SSH deployment shell with disposable fake Git/Docker commands."""
 
 import os
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -73,9 +72,9 @@ class DeploymentShellTests(unittest.TestCase):
                     " log.write('operation:' + sys.argv[1] + '\\n')\n"
                 )
             # Keep the shell's backup writes inside this temporary directory.
-            remote = remote.replace(
-                '"$HOME/workspace/aura-backups"', shlex.quote(str(root / "backups"))
-            )
+            remote = remote.replace("$HOME/workspace/aura-backups", "${AURA_CD_TEST_BACKUP_DIR}")
+            self.assertNotIn("$HOME", remote)
+            self.assertNotIn("${HOME}", remote)
             log = root / "calls.log"
             result = subprocess.run(
                 ["bash", "-se", "--", str(root), "main", COMMIT],
@@ -87,9 +86,14 @@ class DeploymentShellTests(unittest.TestCase):
                     "PATH": str(binaries) + os.pathsep + os.environ["PATH"],
                     "AURA_CD_TEST_LOG": str(log),
                     "AURA_CD_TEST_ACTUAL_COMMIT": actual_commit,
+                    "AURA_CD_TEST_BACKUP_DIR": str(root / "backups"),
                 },
                 timeout=30,
             )
+            if result.returncode == 0 and not managed:
+                backups = list((root / "backups").glob("aura-*.dump"))
+                self.assertEqual(len(backups), 1)
+                self.assertEqual(backups[0].read_bytes(), b"test-backup")
             return result, log.read_text()
 
     def test_stdin_consumer_cannot_skip_the_deployment(self):
