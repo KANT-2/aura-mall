@@ -77,6 +77,8 @@ jobs:
           uv sync --directory apps/api --locked
           apps/api/.venv/bin/ruff check ops
           apps/api/.venv/bin/ruff format --check ops
+          python3 ops/test_deploy.py
+          python3 ops/test_timer.py
           for script in ops/postgres/*.sh; do sh -n "$script"; done
 
       - name: Exercise disposable database cluster

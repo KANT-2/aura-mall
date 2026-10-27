@@ -48,13 +48,14 @@ class OperationError(Exception):
         self.diagnostics = diagnostics
 
 
-def run(args, *, data=None, check=True, output=None, timeout=180):
+def run(args, *, data=None, check=True, output=None, timeout=180, env=None):
     result = subprocess.run(
         list(map(str, args)),
         input=data.encode() if isinstance(data, str) else data,
         stdout=output if output is not None else subprocess.PIPE,
         stderr=subprocess.PIPE,
         timeout=timeout,
+        env=env,
     )
     if check and result.returncode:
         # Do not expose stderr: PostgreSQL failures can include secret-bearing SQL.
@@ -453,7 +454,12 @@ class Database:
                     data=json.dumps({"version": version}),
                     timeout=15,
                 )
-                workers[container.decode()] = json.loads(result.stdout)
+                acknowledgement = json.loads(result.stdout)
+                # Atomic heartbeat replacement may change filesystem enumeration order.
+                acknowledgement["processes"].sort(
+                    key=lambda process: (process["pid"], process["start"], process["instance"])
+                )
+                workers[container.decode()] = acknowledgement
             if containers != self.dc("ps", "--status", "running", "-q", "api").stdout.split():
                 raise OperationError("API container membership changed during acknowledgement")
             return workers
@@ -468,6 +474,37 @@ class Database:
         self.recover_rotation()
         self.dc("up", "-d", "--build", "--no-deps", "api", timeout=600)
         self.status()
+
+    def migrate(self):
+        self.require_primary()
+        self.recover_rotation()
+        config = json.loads(self.dc("config", "--format", "json").stdout)
+        admin = config["services"]["db"]["environment"]
+        if not all(admin.get(key) for key in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")):
+            raise OperationError("Database administrator configuration is incomplete")
+        query = urlencode({"sslmode": "verify-full", "sslrootcert": "/run/aura-db-client/ca.crt"})
+        url = (
+            f"postgresql://{quote(admin['POSTGRES_USER'], safe='')}:"
+            f"{quote(admin['POSTGRES_PASSWORD'], safe='')}@{self.primary}:5432/"
+            f"{quote(admin['POSTGRES_DB'], safe='')}?{query}"
+        )
+        # A one-off migration uses the original administrator, never the rotating DML role.
+        # Docker reads the URL from the process environment, not command arguments or logs.
+        self.dc(
+            "run",
+            "--rm",
+            "--no-deps",
+            "--env",
+            "AURA_DATABASE_URL",
+            "--env",
+            "AURA_DATABASE_URL_FILE=",
+            "api",
+            "alembic",
+            "upgrade",
+            "head",
+            env={**os.environ, "AURA_DATABASE_URL": url},
+            timeout=600,
+        )
 
     def bootstrap(self):
         if self.primary != "db" or (self.state / "fenced-primary").exists():
@@ -736,8 +773,7 @@ SELECT pg_create_physical_replication_slot('aura_standby')
             self.rotate()
         self.status()
 
-    def install_timer(self):
-        directory = Path.home() / ".config/systemd/user"
+    def write_timer_units(self, directory):
         directory.mkdir(parents=True, exist_ok=True)
         escaped = str(ROOT).replace("%", "%%").replace('"', '\\"')
         atomic(
@@ -747,7 +783,7 @@ Description=AURA database TLS renewal, credentials, backup and replication check
 
 [Service]
 Type=oneshot
-WorkingDirectory="{escaped}"
+WorkingDirectory={escaped}
 ExecStart=/usr/bin/python3 "{escaped}/ops/database.py" --project {self.project} maintain
 UMask=0077
 TimeoutStartSec=15min
@@ -769,6 +805,9 @@ WantedBy=timers.target
 """,
             0o644,
         )
+
+    def install_timer(self):
+        self.write_timer_units(Path.home() / ".config/systemd/user")
         run(["systemctl", "--user", "daemon-reload"])
         run(["systemctl", "--user", "enable", "--now", "aura-db-maintenance.timer"])
         print("Daily timer enabled. Ensure this user's systemd manager has lingering enabled.")
@@ -791,6 +830,7 @@ def main():
             "maintain",
             "install-timer",
             "deploy-api",
+            "migrate",
         ],
     )
     parser.add_argument("--force", action="store_true", help="Renew a certificate before it is due")

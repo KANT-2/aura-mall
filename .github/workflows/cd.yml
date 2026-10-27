@@ -71,151 +71,158 @@ jobs:
             bash -se -- "$DEPLOY_PATH" "$DEPLOY_BRANCH" "$DEPLOY_COMMIT" <<'REMOTE'
           set -euo pipefail
 
-          cd "$1"
-          deploy_branch="$2"
-          deploy_commit="$3"
-          case "$deploy_branch" in
-            main|develop) ;;
-            *) echo "Unsupported deployment branch"; exit 1 ;;
-          esac
+          deploy() {
+            cd "$1"
+            deploy_branch="$2"
+            deploy_commit="$3"
+            case "$deploy_branch" in
+              main|develop) ;;
+              *) echo "Unsupported deployment branch"; exit 1 ;;
+            esac
 
-          echo "Checking deployment directory..."
-          test -f compose.yaml
-          test -f .env
+            echo "Checking deployment directory..."
+            test -f compose.yaml
+            test -f .env
 
-          echo "Checking Git working tree..."
-          test -z "$(git status --porcelain --untracked-files=no)"
+            echo "Checking Git working tree..."
+            test -z "$(git status --porcelain --untracked-files=no)"
 
-          echo "Updating $deploy_branch..."
-          git fetch origin "$deploy_branch"
-          git switch "$deploy_branch"
-          git pull --ff-only origin "$deploy_branch"
-          test "$(git rev-parse HEAD)" = "$deploy_commit"
+            echo "Updating $deploy_branch..."
+            git fetch origin "$deploy_branch"
+            git switch "$deploy_branch"
+            git pull --ff-only origin "$deploy_branch"
+            test "$(git rev-parse HEAD)" = "$deploy_commit"
 
-          echo "Validating Compose configuration..."
+            echo "Validating Compose configuration..."
 
-          compose_args=(-f compose.yaml)
-          if test -f .db-ops/client/database-url; then
-            compose_args+=(-f compose.database.yaml)
-          fi
-          if test -f compose.lb.yaml; then
-            compose_args+=(-f compose.lb.yaml)
-          fi
-          docker compose "${compose_args[@]}" config --quiet
-          caddy_network=$(docker compose "${compose_args[@]}" config --format json |
-            python3 -c 'import json,sys; print(json.load(sys.stdin)["networks"]["caddy"]["name"])')
-          docker network inspect "$caddy_network" > /dev/null
-          api_replicas=$(docker compose "${compose_args[@]}" config --format json |
-            python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["api"]["deploy"]["replicas"])')
-          web_replicas=$(docker compose "${compose_args[@]}" config --format json |
-            python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["web"]["deploy"]["replicas"])')
+            compose_args=(-f compose.yaml)
+            if test -f .db-ops/client/database-url; then
+              compose_args+=(-f compose.database.yaml)
+            fi
+            if test -f compose.lb.yaml; then
+              compose_args+=(-f compose.lb.yaml)
+            fi
+            docker compose "${compose_args[@]}" config --quiet
+            caddy_network=$(docker compose "${compose_args[@]}" config --format json |
+              python3 -c 'import json,sys; print(json.load(sys.stdin)["networks"]["caddy"]["name"])')
+            docker network inspect "$caddy_network" > /dev/null
+            api_replicas=$(docker compose "${compose_args[@]}" config --format json |
+              python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["api"]["deploy"]["replicas"])')
+            web_replicas=$(docker compose "${compose_args[@]}" config --format json |
+              python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["web"]["deploy"]["replicas"])')
 
-          echo "Checking AURA database..."
-          if test -f .db-ops/client/database-url; then
-            python3 ops/database.py status
-          else
-            docker compose "${compose_args[@]}" up -d --no-deps db
-            docker compose "${compose_args[@]}" exec -T db \
-              sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
-          fi
+            echo "Checking AURA database..."
+            if test -f .db-ops/client/database-url; then
+              python3 ops/database.py status
+            else
+              docker compose "${compose_args[@]}" up -d --no-deps db
+              docker compose "${compose_args[@]}" exec -T db \
+                sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+            fi
 
-          echo "Building API and Next.js..."
-          docker compose "${compose_args[@]}" build api web
+            echo "Building API and Next.js..."
+            docker compose "${compose_args[@]}" build api web
 
-          echo "Backing up AURA database..."
-          if test -f .db-ops/client/database-url; then
-            python3 ops/database.py backup
-          else
-            mkdir -p "$HOME/workspace/aura-backups"
-            chmod 700 "$HOME/workspace/aura-backups"
-            backup="$HOME/workspace/aura-backups/aura-$(date +%Y%m%d-%H%M%S).dump"
-            docker compose "${compose_args[@]}" exec -T db \
-              sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup"
-            docker compose "${compose_args[@]}" exec -T db \
-              pg_restore -l < "$backup" > /dev/null
-          fi
+            echo "Backing up AURA database..."
+            if test -f .db-ops/client/database-url; then
+              python3 ops/database.py backup
+            else
+              mkdir -p "$HOME/workspace/aura-backups"
+              chmod 700 "$HOME/workspace/aura-backups"
+              backup="$HOME/workspace/aura-backups/aura-$(date +%Y%m%d-%H%M%S).dump"
+              docker compose "${compose_args[@]}" exec -T db \
+                sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup"
+              docker compose "${compose_args[@]}" exec -T db \
+                pg_restore -l < "$backup" > /dev/null
+            fi
 
-          echo "Applying Alembic migrations..."
-          docker compose "${compose_args[@]}" run --rm --no-deps api alembic upgrade head
+            echo "Applying Alembic migrations..."
+            if test -f .db-ops/client/database-url; then
+              python3 ops/database.py migrate
+            else
+              docker compose "${compose_args[@]}" run --rm --no-deps api alembic upgrade head
+            fi
 
-          echo "Deploying $api_replicas FastAPI and $web_replicas Next.js containers..."
-          if test -f .db-ops/client/database-url; then
-            python3 ops/database.py deploy-api
-          fi
-          docker compose "${compose_args[@]}" up -d --no-deps --remove-orphans api web
+            echo "Deploying $api_replicas FastAPI and $web_replicas Next.js containers..."
+            if test -f .db-ops/client/database-url; then
+              python3 ops/database.py deploy-api
+            fi
+            docker compose "${compose_args[@]}" up -d --no-deps --remove-orphans api web
 
-          echo "Checking all API containers..."
-          healthy=false
-          for attempt in $(seq 1 12); do
-            mapfile -t api_containers < <(
-              docker compose "${compose_args[@]}" ps --status running -q api
-            )
-            if [ "${#api_containers[@]}" -eq "$api_replicas" ]; then
-              healthy=true
-              for container in "${api_containers[@]}"; do
-                if ! docker exec "$container" python -c \
-                  "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"; then
-                  healthy=false
+            echo "Checking all API containers..."
+            healthy=false
+            for attempt in $(seq 1 12); do
+              mapfile -t api_containers < <(
+                docker compose "${compose_args[@]}" ps --status running -q api
+              )
+              if [ "${#api_containers[@]}" -eq "$api_replicas" ]; then
+                healthy=true
+                for container in "${api_containers[@]}"; do
+                  if ! docker exec "$container" python -c \
+                    "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"; then
+                    healthy=false
+                    break
+                  fi
+                done
+                if [ "$healthy" = "true" ]; then
                   break
                 fi
-              done
-              if [ "$healthy" = "true" ]; then
-                break
               fi
+              echo "API containers not ready yet (attempt $attempt/12)"
+              sleep 5
+            done
+
+            if [ "$healthy" != "true" ]; then
+              echo "API health check failed"
+              exit 1
             fi
-            echo "API containers not ready yet (attempt $attempt/12)"
-            sleep 5
-          done
 
-          if [ "$healthy" != "true" ]; then
-            echo "API health check failed"
-            exit 1
-          fi
-
-          echo "Checking all Next.js containers..."
-          web_healthy=false
-          for attempt in $(seq 1 12); do
-            mapfile -t web_containers < <(
-              docker compose "${compose_args[@]}" ps --status running -q web
-            )
-            if [ "${#web_containers[@]}" -eq "$web_replicas" ]; then
-              web_healthy=true
-              for container in "${web_containers[@]}"; do
-                if ! docker exec "$container" node -e \
-                  "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
-                  web_healthy=false
+            echo "Checking all Next.js containers..."
+            web_healthy=false
+            for attempt in $(seq 1 12); do
+              mapfile -t web_containers < <(
+                docker compose "${compose_args[@]}" ps --status running -q web
+              )
+              if [ "${#web_containers[@]}" -eq "$web_replicas" ]; then
+                web_healthy=true
+                for container in "${web_containers[@]}"; do
+                  if ! docker exec "$container" node -e \
+                    "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
+                    web_healthy=false
+                    break
+                  fi
+                done
+                if [ "$web_healthy" = "true" ]; then
                   break
                 fi
-              done
-              if [ "$web_healthy" = "true" ]; then
+              fi
+              echo "Next.js containers not ready yet (attempt $attempt/12)"
+              sleep 5
+            done
+
+            if [ "$web_healthy" != "true" ]; then
+              echo "Next.js health check failed"
+              exit 1
+            fi
+
+            echo "Checking public HTTPS route..."
+            public_healthy=false
+            for attempt in $(seq 1 12); do
+              if curl -fsS -o /dev/null https://aura.dev.crasnec.com; then
+                public_healthy=true
                 break
               fi
+              echo "Public route not ready yet (attempt $attempt/12)"
+              sleep 5
+            done
+
+            if [ "$public_healthy" != "true" ]; then
+              echo "Public HTTPS health check failed"
+              exit 1
             fi
-            echo "Next.js containers not ready yet (attempt $attempt/12)"
-            sleep 5
-          done
 
-          if [ "$web_healthy" != "true" ]; then
-            echo "Next.js health check failed"
-            exit 1
-          fi
-
-          echo "Checking public HTTPS route..."
-          public_healthy=false
-          for attempt in $(seq 1 12); do
-            if curl -fsS -o /dev/null https://aura.dev.crasnec.com; then
-              public_healthy=true
-              break
-            fi
-            echo "Public route not ready yet (attempt $attempt/12)"
-            sleep 5
-          done
-
-          if [ "$public_healthy" != "true" ]; then
-            echo "Public HTTPS health check failed"
-            exit 1
-          fi
-
-          echo "AURA HA deployment completed"
+            echo "AURA HA deployment completed"
+          }
+          deploy "$@" </dev/null
 
           REMOTE
