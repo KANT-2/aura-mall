@@ -63,6 +63,8 @@ python3 ops/database.py status
 
 이전의 별도 `web2` 서비스에서 전환할 때는 먼저 공용 Caddy의 웹 upstream을 `aura-web` DNS 별칭을 조회하는 예제로 바꿉니다. `.env`의 `COMPOSE_FILE`에 삭제된 파일을 직접 지정했다면 해당 항목도 제거합니다. CD는 배포 시 현재 Compose에 없는 이전 서비스를 정리합니다.
 
+`develop → main` 배포 PR을 병합하면 `main` push 이벤트로 CD가 실행됩니다. 수동 실행은 `main` 또는 `develop`을 선택할 수 있습니다. 기존 `development` GitHub 환경의 서버·SSH 설정을 재사용하며, 해당 환경의 허용 브랜치에 배포할 브랜치를 등록해야 합니다. CD는 선택한 브랜치를 서버에 반영하고 실행을 시작한 커밋과 서버 HEAD가 같은지 확인한 후 백업·마이그레이션·배포를 진행합니다.
+
 내부 Caddy는 TCP 연결 실패 시 다른 API로 연결할 수 있습니다. 연결 후 응답이 끊긴 요청의 재시도는 GET·HEAD·OPTIONS로 제한하여 처리된 POST 쓰기를 다시 보내지 않습니다. 진행 중인 응답에 별도의 짧은 제한 시간을 추가하지 않습니다.
 
 ## 검증
