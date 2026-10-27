@@ -54,6 +54,7 @@ def test_replay_status_and_private_input_metadata_are_documented(app):
     assert password["writeOnly"] is True
     assert password["format"] == "password"
     assert schema["components"]["schemas"]["DraftIn"]["additionalProperties"] is False
+    assert "429" in schema["paths"]["/api/v1/partner"]["post"]["responses"]
 
 
 def test_swagger_is_available_without_a_database_and_does_not_persist_tokens(app):

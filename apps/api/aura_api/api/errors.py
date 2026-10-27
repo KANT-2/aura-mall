@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from starlette.responses import JSONResponse
 
 from aura_api.core.errors import ErrorDetail, ErrorResponse
-from aura_api.domain.errors import DomainError
+from aura_api.domain.errors import DomainError, RateLimited
 
 STATUS = {
     "invalid": 400,
@@ -16,12 +16,14 @@ STATUS = {
     "forbidden": 403,
     "not_found": 404,
     "conflict": 409,
+    "rate_limited": 429,
 }
 
 
 async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
     body = ErrorResponse(error=ErrorDetail(code=exc.code, message=exc.message))
-    return JSONResponse(body.model_dump(), status_code=STATUS[exc.kind])
+    headers = {"Retry-After": str(exc.retry_after)} if isinstance(exc, RateLimited) else None
+    return JSONResponse(body.model_dump(), status_code=STATUS[exc.kind], headers=headers)
 
 
 def register_domain_errors(app: FastAPI) -> None:

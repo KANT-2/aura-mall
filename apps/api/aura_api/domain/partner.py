@@ -3,6 +3,7 @@
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import timedelta
 
 from aura_api.domain.errors import InvalidInput
 
@@ -10,6 +11,8 @@ EMAIL_PATTERN = re.compile(r"^\S+@\S+\.\S+$")
 TEXT_MAX = 3000
 # Limits follow the ERD columns; the form's own maxlength is the same or smaller.
 FIELD_MAX = {"brand": 100, "name": 50, "email": 254, "type": 30}
+INQUIRY_RATE_LIMIT = 3
+INQUIRY_RATE_WINDOW = timedelta(minutes=10)
 REQUIRED = ("brand", "name", "email", "introduction", "message", "type")
 WEBSITE_MAX = 255
 TYPES = frozenset({"향수", "바디 · 헤어", "홈 프래그런스", "기타 향 제품"})
