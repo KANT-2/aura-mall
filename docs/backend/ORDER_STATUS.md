@@ -17,31 +17,33 @@
 
 환불은 주문 상태가 아니라 결제 기록의 상태로 다룰 예정이므로 목록에 넣지 않았습니다.
 
-## 전이 규칙 (초안)
+## 전이 규칙
 
 ```text
 received ──► paid ──► preparing ──► shipped ──► delivered
    │          │           │
    │          ▼           ▼
-   ├──────► cancelled ◄───┘
-   └──────► preparing   (결제 없이 접수된 주문을 처리하는 현재 운영용)
+   └──────► cancelled ◄───┘
 ```
 
-| 현재        | 바꿀 수 있는 상태                |
-| ----------- | -------------------------------- |
-| `received`  | `paid`, `preparing`, `cancelled` |
-| `paid`      | `preparing`, `cancelled`         |
-| `preparing` | `shipped`, `cancelled`           |
-| `shipped`   | `delivered`                      |
-| `delivered` | 없음                             |
-| `cancelled` | 없음                             |
+결제 1차(마이그레이션 0007)부터 결제되지 않은 주문은 `preparing`으로 갈 수 없습니다. `paid`는
+결제 서비스가 PG 승인과 서버 금액 검증을 마친 뒤에만 설정하며(`payment_verified=True`), 그 밖의
+호출은 409 `ORDER_PAYMENT_REQUIRED`입니다. 결제 흐름은 [결제 문서](PAYMENTS.md)를 봅니다.
+
+| 현재        | 바꿀 수 있는 상태                  |
+| ----------- | ---------------------------------- |
+| `received`  | `paid`(결제 서비스만), `cancelled` |
+| `paid`      | `preparing`, `cancelled`           |
+| `preparing` | `shipped`, `cancelled`             |
+| `shipped`   | `delivered`                        |
+| `delivered` | 없음                               |
+| `cancelled` | 없음                               |
 
 규칙은 `aura_api/domain/ordering.py`의 `ORDER_TRANSITIONS` 한 곳에 있습니다. 목록에 없는 상태는
 400 `ORDER_STATUS_INVALID`, 허용되지 않은 전이는 409 `ORDER_STATUS_CONFLICT`입니다. 누가 어떤
 전이를 할 수 있는지(회원은 접수 상태 취소만 등)는 후속 API PR에서 정합니다.
 
-**팀 확인 필요:** 결제가 생긴 뒤에도 `received → preparing`(결제 없이 제작)을 허용할지,
-`preparing`(특히 맞춤 조향 제작 중) 주문을 취소할 수 있는지.
+**팀 확인 필요:** `preparing`(특히 맞춤 조향 제작 중) 주문을 취소할 수 있는지.
 
 ## 저장과 동시성
 
