@@ -52,8 +52,8 @@ export default defineConfig({
       env: {
         API_URL: mockUrl,
         API_PREFIX: "/api",
-        API_SESSION_COOKIE: "aura_mock_session",
-        API_AUTH_MODE: "cookie",
+        API_ACCESS_COOKIE: "aura_access",
+        API_AUTH_MODE: "jwt",
         API_TIMEOUT_MS: "10000",
         APP_ORIGIN: "http://127.0.0.1:3100",
       },

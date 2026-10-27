@@ -82,7 +82,7 @@ def test_unconfigured_database_stays_unavailable(monkeypatch):
         assert client.get("/health").status_code == 200
 
 
-def test_bff_fixture_keeps_its_session_contract_without_calling_production_storage(monkeypatch):
+def test_bff_fixture_uses_production_token_contract_without_production_storage(monkeypatch):
     settings = Settings(
         _env_file=None,
         database_url=None,
@@ -92,31 +92,27 @@ def test_bff_fixture_keeps_its_session_contract_without_calling_production_stora
         jwt_audience="fixture-test",
         csrf_allowed_origins=["https://bff.test"],
     )
-    monkeypatch.setattr(config, "Settings", lambda: settings)
+    monkeypatch.setattr(config, "Settings", lambda **kwargs: settings)
+    monkeypatch.syspath_prepend(str(Path(__file__).parent / "fixtures"))
     fixture = runpy.run_path(str(Path(__file__).parent / "fixtures" / "bff_app.py"))
     with TestClient(fixture["app"]) as client:
-        anonymous = client.get("/api/v1/session").json()
-        anonymous_token = client.cookies["aura_session"]
         response = client.post(
             "/api/v1/auth/login",
-            headers={
-                "Origin": "https://bff.test",
-                "Authorization": f"Bearer {anonymous_token}",
-            },
+            headers={"Origin": "https://bff.test"},
             json={"email": "member-a@example.com", "password": "bff-password123"},
         )
         assert response.status_code == 200
-        assert response.json()["guestId"] == anonymous["guestId"]
-        assert response.json()["user"]["id"] == "member-a"
-        assert "accessToken" not in response.json()
-        token = response.cookies["aura_session"]
+        pair = response.json()
+        assert "accessToken" in pair and "refreshToken" in pair
+        assert not response.cookies
+        token = pair["accessToken"]
+        headers = {"Authorization": f"Bearer {token}"}
+        assert (
+            client.get("/api/v1/auth/me", headers=headers).json()["email"] == "member-a@example.com"
+        )
         response = client.post(
             "/api/v1/auth/logout",
-            headers={"Origin": "https://bff.test", "Authorization": f"Bearer {token}"},
+            headers={**headers, "Origin": "https://bff.test"},
         )
-        assert response.status_code == 200
-        assert response.json() == {"user": None, "guestId": anonymous["guestId"]}
-        assert (
-            client.get("/api/v1/recipes", headers={"Authorization": f"Bearer {token}"}).status_code
-            == 401
-        )
+        assert response.status_code == 204
+        assert client.get("/api/v1/recipes", headers=headers).status_code == 401

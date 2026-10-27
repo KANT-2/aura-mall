@@ -154,7 +154,7 @@ def test_changed_account_is_409(client):
     response = client.post(
         "/api/v1/recipes",
         json={"name": "향", "counts": {"bergamot": 1}},
-        headers={**bearer(member_id), "X-Session-Owner": str(uuid.uuid4())},
+        headers={**bearer(member_id), "X-Account-Owner": str(uuid.uuid4())},
     )
 
     assert response.status_code == 409

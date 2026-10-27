@@ -64,7 +64,7 @@ export function AdminEmpty({ title, children }: { title: string; children?: Reac
   );
 }
 
-/** 401/403 also refresh the session, so the shell replaces this with the access screen. */
+/** 401/403 also refresh the account, so the shell replaces this with the access screen. */
 export function AdminError({ error, retry }: { error: unknown; retry?: () => void }) {
   const status = error instanceof ApiError ? error.status : 0;
   const message =

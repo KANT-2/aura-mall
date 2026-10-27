@@ -9,7 +9,6 @@ import type { AtelierDraft, Recipe } from "@/features/atelier/model/recipes";
 
 export const catalog: Catalog = catalogFixture as Catalog;
 export type Account = Member & { passwordHash: string; salt: string };
-export type MockSession = { guestId: string; userId?: string };
 export type Order = {
   id: string;
   owner: string;
@@ -37,7 +36,8 @@ export type Inquiry = {
 export type AuditRecord = AdminHistoryEntry & { actorId: string; target: string };
 export type Database = {
   accounts: Record<string, Account>;
-  sessions: Record<string, MockSession>;
+  tokenFamilies: Record<string, { userId: string; revoked: boolean }>;
+  refreshTokens: Record<string, { familyId: string; consumed: boolean; expires: number }>;
   recipes: Record<string, Recipe[]>;
   drafts: Record<string, AtelierDraft>;
   orders: Order[];
@@ -50,7 +50,8 @@ export type Database = {
 };
 const empty = (): Database => ({
   accounts: {},
-  sessions: {},
+  tokenFamilies: {},
+  refreshTokens: {},
   recipes: {},
   drafts: {},
   orders: [],
@@ -66,6 +67,7 @@ export function createDatabase(filename?: string) {
     state = { ...state, ...(JSON.parse(readFileSync(filename, "utf8")) as Partial<Database>) };
     // Carts moved to browser storage; do not persist legacy server carts again.
     Reflect.deleteProperty(state, "carts");
+    Reflect.deleteProperty(state, "sessions");
   }
 
   return {

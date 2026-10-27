@@ -9,7 +9,7 @@ test("BFF exposes the storefront contract and keeps backend-only endpoints priva
   expect((await catalog.json()).products).toHaveLength(30);
   expect(catalog.headers()["cache-control"]).toContain("no-store");
   expect(catalog.headers()["x-request-id"]).toBeTruthy();
-  const session = await request.get("/api/session");
+  const session = await request.get("/api/auth/me");
   expect(session.status()).toBe(200);
   expect((await session.json()).user).toBeNull();
   expect(session.headers()["set-cookie"]).toMatch(/HttpOnly/i);
@@ -35,8 +35,8 @@ test("BFF rejects foreign origins and invalid JSON before authentication", async
   expect((await malformed.json()).error.code).toBe("INVALID_JSON");
 });
 
-test("BFF preserves Mock sessions and isolates recipes, drafts and orders", async ({ request }) => {
-  const guest = await (await request.get("/api/session")).json();
+test("BFF authenticates with JWTs and isolates recipes, drafts and orders", async ({ request }) => {
+  const guest = await (await request.get("/api/auth/me")).json();
   const credentials = { email: `bff-${randomUUID()}@example.com`, password: "password123" };
   const registered = await request.post("/api/auth/register", {
     data: { ...credentials, name: "BFF 회원" },

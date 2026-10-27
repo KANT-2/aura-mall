@@ -3,24 +3,19 @@ import { randomUUID } from "node:crypto";
 import { ApiError } from "@/lib/api/errors";
 import { backendConfig } from "@/server/backend/config";
 import { backendRequest, backendError } from "@/server/backend/transport";
-import {
-  clearSessionCookie,
-  requestJwt,
-  requestSessionCookie,
-  responseSessionCookies,
-} from "@/server/bff/session-cookie";
+import { requestJwt, visitorId } from "@/server/bff/token-cookie";
+import { clearTokens, handleAuth, type AuthAction } from "@/server/bff/auth";
 import { jsonRequestBody } from "@/server/bff/request-body";
 import { requestOrigin } from "@/server/bff/request-origin";
-import { publicSession } from "@/server/bff/session-response";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type Params = Record<string, string>;
 type BackendPath = string | ((params: Params) => string);
 type RouteContext = { params: Promise<Params> };
 type HandlerOptions = {
-  session?: boolean;
+  authenticated?: boolean;
   query?: readonly string[];
-  sessionResponse?: boolean;
+  authAction?: AuthAction;
   bodyFields?: readonly string[];
   responseBody?: (data: unknown) => unknown;
 };
@@ -53,7 +48,7 @@ export function createBffHandler(
 export function createBffHandler(
   method: Method,
   path: BackendPath,
-  { session = true, query, sessionResponse = false, bodyFields, responseBody }: HandlerOptions = {},
+  { authenticated = true, query, authAction, bodyFields, responseBody }: HandlerOptions = {},
 ) {
   return async function handle(request: Request, context?: RouteContext) {
     const requestId = randomUUID();
@@ -61,16 +56,13 @@ export function createBffHandler(
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
       "X-Request-ID": requestId,
-      ...(session ? { Vary: "Cookie" } : {}),
+      ...(authenticated || authAction ? { Vary: "Cookie" } : {}),
     });
-    let jwtCookie: { name: string; secure: boolean } | undefined;
+    let secure: boolean | undefined;
     try {
       const config = backendConfig();
       const origin = requestOrigin(request, config.appOrigin);
-      const jwt = session && config.authMode === "jwt";
-      if (jwt) {
-        jwtCookie = { name: config.sessionCookie, secure: origin.startsWith("https:") };
-      }
+      secure = origin.startsWith("https:");
 
       const mutation = method !== "GET";
       if (request.method !== method && !(method === "GET" && request.method === "HEAD")) {
@@ -97,46 +89,35 @@ export function createBffHandler(
         );
       }
 
+      if (authAction) {
+        return await handleAuth(authAction, request, headers, secure, body);
+      }
+
       const backendPath = typeof path === "string" ? path : path(await context!.params);
+      const token = authenticated
+        ? requestJwt(request.headers.get("cookie"), config.accessCookie)
+        : undefined;
+      const visitorHeaders = new Headers();
+      const guestId = authenticated
+        ? visitorId(request.headers.get("cookie"), visitorHeaders, secure)
+        : undefined;
       const response = await backendRequest(backendPath, {
         method,
         body,
         query: allowedQuery(request.url, query),
         signal: request.signal,
         requestId,
-        cookie:
-          session && !jwt
-            ? requestSessionCookie(request.headers.get("cookie"), config.sessionCookie)
-            : undefined,
-        token: jwt ? requestJwt(request.headers.get("cookie"), config.sessionCookie) : undefined,
-        owner: session ? (request.headers.get("x-session-owner") ?? undefined) : undefined,
+        token,
+        guestId,
+        owner: authenticated ? (request.headers.get("x-account-owner") ?? undefined) : undefined,
       });
-      if (response.status >= 400 && jwt) {
-        throw backendError(response.status, response.data);
-      }
-
-      let data = response.data;
-      if (response.status < 400) {
-        if (jwt && sessionResponse) {
-          data = publicSession(data);
-        } else if (responseBody) {
-          data = responseBody(data);
-        }
-      }
-
-      if (session) {
-        for (const cookie of responseSessionCookies(
-          response.cookies,
-          config.sessionCookie,
-          origin.startsWith("https:"),
-          jwt,
-        )) {
-          headers.append("Set-Cookie", cookie);
-        }
-      }
-
       if (response.status >= 400) {
         throw backendError(response.status, response.data);
+      }
+
+      const data = responseBody ? responseBody(response.data) : response.data;
+      for (const cookie of visitorHeaders.getSetCookie()) {
+        headers.append("Set-Cookie", cookie);
       }
 
       return response.status === 204
@@ -147,9 +128,13 @@ export function createBffHandler(
         error instanceof ApiError
           ? error
           : new ApiError(500, "요청을 처리하지 못했어요.", "INTERNAL_ERROR");
-      if (jwtCookie && failure.status === 401) {
-        headers.append("Set-Cookie", clearSessionCookie(jwtCookie.name, jwtCookie.secure));
-        // FastAPI uses a fixed challenge; never echo arbitrary upstream header parameters.
+      if (failure.status === 401) {
+        // Keep credentials on resource failures: a concurrent refresh may have replaced them.
+        // Only a rejected refresh explicitly ends the browser's authentication.
+        if (authAction === "refresh" && secure !== undefined) {
+          clearTokens(headers, secure);
+        }
+
         headers.set("WWW-Authenticate", "Bearer");
       }
 

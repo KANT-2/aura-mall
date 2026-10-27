@@ -1,3 +1,2 @@
 import { createBffHandler } from "@/server/bff/handler";
-
-export const POST = createBffHandler("POST", "/auth/logout", { sessionResponse: true });
+export const POST = createBffHandler("POST", "/auth/logout", { authAction: "logout" });

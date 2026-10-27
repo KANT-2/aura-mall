@@ -67,21 +67,21 @@ FastAPI(`apps/api`)에 준비된 것:
 
 ### 3.2 회원 · 인증 (AUTH)
 
-| ID         | 우선 | 경로                             | 요구사항 · 인수 기준                                                                                     |
-| ---------- | ---- | -------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| FR-AUTH-01 | P0   | `GET /api/session`               | `Session { user: Member \| null, guestId }` 반환. 처음 온 방문자에게도 `guestId`와 익명 토큰 발급        |
-| FR-AUTH-02 | P0   | `POST /api/auth/register`        | `{ name, email, password, marketing? }` → 201 `Session`. 가입과 동시에 로그인. 같은 이메일은 409         |
-| FR-AUTH-03 | P1   | (가입 시)                        | 신규 회원 배송비 쿠폰 1장 발급, 중복 발급 없음. `Member.coupon`으로 보유 여부 표시                       |
-| FR-AUTH-04 | P0   | `POST /api/auth/login`           | `{ email, password }` → `Session`. 실패는 401 "이메일 또는 비밀번호를 확인해 주세요." (어느 쪽인지 숨김) |
-| FR-AUTH-05 | P0   | `POST /api/auth/logout`          | 본문 없음 → `Session`(user: null, **같은 guestId**). Access Token `jti` 폐기 + Refresh Token 계열 폐기   |
-| FR-AUTH-06 | P0   | (모든 회원 경로)                 | 새로고침·새 탭에서도 로그인 유지. 만료·위조·폐기된 토큰은 401(`WWW-Authenticate: Bearer`)                |
-| FR-AUTH-07 | P1   | (회원 변경 요청)                 | `X-Session-Owner`가 실제 주인과 다르면 409. 소유권은 이 헤더가 아니라 토큰으로 판단                      |
-| FR-AUTH-08 | P0   | (로그인·가입 시)                 | Refresh Token 발급. DB에는 **해시만** 저장하고 만료·사용·폐기 상태를 관리                                |
-| FR-AUTH-09 | P0   | 재발급 (FastAPI, 경로 확정 필요) | 유효한 Refresh Token으로 새 Access Token 발급. 쓰인 Refresh Token은 새것으로 **회전**                    |
-| FR-AUTH-10 | P0   | (재발급 시)                      | 이미 쓰인 Refresh Token이 다시 오면 탈취로 보고 **같은 계열 전체 폐기**                                  |
-| FR-AUTH-11 | P2   | (로그인·요청 시)                 | 정지된 회원 거절(`users.is_active`) — 회원 정지 정책 확정 후                                             |
+| ID         | 우선 | 경로                      | 요구사항 · 인수 기준                                                                                                          |
+| ---------- | ---- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| FR-AUTH-01 | P0   | `GET /api/auth/me`        | `AccountState { user: Member \| null, guestId }` 반환. 처음 온 방문자에게는 비인증 `guestId`만 발급; JWT는 회원 인증에만 사용 |
+| FR-AUTH-02 | P0   | `POST /api/auth/register` | `{ name, email, password, marketing? }` → 201 `AccountState`. 가입과 동시에 로그인. 같은 이메일은 409                         |
+| FR-AUTH-03 | P1   | (가입 시)                 | 신규 회원 배송비 쿠폰 1장 발급, 중복 발급 없음. `Member.coupon`으로 보유 여부 표시                                            |
+| FR-AUTH-04 | P0   | `POST /api/auth/login`    | `{ email, password }` → `AccountState`. 실패는 401 "이메일 또는 비밀번호를 확인해 주세요." (어느 쪽인지 숨김)                 |
+| FR-AUTH-05 | P0   | `POST /api/auth/logout`   | 본문 없음 → `AccountState`(user: null, **같은 guestId**). Access Token `jti` 폐기 + Refresh Token 계열 폐기                   |
+| FR-AUTH-06 | P0   | (모든 회원 경로)          | 새로고침·새 탭에서도 로그인 유지. 만료·위조·폐기된 토큰은 401(`WWW-Authenticate: Bearer`)                                     |
+| FR-AUTH-07 | P1   | (회원 변경 요청)          | `X-Account-Owner`가 실제 주인과 다르면 409. 소유권은 이 헤더가 아니라 토큰으로 판단                                           |
+| FR-AUTH-08 | P0   | (로그인·가입 시)          | Refresh Token 발급. DB에는 **해시만** 저장하고 만료·사용·폐기 상태를 관리                                                     |
+| FR-AUTH-09 | P0   | `POST /api/auth/refresh`  | 유효한 Refresh Token으로 새 Access Token 발급. 쓰인 Refresh Token은 새것으로 **회전**                                         |
+| FR-AUTH-10 | P0   | (재발급 시)               | 이미 쓰인 Refresh Token이 다시 오면 탈취로 보고 **같은 계열 전체 폐기**                                                       |
+| FR-AUTH-11 | P2   | (로그인·요청 시)          | 정지된 회원 거절(`users.is_active`) — 회원 정지 정책 확정 후                                                                  |
 
-Refresh Token은 백엔드에서 구현한다. BFF는 아직 Refresh를 연결하지 않으므로(#37) 웹에서는 Access Token 만료 시 다시 로그인한다. BFF 연결은 후속 범위다.
+Refresh Token 회전은 백엔드가 수행하고 BFF가 HttpOnly 쿠키로 보관한다. 브라우저는 Web Lock으로 갱신을 직렬화하고 Access 만료 시 자동 갱신 후 한 번 재시도한다. Refresh도 거절되면 두 인증 쿠키를 지우고 다시 로그인한다.
 
 ### 3.3 조향 · 레시피 (ATL)
 
@@ -122,7 +122,7 @@ Refresh Token은 백엔드에서 구현한다. BFF는 아직 Refresh를 연결�
 | --------- | ---- | ------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | FR-ADM-01 | P0   | `POST /api/admin/auth/login`                      | `{ email, password }` → 관리자 세션. 비활성(`disabled`) 계정·잘못된 비밀번호는 401           |
 | FR-ADM-02 | P0   | `POST /api/admin/auth/logout`                     | 관리자 토큰 폐기                                                                             |
-| FR-ADM-03 | P0   | `GET /api/admin/session`                          | 현재 관리자 정보 또는 401                                                                    |
+| FR-ADM-03 | P0   | `GET /api/admin/auth/me`                          | 현재 관리자 정보 또는 401                                                                    |
 | FR-ADM-04 | P1   | `POST /api/admin/admins`                          | 로그인한 관리자만 새 관리자 등록. 같은 이메일은 409. 감사 기록 `admin.create`                |
 | FR-ADM-05 | P0   | (모든 `/api/admin/**`)                            | 요청마다 실제 관리자 계정·상태를 다시 조회. 미인증 401, 고객 토큰 403                        |
 | FR-ADM-06 | P1   | `GET /api/admin/overview`                         | 최근 7일 주문 수·금액, 문의 상태별 건수, 재고 5개 이하 상품                                  |

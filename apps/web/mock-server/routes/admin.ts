@@ -26,7 +26,7 @@ import {
   type Order,
 } from "../data/store";
 import { HttpError, requireJsonBody, requireString } from "../http";
-import { requireAdmin } from "../session";
+import { requireAdmin } from "../auth";
 
 const imageOptions = [...new Set(catalog.products.map((product) => product.image))].sort();
 const RECENT_DAYS = 7;

@@ -7,6 +7,8 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 
 from aura_api.config import Settings
+from aura_api.domain.errors import Conflict
+from aura_api.domain.identity import Registration
 from aura_api.identity.repository import AuthRepository, AuthStorageUnavailable
 from aura_api.identity.tokens import IssuedTokens, hash_refresh_token, issue_tokens
 
@@ -48,9 +50,27 @@ class AuthLifecycleService:
             raise AuthenticationRejected()
         tokens = self._issue(user.id, uuid4())
         # Recheck active status inside the persistence transaction.
-        if not await self.repository.create_session(tokens):
+        if not await self.repository.create_token_family(tokens):
             raise AuthenticationRejected()
         return tokens
+
+    async def register(self, registration: Registration) -> IssuedTokens:
+        self._require_configured()
+        password_hash = await run_sync(PASSWORD_HASHER.hash, registration.password)
+        tokens = self._issue(uuid4(), uuid4())
+        if not await self.repository.register(registration, password_hash, tokens):
+            raise Conflict("EMAIL_EXISTS", "이미 가입된 이메일입니다.")
+        return tokens
+
+    async def me(self, user_id: str) -> dict:
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise AuthenticationRejected() from None
+        profile = await self.repository.profile(user_uuid)
+        if profile is None:
+            raise AuthenticationRejected()
+        return profile
 
     async def refresh(self, token: str) -> IssuedTokens:
         self._require_configured()
