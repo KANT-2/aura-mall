@@ -84,31 +84,58 @@ jobs:
           echo "Validating Compose configuration..."
           docker compose config --quiet
 
-          echo "Building and deploying AURA API..."
-          docker compose up -d --build --no-deps api
+                    echo "Checking AURA database..."
+          docker compose up -d --no-deps db
+          docker compose exec -T db sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 
-          echo "Checking AURA API..."
-          docker compose ps api
+          echo "Building API and Next.js..."
+          docker compose build api web
 
-          echo "Waiting for AURA API health check..."
+          echo "Backing up AURA database..."
+          mkdir -p "$HOME/workspace/aura-backups"
+          chmod 700 "$HOME/workspace/aura-backups"
+          backup="$HOME/workspace/aura-backups/aura-$(date +%Y%m%d-%H%M%S).dump"
+          docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup"
+          docker compose exec -T db pg_restore -l < "$backup" > /dev/null
 
+          echo "Applying Alembic migrations..."
+          docker compose run --rm --no-deps api alembic upgrade head
+
+          echo "Deploying FastAPI and Next.js..."
+          docker compose up -d --no-deps api web
+
+          echo "Checking API..."
           healthy=false
           for attempt in $(seq 1 12); do
             if docker compose exec -T api python -c \
-              "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read().decode())"; then
+              "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"; then
               healthy=true
               break
             fi
-
-            echo "API not ready yet (attempt $attempt/12)"
             sleep 5
           done
 
           if [ "$healthy" != "true" ]; then
-            echo "AURA API health check failed"
+            echo "API health check failed"
             exit 1
           fi
 
-          echo "AURA API deployment completed"
+          echo "Checking Next.js..."
+          web_healthy=false
+          for attempt in $(seq 1 12); do
+            if curl -fsS -o /dev/null http://127.0.0.1:13000; then
+              web_healthy=true
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$web_healthy" != "true" ]; then
+            echo "Next.js health check failed"
+            exit 1
+          fi
+
+          echo "AURA API and Next.js deployment completed"
 
           REMOTE
+          
