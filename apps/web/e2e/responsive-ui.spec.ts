@@ -29,8 +29,12 @@ test("product photos never cover the product name on phone and tablet layouts", 
     await page.setViewportSize({ width, height: 900 });
     for (const path of [routes.product, routes.gift]) {
       await page.goto(path);
-      const photo = await page.locator(".detail-image").boundingBox();
-      const title = await page.getByRole("heading", { level: 1 }).boundingBox();
+      const photoRegion = page.locator(".detail-image");
+      const heading = page.getByRole("heading", { level: 1 });
+      await expect(photoRegion).toBeVisible();
+      await expect(heading).toBeVisible();
+      const photo = await photoRegion.boundingBox();
+      const title = await heading.boundingBox();
       const overlapX =
         Math.min(photo!.x + photo!.width, title!.x + title!.width) - Math.max(photo!.x, title!.x);
       const overlapY =

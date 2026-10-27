@@ -16,6 +16,7 @@ import { publicSession } from "@/server/bff/session-response";
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type Params = Record<string, string>;
 type BackendPath = string | ((params: Params) => string);
+type RouteContext = { params: Promise<Params> };
 type HandlerOptions = {
   session?: boolean;
   query?: readonly string[];
@@ -41,10 +42,20 @@ export function allowedQuery(url: string, names: readonly string[] = []) {
 /** Explicit route files select the upstream path; browser input cannot select a host. */
 export function createBffHandler(
   method: Method,
+  path: string,
+  options?: HandlerOptions,
+): (request: Request) => Promise<Response>;
+export function createBffHandler(
+  method: Method,
+  path: (params: Params) => string,
+  options?: HandlerOptions,
+): (request: Request, context: RouteContext) => Promise<Response>;
+export function createBffHandler(
+  method: Method,
   path: BackendPath,
   { session = true, query, sessionResponse = false, bodyFields, responseBody }: HandlerOptions = {},
 ) {
-  return async function handle(request: Request, context?: { params: Promise<Params> }) {
+  return async function handle(request: Request, context?: RouteContext) {
     const requestId = randomUUID();
     const headers = new Headers({
       "Cache-Control": "private, no-store",
