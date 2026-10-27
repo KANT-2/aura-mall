@@ -39,7 +39,7 @@ function HeaderContents() {
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
   }, []);
-  const c = collections.find((x) => x.id === collection)!;
+  const c = collections.find((x) => x.id === collection) ?? collections[0];
   return (
     <>
       <a className="skip" href="#main-content">
@@ -106,16 +106,20 @@ function HeaderContents() {
               id="collection-menu"
               className="mega"
             >
-              <div className="mega-visual" style={{ background: c.color }}>
-                <Asset id={"collection-" + c.id} />
-                <p>{c.description}</p>
+              <div className="mega-visual" style={c ? { background: c.color } : undefined}>
+                {c && (
+                  <>
+                    <Asset id={"collection-" + c.id} />
+                    <p>{c.description}</p>
+                  </>
+                )}
               </div>
               <div>
                 <span className="eyebrow">COLLECTION</span>
                 {collections.map((x) => (
                   <Link
                     key={x.id}
-                    className={collection === x.id ? "chosen" : ""}
+                    className={c?.id === x.id ? "chosen" : ""}
                     onMouseEnter={() => setCollection(x.id)}
                     onFocus={() => setCollection(x.id)}
                     href={"/shop?collection=" + x.id}
@@ -123,6 +127,7 @@ function HeaderContents() {
                     {x.name} <Arrow />
                   </Link>
                 ))}
+                {!collections.length && <p>아직 등록된 컬렉션이 없어요.</p>}
                 <Link data-testid={testIds.navigation.allProducts} href="/shop">
                   모든 컬렉션
                 </Link>
@@ -130,7 +135,10 @@ function HeaderContents() {
               <div className="mega-types">
                 <span className="eyebrow">CATEGORY</span>
                 {types.map((t) => (
-                  <Link href={`/shop?collection=${collection}&type=${t.id}`} key={t.id}>
+                  <Link
+                    href={c ? `/shop?collection=${c.id}&type=${t.id}` : `/shop?type=${t.id}`}
+                    key={t.id}
+                  >
                     {t.name}
                     <span>{t.label}</span>
                   </Link>
