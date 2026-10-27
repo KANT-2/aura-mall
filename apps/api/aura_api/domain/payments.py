@@ -5,6 +5,7 @@ then sends back the PG `paymentKey`. Nothing else the client says about money is
 """
 
 import re
+from datetime import timedelta
 from typing import Literal
 
 from aura_api.domain.errors import InvalidInput
@@ -22,6 +23,13 @@ PAYMENT_STATUSES: tuple[PaymentStatus, ...] = (
 )
 # Statuses that hold the order: at most one per order (partial unique index).
 OPEN_PAYMENT_STATUSES: tuple[PaymentStatus, ...] = ("READY", "IN_PROGRESS", "DONE")
+
+# Refund attempts (0009): IN_PROGRESS result pending · DONE returned · FAILED rejected by the PG.
+REFUND_STATUSES = ("IN_PROGRESS", "DONE", "FAILED")
+# An IN_PROGRESS payment or refund older than this is "result unknown" and needs a person if the
+# reconciliation job has not settled it (the job's default threshold).
+UNRESOLVED_AFTER = timedelta(minutes=2)
+REVIEW_REASON = re.compile(r"^[A-Z][A-Z0-9_]{0,99}$")  # codes such as PG_RESULT_MISMATCH
 
 # Toss Payments limits (https://docs.tosspayments.com/reference).
 PAYMENT_KEY = re.compile(r"^[A-Za-z0-9_-]{1,200}$")
@@ -55,3 +63,14 @@ def order_name(first_item: str, item_lines: int) -> str:
     rest = item_lines - 1
     name = first_item + (f" 외 {rest}건" if rest > 0 else "")
     return name[:ORDER_NAME_MAX]
+
+
+def review_filter(
+    status: object, reason: object, allowed: tuple[str, ...]
+) -> tuple[str | None, str | None]:
+    """Validate the admin list filters. Unknown values are an error, never silently ignored."""
+    if status is not None and status not in allowed:
+        raise InvalidInput("STATUS_INVALID", "상태 값을 확인해 주세요.")
+    if reason is not None and (not isinstance(reason, str) or not REVIEW_REASON.match(reason)):
+        raise InvalidInput("REVIEW_REASON_INVALID", "검토 사유 값을 확인해 주세요.")
+    return status, reason
