@@ -81,3 +81,12 @@ jobs:
 
       - name: Exercise disposable database cluster
         run: python3 ops/test_database.py
+
+  shared-caddy:
+    name: Shared Caddy routing and load balancing
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify shared proxy and API replicas
+        run: python3 ops/test_caddy.py

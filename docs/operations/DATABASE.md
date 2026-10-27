@@ -50,7 +50,7 @@ python3 ops/database.py status
 python3 ops/database.py deploy-api
 ```
 
-CD는 관리 URL 파일이 존재하면 이 추가 구성을 선택하고 `deploy-api`로 배포합니다. 배포와 정기 유지보수는 같은 파일 잠금을 사용합니다. DB를 일반 `docker compose up`으로 재생성하지 않습니다. TLS 설정이나 승격 후 fence를 빼고 기동할 수 있습니다.
+CD는 관리 URL 파일이 존재하면 이 추가 구성을 선택하고 `deploy-api`로 배포합니다. `compose.lb.yaml`이 있으면 CD와 운영 도구 모두 함께 사용해 기존 Caddy 공유 네트워크와 API 복제 수를 유지합니다. 먼저 [Caddy 배포 준비](../backend/DEPLOYMENT.md)를 완료합니다. 배포와 정기 유지보수는 같은 파일 잠금을 사용합니다. DB를 일반 `docker compose up`으로 재생성하지 않습니다. TLS 설정이나 승격 후 fence를 빼고 기동할 수 있습니다.
 
 최초 전환이 실패하면 API를 멈춘 상태에서 원인을 해결하고 `bootstrap`을 재실행합니다. 전환 자체를 취소하려면 기존 `.env`를 유지한 채 기본 Compose로 DB/API를 재생성하면 됩니다. 단, **승격 후에는 이 방식으로 돌아가면 안 됩니다.** 승격 후 복구는 아래 절차를 따릅니다.
 
