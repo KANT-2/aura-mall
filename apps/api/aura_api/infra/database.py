@@ -5,9 +5,11 @@ never commit on their own.
 """
 
 from collections.abc import AsyncIterator
+from ssl import TLSVersion, create_default_context
 
 from fastapi import Request
 from sqlalchemy import MetaData
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -31,7 +33,18 @@ class Base(DeclarativeBase):
 
 
 def create_engine(database_url: str) -> AsyncEngine:
-    return create_async_engine(database_url, pool_pre_ping=True)
+    url = make_url(database_url).set(drivername="postgresql+asyncpg")
+    connect_args = {}
+    # libpq URL options are not keyword arguments accepted by SQLAlchemy's asyncpg dialect.
+    # Keep the same verify-full URL usable by psycopg, asyncpg seed and migration tools.
+    if "sslmode" in url.query:
+        if url.query["sslmode"] != "verify-full" or not url.query.get("sslrootcert"):
+            raise ValueError("Database TLS requires sslmode=verify-full and sslrootcert")
+        context = create_default_context(cafile=url.query["sslrootcert"])
+        context.minimum_version = TLSVersion.TLSv1_2
+        connect_args["ssl"] = context
+        url = url.difference_update_query(["sslmode", "sslrootcert"])
+    return create_async_engine(url, connect_args=connect_args, pool_pre_ping=True)
 
 
 def create_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
@@ -41,6 +54,11 @@ def create_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]
 
 async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
     """FastAPI dependency. Fails closed when no database is configured."""
+    runtime = getattr(request.app.state, "database_runtime", None)
+    if runtime is not None:
+        async with runtime.lease() as generation, generation.sessions() as session:
+            yield session
+        return
     sessionmaker: async_sessionmaker[AsyncSession] | None = getattr(
         request.app.state, "sessionmaker", None
     )

@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import psycopg
@@ -6,25 +7,65 @@ from psycopg import sql
 from psycopg.rows import dict_row
 
 from aura_api.domain.identity import Registration
-from aura_api.identity.repository import AuthStorageUnavailable, TokenIssuer
+from aura_api.identity.repository import (
+    DELETION_GRACE,
+    LOGIN_FAILURE_LIMIT,
+    LOGIN_LOCK,
+    AuthStorageUnavailable,
+    TokenIssuer,
+)
 from aura_api.identity.schema_contract import inspect_contract
-from aura_api.identity.tokens import IssuedTokens, UserRecord
+from aura_api.identity.tokens import IssuedTokens, UserRecord, hash_login_email
+
+if TYPE_CHECKING:
+    from aura_api.infra.database_rotation import RotatingDatabase
+
+# Restorable = deactivated, grace period not over (DB clock) and not yet purged.
+USER_COLUMNS = """id, password_hash, is_active, deletion_requested_at,
+    (NOT is_active AND deletion_requested_at IS NOT NULL AND deleted_at IS NULL
+     AND deletion_scheduled_at > clock_timestamp()) AS restorable"""
+# Purged accounts keep their row for retained orders; nothing identifies the member.
+DELETED_NAME = "탈퇴회원"
+DELETED_PASSWORD_HASH = "!deleted"
+
+
+def user_record(row) -> UserRecord | None:
+    return UserRecord(**row) if row else None
 
 
 class PostgresAuthRepository:
     """JWT token families and customer profiles; no automatic DDL or fallback."""
 
-    def __init__(self, dsn: str, issuer: str, *, schema: str = "public"):
+    def __init__(
+        self,
+        dsn: str,
+        issuer: str,
+        *,
+        schema: str = "public",
+        runtime: "RotatingDatabase | None" = None,
+    ):
         self._dsn = dsn
         self._issuer = issuer
         self._schema = schema
+        self._runtime = runtime
+
+    @asynccontextmanager
+    async def _dsn_lease(self):
+        if self._runtime is None:
+            yield self._dsn
+        else:
+            async with self._runtime.lease() as generation:
+                yield generation.dsn
 
     @asynccontextmanager
     async def _connection(self, *, check_schema: bool = True):
         try:
-            async with await psycopg.AsyncConnection.connect(
-                self._dsn, row_factory=dict_row, connect_timeout=3
-            ) as connection:
+            async with (
+                self._dsn_lease() as dsn,
+                await psycopg.AsyncConnection.connect(
+                    dsn, row_factory=dict_row, connect_timeout=3
+                ) as connection,
+            ):
                 await connection.execute(
                     sql.SQL("SET LOCAL search_path TO pg_catalog, {}").format(
                         sql.Identifier(self._schema)
@@ -47,18 +88,48 @@ class PostgresAuthRepository:
     async def find_user(self, email: str) -> UserRecord | None:
         async with self._connection() as connection:
             cursor = await connection.execute(
-                "SELECT id, password_hash, is_active FROM users WHERE lower(email) = %s", (email,)
+                f"SELECT {USER_COLUMNS} FROM users WHERE lower(email) = %s", (email,)
             )
-            row = await cursor.fetchone()
-        return UserRecord(row["id"], row["password_hash"], row["is_active"]) if row else None
+            return user_record(await cursor.fetchone())
 
     async def find_user_by_id(self, user_id: UUID) -> UserRecord | None:
         async with self._connection() as connection:
             cursor = await connection.execute(
-                "SELECT id, password_hash, is_active FROM users WHERE id = %s", (user_id,)
+                f"SELECT {USER_COLUMNS} FROM users WHERE id = %s", (user_id,)
+            )
+            return user_record(await cursor.fetchone())
+
+    async def reserve_login_attempt(self, email_hash: str) -> int:
+        async with self._connection() as connection:
+            # The row lock serializes concurrent attempts for one email, including unknown ones.
+            await connection.execute(
+                "INSERT INTO login_failures (email_hash) VALUES (%s) ON CONFLICT DO NOTHING",
+                (email_hash,),
+            )
+            cursor = await connection.execute(
+                """SELECT failure_count,
+                     ceil(extract(epoch FROM locked_until - clock_timestamp()))::int AS wait
+                   FROM login_failures WHERE email_hash = %s FOR UPDATE""",
+                (email_hash,),
             )
             row = await cursor.fetchone()
-        return UserRecord(row["id"], row["password_hash"], row["is_active"]) if row else None
+            if row["wait"] is not None and row["wait"] > 0:
+                return row["wait"]
+            # Count the attempt before verifying it; success clears the row afterwards.
+            failures = row["failure_count"] + 1
+            await connection.execute(
+                """UPDATE login_failures SET failure_count = %s, updated_at = clock_timestamp(),
+                     locked_until = CASE WHEN %s THEN clock_timestamp() + %s END
+                   WHERE email_hash = %s""",
+                (failures, failures >= LOGIN_FAILURE_LIMIT, LOGIN_LOCK, email_hash),
+            )
+        return 0
+
+    async def clear_login_failures(self, email_hash: str) -> None:
+        async with self._connection() as connection:
+            await connection.execute(
+                "DELETE FROM login_failures WHERE email_hash = %s", (email_hash,)
+            )
 
     async def _active_user(self, connection, user_id):
         cursor = await connection.execute(
@@ -163,6 +234,41 @@ class PostgresAuthRepository:
                 accepted = True
         return accepted
 
+    async def restore_token_family(
+        self,
+        tokens: IssuedTokens,
+        *,
+        expected_password_hash: str,
+        expected_deletion_requested_at,
+    ) -> bool:
+        accepted = False
+        async with self._connection() as connection:
+            # The purge job takes the same row lock and rechecks the schedule, so either the
+            # whole restore or the whole purge commits.
+            cursor = await connection.execute(
+                """SELECT id FROM users
+                   WHERE id = %s AND NOT is_active AND password_hash = %s
+                     AND deletion_requested_at = %s AND deleted_at IS NULL
+                     AND deletion_scheduled_at > clock_timestamp()
+                   FOR UPDATE""",
+                (tokens.user_id, expected_password_hash, expected_deletion_requested_at),
+            )
+            if await cursor.fetchone() is not None:
+                await connection.execute(
+                    """UPDATE users SET is_active = true, deletion_requested_at = NULL,
+                         deletion_scheduled_at = NULL
+                       WHERE id = %s""",
+                    (tokens.user_id,),
+                )
+                await connection.execute(
+                    """INSERT INTO auth_token_families (id, user_id, created_at)
+                       VALUES (%s, %s, %s)""",
+                    (tokens.family_id, tokens.user_id, tokens.issued_at),
+                )
+                await self._insert_tokens(connection, tokens)
+                accepted = True
+        return accepted
+
     async def change_password(
         self, user_id: UUID, *, expected_password_hash: str, new_password_hash: str
     ) -> bool | None:
@@ -202,10 +308,46 @@ class PostgresAuthRepository:
                 return None
             if user["password_hash"] != expected_password_hash:
                 return False
+            # Recipes and coupons stay for a possible restore; the purge job removes them.
             await connection.execute(
-                "UPDATE users SET is_active = false, marketing = false WHERE id = %s", (user_id,)
+                """UPDATE users SET is_active = false, marketing = false,
+                     deletion_requested_at = now(), deletion_scheduled_at = now() + %s
+                   WHERE id = %s""",
+                (DELETION_GRACE, user_id),
             )
             await self._revoke_user_families(connection, user_id)
+        return True
+
+    async def due_member_ids(self, limit: int) -> list[UUID]:
+        async with self._connection() as connection:
+            cursor = await connection.execute(
+                """SELECT id FROM users
+                   WHERE NOT is_active AND deleted_at IS NULL
+                     AND deletion_scheduled_at <= clock_timestamp()
+                   ORDER BY deletion_scheduled_at, id LIMIT %s""",
+                (limit,),
+            )
+            return [row["id"] for row in await cursor.fetchall()]
+
+    async def purge_member(self, user_id: UUID) -> bool:
+        """Anonymize one expired member in one transaction; False if no longer due."""
+        async with self._connection() as connection:
+            # Recheck under the user lock: a restore that committed first wins.
+            cursor = await connection.execute(
+                """SELECT email FROM users
+                   WHERE id = %s AND NOT is_active AND deleted_at IS NULL
+                     AND deletion_scheduled_at <= clock_timestamp()
+                   FOR UPDATE""",
+                (user_id,),
+            )
+            user = await cursor.fetchone()
+            if user is None:
+                return False
+            await self._revoke_user_families(connection, user_id)
+            await connection.execute(
+                "DELETE FROM auth_token_families WHERE user_id = %s", (user_id,)
+            )
+            # Coupons tied to an order are kept with the retained order records.
             await connection.execute(
                 """DELETE FROM user_coupons c
                    WHERE c.user_id = %s AND c.status = 'AVAILABLE' AND c.used_order_id IS NULL
@@ -214,7 +356,45 @@ class PostgresAuthRepository:
             )
             # Ingredients cascade; other members' children retain their rows with parent_id NULL.
             await connection.execute("DELETE FROM recipes WHERE user_id = %s", (user_id,))
+            await connection.execute(
+                "DELETE FROM login_failures WHERE email_hash = %s",
+                (hash_login_email(user["email"].lower()),),
+            )
+            await connection.execute(
+                """UPDATE users SET email = 'deleted-' || id || '@deleted.invalid', name = %s,
+                     password_hash = %s, marketing = false, deleted_at = clock_timestamp()
+                   WHERE id = %s""",
+                (DELETED_NAME, DELETED_PASSWORD_HASH, user_id),
+            )
         return True
+
+    async def prune_login_failures(self) -> None:
+        """Forget unlocked failure rows untouched for a day."""
+        async with self._connection() as connection:
+            await connection.execute(
+                """DELETE FROM login_failures
+                   WHERE updated_at < clock_timestamp() - interval '1 day'
+                     AND (locked_until IS NULL OR locked_until <= clock_timestamp())"""
+            )
+
+    async def start_purge_run(self, *, dry_run: bool) -> UUID:
+        async with self._connection() as connection:
+            cursor = await connection.execute(
+                "INSERT INTO member_deletion_runs (dry_run) VALUES (%s) RETURNING id", (dry_run,)
+            )
+            return (await cursor.fetchone())["id"]
+
+    async def finish_purge_run(
+        self, run_id: UUID, *, status: str, eligible: int, deleted: int, failed: list[UUID]
+    ) -> None:
+        async with self._connection() as connection:
+            await connection.execute(
+                """UPDATE member_deletion_runs
+                   SET finished_at = clock_timestamp(), status = %s, eligible = %s,
+                       deleted = %s, failed = %s, failed_user_ids = %s
+                   WHERE id = %s""",
+                (status, eligible, deleted, len(failed), failed, run_id),
+            )
 
     async def _revoke_family(self, connection, family_id):
         await connection.execute(

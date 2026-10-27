@@ -3,7 +3,7 @@
 -- contract in docs/FASTAPI_BFF.md. Run once on an empty database (PostgreSQL 13+):
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/schema.sql
 -- Then load initial catalog data with db/seed.sql. The cart is not stored (browser only).
--- This file is the latest full schema (migrations 0001 + 0002 + 0003). Alembic applies the same
+-- This file is the latest full schema (migrations 0001 through 0007). Alembic applies the same
 -- DDL step by step from migrations/sql/; tests/db checks that both give the same tables.
 
 BEGIN;
@@ -20,10 +20,21 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     marketing     BOOLEAN      NOT NULL DEFAULT false,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    is_active     BOOLEAN      NOT NULL DEFAULT true    -- false: login refused (0002)
+    is_active     BOOLEAN      NOT NULL DEFAULT true,   -- false: login refused (0002)
+    -- 0005: a deactivated member stays restorable until deletion_scheduled_at. The purge job
+    -- anonymizes the account afterwards and records deleted_at; orders keep their user_id.
+    deletion_requested_at TIMESTAMPTZ,
+    deletion_scheduled_at TIMESTAMPTZ,
+    deleted_at            TIMESTAMPTZ,
+    CONSTRAINT users_deletion_schedule_check
+        CHECK ((deletion_requested_at IS NULL) = (deletion_scheduled_at IS NULL)),
+    CONSTRAINT users_deletion_inactive_check
+        CHECK ((deletion_requested_at IS NULL AND deleted_at IS NULL) OR NOT is_active)
 );
 -- Emails are stored lower-cased; the index also blocks case-only duplicates.
 CREATE UNIQUE INDEX users_email_lower_key ON users (lower(email));
+CREATE INDEX users_deletion_due_idx ON users (deletion_scheduled_at)
+    WHERE deletion_scheduled_at IS NOT NULL AND deleted_at IS NULL;
 
 CREATE TABLE user_coupons (
     id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -113,6 +124,34 @@ CREATE TABLE admin_sessions (
 );
 CREATE INDEX admin_sessions_admin_id_idx ON admin_sessions (admin_id);
 CREATE INDEX admin_sessions_expires_at_idx ON admin_sessions (expires_at);
+
+-- Consecutive member login failures per normalized email, stored only as a SHA-256 hex (0005).
+-- Unknown emails get rows too so the limit never reveals whether an account exists.
+CREATE TABLE login_failures (
+    email_hash    VARCHAR(64) PRIMARY KEY,
+    failure_count INTEGER     NOT NULL DEFAULT 0,
+    locked_until  TIMESTAMPTZ,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT login_failures_email_hash_check CHECK (email_hash ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT login_failures_failure_count_check CHECK (failure_count >= 0)
+);
+CREATE INDEX login_failures_updated_at_idx ON login_failures (updated_at);
+
+-- One row per member purge execution, including dry runs (0005). A row left in 'running'
+-- means the process stopped before recording its result.
+CREATE TABLE member_deletion_runs (
+    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    started_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at     TIMESTAMPTZ,
+    status          VARCHAR(20) NOT NULL DEFAULT 'running',
+    dry_run         BOOLEAN     NOT NULL,
+    eligible        INTEGER     NOT NULL DEFAULT 0,
+    deleted         INTEGER     NOT NULL DEFAULT 0,
+    failed          INTEGER     NOT NULL DEFAULT 0,
+    failed_user_ids UUID[]      NOT NULL DEFAULT '{}',
+    CONSTRAINT member_deletion_runs_status_check
+        CHECK (status IN ('running', 'succeeded', 'partial', 'failed'))
+);
 
 -- ---------------------------------------------------------------------------
 -- Catalog: original string IDs from apps/web/mock-server/fixtures/catalog.json
@@ -266,6 +305,9 @@ CREATE TABLE orders (
     coupon_id       UUID         REFERENCES user_coupons (id),
     idempotency_key VARCHAR(64),
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    status          VARCHAR(20)  NOT NULL DEFAULT 'received',  -- 0006, accepted without payment
+    CONSTRAINT orders_status_check
+        CHECK (status IN ('received', 'paid', 'preparing', 'shipped', 'delivered', 'cancelled')),
     CONSTRAINT orders_amounts_check
         CHECK (items_amount >= 0 AND shipping_fee >= 0 AND total = items_amount + shipping_fee),
     CONSTRAINT orders_user_idempotency_key UNIQUE (user_id, idempotency_key)
@@ -302,6 +344,62 @@ CREATE TABLE order_item_selections (
     position      SMALLINT     NOT NULL,
     PRIMARY KEY (order_item_id, product_id)
 );
+
+-- Every order status change, including the first 'received' entry (from_status NULL) (0006).
+-- Rows are only added.
+CREATE TABLE order_status_history (
+    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id    UUID         NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
+    from_status VARCHAR(20),
+    to_status   VARCHAR(20)  NOT NULL,
+    actor_type  VARCHAR(10)  NOT NULL,
+    actor_id    UUID,                    -- member or admin id; NULL for system changes
+    reason      VARCHAR(200),
+    changed_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT order_status_history_from_status_check CHECK (from_status IS NULL OR
+        from_status IN ('received', 'paid', 'preparing', 'shipped', 'delivered', 'cancelled')),
+    CONSTRAINT order_status_history_to_status_check
+        CHECK (to_status IN ('received', 'paid', 'preparing', 'shipped', 'delivered', 'cancelled')),
+    CONSTRAINT order_status_history_actor_type_check
+        CHECK (actor_type IN ('member', 'admin', 'system')),
+    CONSTRAINT order_status_history_actor_check CHECK ((actor_type = 'system') = (actor_id IS NULL))
+);
+CREATE INDEX order_status_history_order_idx ON order_status_history (order_id, changed_at, id);
+
+-- PG payment attempts per order (0007). The amount is copied from orders.total when issued.
+CREATE TABLE payments (
+    id                 UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id           UUID         NOT NULL REFERENCES orders (id),
+    provider           VARCHAR(20)  NOT NULL,
+    pg_order_id        VARCHAR(64)  NOT NULL,   -- orderId sent to the PG, one per attempt
+    payment_key        VARCHAR(200),            -- PG paymentKey, set when approval is claimed
+    amount             INTEGER      NOT NULL,
+    status             VARCHAR(20)  NOT NULL DEFAULT 'READY',
+    method             VARCHAR(30),
+    failure_code       VARCHAR(100),
+    failure_message    VARCHAR(500),
+    review_reason      VARCHAR(100),            -- approved at the PG but needs manual handling
+    confirm_started_at TIMESTAMPTZ,
+    approved_at        TIMESTAMPTZ,
+    created_at         TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at         TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT payments_pg_order_id_key UNIQUE (pg_order_id),
+    CONSTRAINT payments_payment_key_key UNIQUE (payment_key),
+    CONSTRAINT payments_status_check
+        CHECK (status IN ('READY', 'IN_PROGRESS', 'DONE', 'FAILED')),
+    CONSTRAINT payments_amount_check CHECK (amount > 0),
+    CONSTRAINT payments_pg_order_id_check CHECK (pg_order_id ~ '^[A-Za-z0-9_-]{6,64}$'),
+    CONSTRAINT payments_claimed_check
+        CHECK (status = 'READY' OR (payment_key IS NOT NULL AND confirm_started_at IS NOT NULL)),
+    CONSTRAINT payments_approved_check CHECK ((status = 'DONE') = (approved_at IS NOT NULL))
+);
+-- One open or approved attempt per order: a second approval for the same order cannot exist.
+CREATE UNIQUE INDEX payments_order_open_key ON payments (order_id)
+    WHERE status IN ('READY', 'IN_PROGRESS', 'DONE');
+CREATE INDEX payments_order_idx ON payments (order_id, created_at DESC);
+-- Attempts whose result is still unknown, for the reconciliation job.
+CREATE INDEX payments_in_progress_idx ON payments (confirm_started_at)
+    WHERE status = 'IN_PROGRESS';
 
 -- ---------------------------------------------------------------------------
 -- Partner inquiries (+ admin handling status)

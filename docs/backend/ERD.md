@@ -39,6 +39,8 @@ erDiagram
     recipes |o--o{ recipes : "다시 만들기(parent)"
 
     orders ||--o{ order_items : "주문 항목"
+    orders ||--o{ order_status_history : "상태 변경"
+    orders ||--o{ payments : "결제 시도"
     order_items ||--o{ order_item_selections : "Gift Set 구성"
     user_coupons |o--o| orders : "사용"
 
@@ -56,6 +58,9 @@ erDiagram
         boolean marketing
         timestamptz created_at
         boolean is_active
+        timestamptz deletion_requested_at
+        timestamptz deletion_scheduled_at
+        timestamptz deleted_at
     }
     user_coupons {
         uuid id PK
@@ -214,6 +219,26 @@ erDiagram
         uuid coupon_id FK
         varchar idempotency_key
         timestamptz created_at
+        varchar status
+    }
+    payments {
+        uuid id PK
+        uuid order_id FK
+        varchar pg_order_id UK
+        varchar payment_key UK
+        int amount
+        varchar status
+        timestamptz approved_at
+    }
+    order_status_history {
+        uuid id PK
+        uuid order_id FK
+        varchar from_status
+        varchar to_status
+        varchar actor_type
+        uuid actor_id
+        varchar reason
+        timestamptz changed_at
     }
     order_items {
         uuid id PK
@@ -286,15 +311,21 @@ erDiagram
 
 **users** — 회원
 
-| 컬럼          | 타입         | 제약                         | 설명                                     |
-| ------------- | ------------ | ---------------------------- | ---------------------------------------- |
-| id            | UUID         | PK                           | 회원 ID (`Member.id`)                    |
-| email         | VARCHAR(254) | NOT NULL, UK(`lower(email)`) | 소문자로 저장, 대소문자 무관 중복 금지   |
-| name          | VARCHAR(100) | NOT NULL                     | 이름                                     |
-| password_hash | VARCHAR(255) | NOT NULL                     | 서버 해시값(Argon2id 등). 평문 저장 금지 |
-| marketing     | BOOLEAN      | NOT NULL DEFAULT false       | 마케팅 수신 동의                         |
-| created_at    | TIMESTAMPTZ  | NOT NULL DEFAULT now()       | 가입 시각                                |
-| is_active     | BOOLEAN      | NOT NULL DEFAULT true        | false면 로그인 거절 (마이그레이션 0002)  |
+| 컬럼                  | 타입         | 제약                         | 설명                                     |
+| --------------------- | ------------ | ---------------------------- | ---------------------------------------- |
+| id                    | UUID         | PK                           | 회원 ID (`Member.id`)                    |
+| email                 | VARCHAR(254) | NOT NULL, UK(`lower(email)`) | 소문자로 저장, 대소문자 무관 중복 금지   |
+| name                  | VARCHAR(100) | NOT NULL                     | 이름                                     |
+| password_hash         | VARCHAR(255) | NOT NULL                     | 서버 해시값(Argon2id 등). 평문 저장 금지 |
+| marketing             | BOOLEAN      | NOT NULL DEFAULT false       | 마케팅 수신 동의                         |
+| created_at            | TIMESTAMPTZ  | NOT NULL DEFAULT now()       | 가입 시각                                |
+| is_active             | BOOLEAN      | NOT NULL DEFAULT true        | false면 로그인 거절 (마이그레이션 0002)  |
+| deletion_requested_at | TIMESTAMPTZ  | NULL                         | 탈퇴 신청 시각 (0005)                    |
+| deletion_scheduled_at | TIMESTAMPTZ  | NULL, 부분 INDEX             | 신청 + 30일. 이전 로그인 시 복구 (0005)  |
+| deleted_at            | TIMESTAMPTZ  | NULL                         | 예약 삭제 완료 시각. 행은 익명화 (0005)  |
+
+> 0005 CHECK: 신청·예정 시각은 함께 NULL이거나 함께 값이 있고, 탈퇴 신청·삭제된 회원은 `is_active=false`다.
+> 예약 삭제는 주문 보존을 위해 행을 지우지 않고 이메일·이름·비밀번호 해시를 익명 값으로 바꾼다.
 
 **user_coupons** — 신규 회원 배송비 쿠폰
 
@@ -353,6 +384,29 @@ erDiagram
 | issued_at  | TIMESTAMPTZ | NOT NULL DEFAULT now()                 | 발급 시각              |
 | expires_at | TIMESTAMPTZ | NOT NULL, INDEX, CHECK > issued_at     | 만료 시각 (기본 1시간) |
 | revoked_at | TIMESTAMPTZ | NULL                                   | 로그아웃 시각          |
+
+**login_failures** — 회원 로그인 연속 실패 기록 (마이그레이션 0005)
+
+| 컬럼          | 타입        | 제약                          | 설명                                        |
+| ------------- | ----------- | ----------------------------- | ------------------------------------------- |
+| email_hash    | VARCHAR(64) | PK, CHECK 소문자 hex 64자     | 정규화 이메일의 SHA-256. 이메일 원문 미저장 |
+| failure_count | INTEGER     | NOT NULL DEFAULT 0, CHECK ≥0  | 연속 시도 수 (성공 시 행 삭제)              |
+| locked_until  | TIMESTAMPTZ | NULL                          | 3회째부터 10분 제한 종료 시각               |
+| updated_at    | TIMESTAMPTZ | NOT NULL DEFAULT now(), INDEX | 하루 지난 미잠금 행은 예약 작업이 정리      |
+
+**member_deletion_runs** — 회원 예약 삭제 실행 기록 (마이그레이션 0005)
+
+| 컬럼            | 타입        | 제약                                   | 설명                          |
+| --------------- | ----------- | -------------------------------------- | ----------------------------- |
+| id              | UUID        | PK                                     | 실행 ID                       |
+| started_at      | TIMESTAMPTZ | NOT NULL DEFAULT now()                 | 시작 시각                     |
+| finished_at     | TIMESTAMPTZ | NULL                                   | 종료 시각 (NULL이면 중단)     |
+| status          | VARCHAR(20) | CHECK running·succeeded·partial·failed | 실행 결과                     |
+| dry_run         | BOOLEAN     | NOT NULL                               | 건수만 확인한 실행 여부       |
+| eligible        | INTEGER     | NOT NULL DEFAULT 0                     | 삭제 예정 시각이 지난 회원 수 |
+| deleted         | INTEGER     | NOT NULL DEFAULT 0                     | 익명화 완료 수                |
+| failed          | INTEGER     | NOT NULL DEFAULT 0                     | 롤백된 회원 수                |
+| failed_user_ids | UUID[]      | NOT NULL DEFAULT '{}'                  | 다음 실행에서 재시도할 회원   |
 
 > 인증은 JWT로 결정했다(쿠키 값 = 서명된 JWT). 비회원 식별값 `guestId`는 별도 비인증 방문자 쿠키에 두며 JWT·회원 인증에 사용하지 않는다.
 > 토큰 검증기는 **발급 기록이 있는 토큰만** 통과시킨다. 회원 Access Token은 `refresh_tokens.access_jti`, 관리자 Access Token은 `admin_sessions`에 기록되고, 로그아웃한 jti는 `revoked_tokens`에 들어간다. Refresh Token은 재발급할 때마다 새것으로 바꾸고(회전), 이미 쓰인 토큰이 다시 오면 같은 계열 전체를 폐기한다. 관리자는 Refresh 없이 Access Token만 받는다.
@@ -504,6 +558,7 @@ erDiagram
 | coupon_id       | UUID         | FK → user_coupons, NULL                                  | 사용한 쿠폰                        |
 | idempotency_key | VARCHAR(64)  | NULL                                                     | 같은 주문 중복 생성 방지           |
 | created_at      | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                   | `Order.created`                    |
+| status          | VARCHAR(20)  | NOT NULL DEFAULT `received`, CHECK 6개 상태              | `Order.status` (마이그레이션 0006) |
 |                 |              | UK(user_id, idempotency_key)                             |                                    |
 |                 |              | INDEX(user_id, created_at DESC)                          | 내 주문 최신순 조회                |
 
@@ -521,6 +576,44 @@ erDiagram
 | unit_price       | INTEGER      | NOT NULL, CHECK ≥ 0                                  | 서버가 계산한 단가 (Gift Set = 선택 3개 합)     |
 | quantity         | SMALLINT     | NOT NULL, CHECK(quantity BETWEEN 1 AND 15)           |                                                 |
 | custom           | JSONB        | NULL                                                 | 맞춤 조향 구성 (주문 허용 시)                   |
+
+**order_status_history** — 주문 상태 변경 이력 (마이그레이션 0006, 추가만 함)
+
+| 컬럼        | 타입         | 제약                                      | 설명                                |
+| ----------- | ------------ | ----------------------------------------- | ----------------------------------- |
+| id          | UUID         | PK                                        |                                     |
+| order_id    | UUID         | FK → orders ON DELETE CASCADE, INDEX      | 주문별 시간순 조회                  |
+| from_status | VARCHAR(20)  | NULL, CHECK 6개 상태                      | 첫 `received` 기록은 NULL           |
+| to_status   | VARCHAR(20)  | NOT NULL, CHECK 6개 상태                  | 바뀐 상태                           |
+| actor_type  | VARCHAR(10)  | NOT NULL, CHECK `member`·`admin`·`system` | 변경 주체                           |
+| actor_id    | UUID         | NULL, `system`일 때만 NULL (CHECK)        | 회원 또는 관리자 ID. FK 없음        |
+| reason      | VARCHAR(200) | NULL                                      | 변경 사유                           |
+| changed_at  | TIMESTAMPTZ  | NOT NULL DEFAULT now()                    | 0006 이전 주문은 주문 시각으로 기록 |
+
+> 상태: `received` 접수(결제 없음) · `paid` 결제 완료 · `preparing` 제작·출고 준비 · `shipped` 배송 중 · `delivered` 배송 완료 · `cancelled` 취소. 전이 규칙은 [주문 상태 문서](ORDER_STATUS.md).
+
+**payments** — 주문별 PG 결제 시도 (마이그레이션 0007)
+
+| 컬럼               | 타입         | 제약                                                    | 설명                                |
+| ------------------ | ------------ | ------------------------------------------------------- | ----------------------------------- |
+| id                 | UUID         | PK                                                      | PG 멱등키로도 사용                  |
+| order_id           | UUID         | FK → orders, INDEX                                      | 주문 삭제 시 함께 지우지 않음       |
+| provider           | VARCHAR(20)  | NOT NULL                                                | `toss`                              |
+| pg_order_id        | VARCHAR(64)  | NOT NULL, UK, CHECK 영문·숫자·`-`·`_` 6~64자            | PG에 보낸 주문번호(`aura-<id hex>`) |
+| payment_key        | VARCHAR(200) | UK, NULL                                                | PG paymentKey. 승인 요청 시 기록    |
+| amount             | INTEGER      | NOT NULL, CHECK > 0                                     | 발급 시점의 `orders.total`          |
+| status             | VARCHAR(20)  | CHECK `READY`·`IN_PROGRESS`·`DONE`·`FAILED`             |                                     |
+| method             | VARCHAR(30)  | NULL                                                    | PG 결제수단 (카드 등)               |
+| failure_code       | VARCHAR(100) | NULL                                                    | PG 실패 코드                        |
+| failure_message    | VARCHAR(500) | NULL                                                    | PG 실패 사유                        |
+| review_reason      | VARCHAR(100) | NULL                                                    | 승인됐지만 수동 처리가 필요한 사유  |
+| confirm_started_at | TIMESTAMPTZ  | `READY`가 아니면 paymentKey와 함께 필수 (CHECK)         | 승인 요청 시각, 재확인 기준         |
+| approved_at        | TIMESTAMPTZ  | `DONE`일 때만 값 (CHECK)                                | PG 승인 시각                        |
+| created_at         | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                  |                                     |
+| updated_at         | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                  |                                     |
+|                    |              | UNIQUE(order_id) WHERE status IN READY·IN_PROGRESS·DONE | 주문당 진행·완료 결제는 1건         |
+
+> 카드 번호 등 결제수단 정보는 저장하지 않습니다. 브라우저가 PG 결제창과 직접 통신합니다.
 
 **order_item_selections** — Gift Set 구성 3개 (스냅샷)
 

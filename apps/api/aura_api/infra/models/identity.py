@@ -10,11 +10,14 @@ from sqlalchemy import (
     ForeignKey,
     ForeignKeyConstraint,
     Index,
+    Integer,
     String,
     UniqueConstraint,
+    Uuid,
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aura_api.infra.database import Base
@@ -26,7 +29,22 @@ class User(Base):
     """Customer account. Admins are a separate table."""
 
     __tablename__ = "users"
-    __table_args__ = (Index("users_email_lower_key", func.lower(text("email")), unique=True),)
+    __table_args__ = (
+        CheckConstraint(
+            "(deletion_requested_at IS NULL) = (deletion_scheduled_at IS NULL)",
+            name="deletion_schedule",
+        ),
+        CheckConstraint(
+            "(deletion_requested_at IS NULL AND deleted_at IS NULL) OR NOT is_active",
+            name="deletion_inactive",
+        ),
+        Index("users_email_lower_key", func.lower(text("email")), unique=True),
+        Index(
+            "users_deletion_due_idx",
+            "deletion_scheduled_at",
+            postgresql_where=text("deletion_scheduled_at IS NOT NULL AND deleted_at IS NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=UUID_DEFAULT)
     email: Mapped[str] = mapped_column(String(254))
@@ -35,6 +53,10 @@ class User(Base):
     marketing: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    # 0005: restorable until deletion_scheduled_at; deleted_at is set by the purge job.
+    deletion_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deletion_scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Admin(Base):
@@ -151,3 +173,40 @@ class AdminSession(Base):
     issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class LoginFailure(Base):
+    """Consecutive member login failures per SHA-256 of the normalized email (0005)."""
+
+    __tablename__ = "login_failures"
+    __table_args__ = (
+        CheckConstraint("email_hash ~ '^[0-9a-f]{64}$'", name="email_hash"),
+        CheckConstraint("failure_count >= 0", name="failure_count"),
+        Index("login_failures_updated_at_idx", "updated_at"),
+    )
+
+    email_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    failure_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MemberDeletionRun(Base):
+    """Result of one member purge execution (0005)."""
+
+    __tablename__ = "member_deletion_runs"
+    __table_args__ = (
+        CheckConstraint("status IN ('running', 'succeeded', 'partial', 'failed')", name="status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=UUID_DEFAULT)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'running'"))
+    dry_run: Mapped[bool] = mapped_column(Boolean)
+    eligible: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    deleted: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    failed: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    failed_user_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(Uuid), server_default=text("'{}'")
+    )

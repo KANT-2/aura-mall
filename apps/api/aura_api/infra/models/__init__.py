@@ -17,13 +17,21 @@ from aura_api.infra.models.identity import (
     Admin,
     AdminSession,
     AuthTokenFamily,
+    LoginFailure,
+    MemberDeletionRun,
     RefreshToken,
     RevokedToken,
     User,
     UserCoupon,
 )
-from aura_api.infra.models.ordering import Order, OrderItem, OrderItemSelection
+from aura_api.infra.models.ordering import (
+    Order,
+    OrderItem,
+    OrderItemSelection,
+    OrderStatusHistory,
+)
 from aura_api.infra.models.partner import PartnerInquiry
+from aura_api.infra.models.payment import Payment
 
 __all__ = [
     "Admin",
@@ -31,13 +39,17 @@ __all__ = [
     "AdminSession",
     "AtelierDraft",
     "AuthTokenFamily",
+    "LoginFailure",
+    "MemberDeletionRun",
     "Base",
     "Collection",
     "Ingredient",
     "Order",
     "OrderItem",
     "OrderItemSelection",
+    "OrderStatusHistory",
     "PartnerInquiry",
+    "Payment",
     "Product",
     "ProductType",
     "Promotion",

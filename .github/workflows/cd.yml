@@ -82,36 +82,70 @@ jobs:
           git pull --ff-only origin develop
 
           echo "Validating Compose configuration..."
-          docker compose config --quiet
+          test -f compose.web2.yaml
+          docker network inspect caddy > /dev/null
 
-                    echo "Checking AURA database..."
-          docker compose up -d --no-deps db
-          docker compose exec -T db sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+          compose_args=(-f compose.yaml)
+          if test -f .db-ops/client/database-url; then
+            compose_args+=(-f compose.database.yaml)
+          fi
+          compose_args+=(-f compose.web2.yaml)
+          docker compose "${compose_args[@]}" config --quiet
+
+          echo "Checking AURA database..."
+          if test -f .db-ops/client/database-url; then
+            python3 ops/database.py status
+          else
+            docker compose "${compose_args[@]}" up -d --no-deps db
+            docker compose "${compose_args[@]}" exec -T db \
+              sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+          fi
 
           echo "Building API and Next.js..."
-          docker compose build api web
+          docker compose "${compose_args[@]}" build api web
 
           echo "Backing up AURA database..."
-          mkdir -p "$HOME/workspace/aura-backups"
-          chmod 700 "$HOME/workspace/aura-backups"
-          backup="$HOME/workspace/aura-backups/aura-$(date +%Y%m%d-%H%M%S).dump"
-          docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup"
-          docker compose exec -T db pg_restore -l < "$backup" > /dev/null
+          if test -f .db-ops/client/database-url; then
+            python3 ops/database.py backup
+          else
+            mkdir -p "$HOME/workspace/aura-backups"
+            chmod 700 "$HOME/workspace/aura-backups"
+            backup="$HOME/workspace/aura-backups/aura-$(date +%Y%m%d-%H%M%S).dump"
+            docker compose "${compose_args[@]}" exec -T db \
+              sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup"
+            docker compose "${compose_args[@]}" exec -T db \
+              pg_restore -l < "$backup" > /dev/null
+          fi
 
           echo "Applying Alembic migrations..."
-          docker compose run --rm --no-deps api alembic upgrade head
+          docker compose "${compose_args[@]}" run --rm --no-deps api alembic upgrade head
 
-          echo "Deploying FastAPI and Next.js..."
-          docker compose up -d --no-deps api web
+          echo "Deploying two FastAPI and two Next.js containers..."
+          if test -f .db-ops/client/database-url; then
+            python3 ops/database.py deploy-api
+          fi
+          docker compose "${compose_args[@]}" up -d --no-deps api web web2
 
-          echo "Checking API..."
+          echo "Checking both API containers..."
           healthy=false
           for attempt in $(seq 1 12); do
-            if docker compose exec -T api python -c \
-              "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"; then
+            mapfile -t api_containers < <(
+              docker compose "${compose_args[@]}" ps --status running -q api
+            )
+            if [ "${#api_containers[@]}" -eq 2 ]; then
               healthy=true
-              break
+              for container in "${api_containers[@]}"; do
+                if ! docker exec "$container" python -c \
+                  "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"; then
+                  healthy=false
+                  break
+                fi
+              done
+              if [ "$healthy" = "true" ]; then
+                break
+              fi
             fi
+            echo "API containers not ready yet (attempt $attempt/12)"
             sleep 5
           done
 
@@ -120,13 +154,17 @@ jobs:
             exit 1
           fi
 
-          echo "Checking Next.js..."
+          echo "Checking both Next.js containers..."
           web_healthy=false
           for attempt in $(seq 1 12); do
-            if curl -fsS -o /dev/null http://127.0.0.1:13000; then
+            if docker compose "${compose_args[@]}" exec -T web node -e \
+                 "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" \
+              && docker compose "${compose_args[@]}" exec -T web2 node -e \
+                 "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
               web_healthy=true
               break
             fi
+            echo "Next.js containers not ready yet (attempt $attempt/12)"
             sleep 5
           done
 
@@ -135,7 +173,22 @@ jobs:
             exit 1
           fi
 
-          echo "AURA API and Next.js deployment completed"
+          echo "Checking public HTTPS route..."
+          public_healthy=false
+          for attempt in $(seq 1 12); do
+            if curl -fsS -o /dev/null https://aura.dev.crasnec.com; then
+              public_healthy=true
+              break
+            fi
+            echo "Public route not ready yet (attempt $attempt/12)"
+            sleep 5
+          done
+
+          if [ "$public_healthy" != "true" ]; then
+            echo "Public HTTPS health check failed"
+            exit 1
+          fi
+
+          echo "AURA HA deployment completed"
 
           REMOTE
-          

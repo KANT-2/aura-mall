@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from datetime import datetime, timedelta
 from typing import Protocol
 from uuid import UUID
 
@@ -6,6 +7,11 @@ from aura_api.domain.identity import Registration
 from aura_api.identity.tokens import IssuedTokens, UserRecord
 
 TokenIssuer = Callable[[UUID, UUID], IssuedTokens]
+
+# Team policy (CRA-34 follow-up): deletion grace period and member login failure limits.
+DELETION_GRACE = timedelta(days=30)
+LOGIN_FAILURE_LIMIT = 3
+LOGIN_LOCK = timedelta(minutes=10)
 
 
 class AuthStorageUnavailable(RuntimeError):
@@ -20,6 +26,22 @@ class AuthRepository(Protocol):
     async def create_token_family(
         self, tokens: IssuedTokens, *, expected_password_hash: str
     ) -> bool: ...
+
+    async def restore_token_family(
+        self,
+        tokens: IssuedTokens,
+        *,
+        expected_password_hash: str,
+        expected_deletion_requested_at: datetime,
+    ) -> bool:
+        """Cancel a pending deletion and save the new family in one transaction."""
+        ...
+
+    async def reserve_login_attempt(self, email_hash: str) -> int:
+        """Count one attempt; return 0 when allowed, else seconds until the lock ends."""
+        ...
+
+    async def clear_login_failures(self, email_hash: str) -> None: ...
 
     async def change_password(
         self, user_id: UUID, *, expected_password_hash: str, new_password_hash: str
@@ -56,6 +78,17 @@ class UnavailableAuthRepository:
         raise AuthStorageUnavailable()
 
     async def create_token_family(self, tokens, *, expected_password_hash):
+        raise AuthStorageUnavailable()
+
+    async def restore_token_family(
+        self, tokens, *, expected_password_hash, expected_deletion_requested_at
+    ):
+        raise AuthStorageUnavailable()
+
+    async def reserve_login_attempt(self, email_hash):
+        raise AuthStorageUnavailable()
+
+    async def clear_login_failures(self, email_hash):
         raise AuthStorageUnavailable()
 
     async def change_password(self, user_id, *, expected_password_hash, new_password_hash):

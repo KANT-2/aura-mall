@@ -8,11 +8,12 @@ from typing import Any
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from aura_api.domain.ordering import PricedOrder
+from aura_api.domain.ordering import ActorType, PricedOrder, ensure_status_change
 from aura_api.infra.models import (
     Order,
     OrderItem,
     OrderItemSelection,
+    OrderStatusHistory,
     Product,
     ProductType,
     UserCoupon,
@@ -37,6 +38,17 @@ class SavedOrder:
     recipient: str
     address: str
     created_at: datetime
+    status: str
+
+
+@dataclass(frozen=True)
+class StatusChange:
+    from_status: str | None
+    to_status: str
+    actor_type: str
+    actor_id: uuid.UUID | None
+    reason: str | None
+    changed_at: datetime
 
 
 async def products_with_type_names(session: AsyncSession) -> dict[str, tuple[Product, str]]:
@@ -138,9 +150,25 @@ async def add_order(
             )
         )
     await session.flush()
-    await session.refresh(order, ["created_at"])
+    await session.refresh(order, ["created_at", "status"])
+    session.add(
+        OrderStatusHistory(
+            order_id=order.id,
+            to_status=order.status,
+            actor_type="member",
+            actor_id=user_id,
+            changed_at=order.created_at,
+        )
+    )
+    await session.flush()
     return SavedOrder(
-        order.id, items, order.total, order.recipient, order.address, order.created_at
+        order.id,
+        items,
+        order.total,
+        order.recipient,
+        order.address,
+        order.created_at,
+        order.status,
     )
 
 
@@ -199,7 +227,72 @@ async def _saved(session: AsyncSession, orders: list[Order]) -> list[SavedOrder]
         )
     return [
         SavedOrder(
-            order.id, items[order.id], order.total, order.recipient, order.address, order.created_at
+            order.id,
+            items[order.id],
+            order.total,
+            order.recipient,
+            order.address,
+            order.created_at,
+            order.status,
         )
         for order in orders
     ]
+
+
+async def status_history(session: AsyncSession, order_id: uuid.UUID) -> list[StatusChange]:
+    """Oldest first, including the first 'received' entry."""
+    rows = await session.scalars(
+        select(OrderStatusHistory)
+        .where(OrderStatusHistory.order_id == order_id)
+        .order_by(OrderStatusHistory.changed_at, OrderStatusHistory.id)
+    )
+    return [
+        StatusChange(
+            row.from_status, row.to_status, row.actor_type, row.actor_id, row.reason, row.changed_at
+        )
+        for row in rows
+    ]
+
+
+async def change_status(
+    session: AsyncSession,
+    order_id: uuid.UUID,
+    new_status: object,
+    *,
+    actor_type: ActorType,
+    actor_id: uuid.UUID | None,
+    reason: object = None,
+    owner_id: uuid.UUID | None = None,
+    payment_verified: bool = False,
+) -> Order | None:
+    """Apply one status change under the order row lock and record it.
+
+    `owner_id` limits the change to that member's order. None means no such order. The
+    caller's transaction commits the change; follow-up work (stock, coupon) joins it.
+    """
+    # Reload under the lock even if this session already holds the order with an older status.
+    query = (
+        select(Order)
+        .where(Order.id == order_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if owner_id is not None:
+        query = query.where(Order.user_id == owner_id)
+    order = await session.scalar(query)
+    if order is None:
+        return None
+    note = ensure_status_change(order.status, new_status, reason, payment_verified=payment_verified)
+    session.add(
+        OrderStatusHistory(
+            order_id=order.id,
+            from_status=order.status,
+            to_status=new_status,
+            actor_type=actor_type,
+            actor_id=actor_id,
+            reason=note,
+        )
+    )
+    order.status = new_status
+    await session.flush()
+    return order

@@ -149,8 +149,9 @@ export function MemberSettings({ member }: { member: Member }) {
       <h2>계정 사용 중지</h2>
       <p>이 브라우저의 장바구니는 유지됩니다.</p>
       <p>
-        저장 레시피와 안전한 미사용 쿠폰을 정리합니다. 주문 기록은 보존하며 개인정보 완전 파기를
-        의미하지 않습니다.
+        30일 안에 같은 이메일과 비밀번호로 로그인하면 계정과 저장 레시피·쿠폰이 복구됩니다. 30일이
+        지나면 복구할 수 없으며 회원 정보와 레시피·미사용 쿠폰은 삭제 대상이 됩니다. 주문 기록은
+        보존하며 이 안내는 개인정보 완전 파기를 의미하지 않습니다.
       </p>
       <form onSubmit={(event) => void submit(event, "deactivate")}>
         <fieldset disabled={pending}>

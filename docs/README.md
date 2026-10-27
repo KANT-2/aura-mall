@@ -4,17 +4,18 @@
 
 ## 현재 기준
 
-| 문서                                       | 내용                                     |
-| ------------------------------------------ | ---------------------------------------- |
-| [제품 기획](product/PRD.md)                | 서비스 범위·상품 정책·화면·사용자 경험   |
-| [웹 개발 안내](../apps/web/README.md)      | Next.js·BFF·Mock·훅·CSS·웹 검증          |
-| [API 개발 안내](../apps/api/README.md)     | FastAPI 설치·설정·라우터·Python 검증     |
-| [FastAPI BFF 계약](FASTAPI_BFF.md)         | 업무 API의 입력·응답·세션·오류·연결 기준 |
-| [백엔드 요구사항](backend/REQUIREMENTS.md) | 백엔드 기능·비기능 요구사항·인수 기준    |
-| [백엔드 설계서](backend/DESIGN.md)         | 구조·API·JWT 인증·트랜잭션·인프라 설계   |
-| [백엔드 ERD](backend/ERD.md)               | 백엔드 테이블·관계·제약 설계(초안)       |
-| [도메인 규칙](backend/DOMAIN_RULES.md)     | 회원·조향·주문·문의 업무 규칙(초안)      |
-| [에셋 안내](assets/README.md)              | 현재 자산 위치·목록·미리보기·글꼴        |
+| 문서                                       | 내용                                       |
+| ------------------------------------------ | ------------------------------------------ |
+| [제품 기획](product/PRD.md)                | 서비스 범위·상품 정책·화면·사용자 경험     |
+| [웹 개발 안내](../apps/web/README.md)      | Next.js·BFF·Mock·훅·CSS·웹 검증            |
+| [API 개발 안내](../apps/api/README.md)     | FastAPI 설치·설정·라우터·Python 검증       |
+| [FastAPI BFF 계약](FASTAPI_BFF.md)         | 업무 API의 입력·응답·세션·오류·연결 기준   |
+| [백엔드 요구사항](backend/REQUIREMENTS.md) | 백엔드 기능·비기능 요구사항·인수 기준      |
+| [백엔드 설계서](backend/DESIGN.md)         | 구조·API·JWT 인증·트랜잭션·인프라 설계     |
+| [백엔드 ERD](backend/ERD.md)               | 백엔드 테이블·관계·제약 설계(초안)         |
+| [도메인 규칙](backend/DOMAIN_RULES.md)     | 회원·조향·주문·문의 업무 규칙(초안)        |
+| [에셋 안내](assets/README.md)              | 현재 자산 위치·목록·미리보기·글꼴          |
+| [DB 운영 안내](operations/DATABASE.md)     | TLS 자동 갱신·접속 비밀번호 회전·복제·복구 |
 
 제품 기획은 목표 정책과 경험을 정의합니다. 실제 구현 범위는 앱별 README와 소스, API 구현 시 준수할 통신 규칙은 BFF 계약을 기준으로 확인합니다. 현재 웹의 업무 데이터는 Mock에서 제공하고 FastAPI에는 헬스 체크 골격이 있습니다.
 

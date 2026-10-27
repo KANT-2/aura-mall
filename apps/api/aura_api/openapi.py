@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 from aura_api.core.errors import ErrorResponse
 
-CONTRACT_VERSION = "1.0.0"
+CONTRACT_VERSION = "1.2.0"
 ERROR_RESPONSES = {
     code: {"model": ErrorResponse} for code in (400, 401, 403, 404, 409, 422, 500, 503)
 }
@@ -20,6 +20,10 @@ TAGS = [
     {"name": "recipes", "description": "회원 소유 레시피"},
     {"name": "atelier", "description": "방문자별 조향 초안. 회원 데이터와 분리합니다."},
     {"name": "orders", "description": "회원 주문 조회·접수. 화면 결제 활성화와는 별도입니다."},
+    {
+        "name": "payments",
+        "description": "회원 주문 결제. PG 승인과 서버 금액 검증 후에만 결제 완료입니다.",
+    },
     {"name": "admin", "description": "관리자 JWT 전용 인증·등록·운영 API"},
 ]
 DESCRIPTION = """AURA FastAPI 업무 API입니다. 브라우저는 Next BFF의 `/api`를 사용합니다.
@@ -68,8 +72,10 @@ def configure_openapi(app: FastAPI, prefix: str) -> None:
                     continue
                 if relative.startswith("/admin/") and relative != "/admin/auth/login":
                     operation["security"] = [{"AdminJWT": []}]
-                elif relative in {"/auth/me", "/auth/logout", "/orders"} or (
-                    relative.startswith("/recipes") and method != "get"
+                elif (
+                    relative in {"/auth/me", "/auth/logout", "/orders"}
+                    or relative.startswith("/payments")
+                    or (relative.startswith("/recipes") and method != "get")
                 ):
                     operation["security"] = [{"MemberJWT": []}]
                 elif relative in {"/recipes", "/atelier/draft"}:
