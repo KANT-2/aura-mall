@@ -137,15 +137,39 @@ def test_shared_uuid_admin_markers_cannot_reach_member_business_routes(
     boundary.member_exists.assert_not_awaited()
 
 
-def test_shared_uuid_member_profile_still_accepts_member_token(boundary):
-    response = boundary.client.get("/api/v1/auth/me", headers=bearer(boundary.member.access_token))
+@pytest.mark.parametrize("principal_type", [None, "member"])
+def test_shared_uuid_member_profile_still_accepts_member_token(boundary, principal_type):
+    token = boundary.member.access_token
+    if principal_type is not None:
+        claims = jwt.decode(
+            token,
+            KEY,
+            algorithms=["HS256"],
+            issuer="cra22-test",
+            audience="cra22-api",
+        )
+        token = jwt.encode({**claims, "principal_type": principal_type}, KEY, algorithm="HS256")
+    response = boundary.client.get("/api/v1/auth/me", headers=bearer(token))
     assert response.status_code == 200
     assert response.json()["role"] == "member"
 
 
-def test_admin_principal_cannot_read_member_profile_with_shared_uuid(boundary):
-    response = boundary.client.get(
-        "/api/v1/auth/me", headers=bearer(boundary.operator.access_token)
-    )
+@pytest.mark.parametrize("missing_marker", [None, "principal_type", "permissions"])
+def test_admin_principal_cannot_read_member_profile_with_shared_uuid(boundary, missing_marker):
+    token = boundary.operator.access_token
+    if missing_marker is not None:
+        claims = jwt.decode(
+            token,
+            KEY,
+            algorithms=["HS256"],
+            issuer="cra22-test",
+            audience="cra22-api",
+        )
+        del claims[missing_marker]
+        token = jwt.encode(claims, KEY, algorithm="HS256")
+    response = boundary.client.get("/api/v1/auth/me", headers=bearer(token))
     assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+    assert "member-only@example.com" not in response.text
+    assert token not in response.text
     boundary.repository.profile.assert_not_awaited()

@@ -4,7 +4,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
-from aura_api.core.auth import CurrentUser
+from aura_api.api.deps import bearer_claims, is_member_principal
+from aura_api.core.auth import CurrentUser, JWTVerifier, get_jwt_verifier
 from aura_api.domain.identity import validate_registration
 from aura_api.identity.repository import AuthStorageUnavailable
 from aura_api.identity.service import AuthenticationRejected, AuthLifecycleService
@@ -92,7 +93,14 @@ async def register(body: RegistrationInput, service: Service):
 
 
 @router.get("/me", response_model=MemberResponse)
-async def me(user: CurrentUser, service: Service):
+async def me(
+    request: Request,
+    user: CurrentUser,
+    service: Service,
+    verifier: Annotated[JWTVerifier, Depends(get_jwt_verifier)],
+):
+    if not is_member_principal(bearer_claims(request, verifier)):
+        raise HTTPException(401, headers={"WWW-Authenticate": "Bearer"})
     try:
         return await service.me(user.user_id)
     except AuthenticationRejected:
