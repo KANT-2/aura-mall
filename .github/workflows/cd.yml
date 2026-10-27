@@ -82,41 +82,113 @@ jobs:
           git pull --ff-only origin develop
 
           echo "Validating Compose configuration..."
+          test -f compose.web2.yaml
+          docker network inspect caddy > /dev/null
+
           compose_args=(-f compose.yaml)
           if test -f .db-ops/client/database-url; then
             compose_args+=(-f compose.database.yaml)
           fi
+          compose_args+=(-f compose.web2.yaml)
           docker compose "${compose_args[@]}" config --quiet
 
-          echo "Building and deploying AURA API..."
+          echo "Checking AURA database..."
           if test -f .db-ops/client/database-url; then
-            python3 ops/database.py deploy-api
+            python3 ops/database.py status
           else
-            docker compose "${compose_args[@]}" up -d --build --no-deps api
+            docker compose "${compose_args[@]}" up -d --no-deps db
+            docker compose "${compose_args[@]}" exec -T db \
+              sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
           fi
 
-          echo "Checking AURA API..."
-          docker compose "${compose_args[@]}" ps api
+          echo "Building API and Next.js..."
+          docker compose "${compose_args[@]}" build api web
 
-          echo "Waiting for AURA API health check..."
+          echo "Backing up AURA database..."
+          if test -f .db-ops/client/database-url; then
+            python3 ops/database.py backup
+          else
+            mkdir -p "$HOME/workspace/aura-backups"
+            chmod 700 "$HOME/workspace/aura-backups"
+            backup="$HOME/workspace/aura-backups/aura-$(date +%Y%m%d-%H%M%S).dump"
+            docker compose "${compose_args[@]}" exec -T db \
+              sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup"
+            docker compose "${compose_args[@]}" exec -T db \
+              pg_restore -l < "$backup" > /dev/null
+          fi
 
+          echo "Applying Alembic migrations..."
+          docker compose "${compose_args[@]}" run --rm --no-deps api alembic upgrade head
+
+          echo "Deploying two FastAPI and two Next.js containers..."
+          if test -f .db-ops/client/database-url; then
+            python3 ops/database.py deploy-api
+          fi
+          docker compose "${compose_args[@]}" up -d --no-deps api web web2
+
+          echo "Checking both API containers..."
           healthy=false
           for attempt in $(seq 1 12); do
-            if docker compose "${compose_args[@]}" exec -T api python -c \
-              "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read().decode())"; then
+            mapfile -t api_containers < <(
+              docker compose "${compose_args[@]}" ps --status running -q api
+            )
+            if [ "${#api_containers[@]}" -eq 2 ]; then
               healthy=true
-              break
+              for container in "${api_containers[@]}"; do
+                if ! docker exec "$container" python -c \
+                  "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"; then
+                  healthy=false
+                  break
+                fi
+              done
+              if [ "$healthy" = "true" ]; then
+                break
+              fi
             fi
-
-            echo "API not ready yet (attempt $attempt/12)"
+            echo "API containers not ready yet (attempt $attempt/12)"
             sleep 5
           done
 
           if [ "$healthy" != "true" ]; then
-            echo "AURA API health check failed"
+            echo "API health check failed"
             exit 1
           fi
 
-          echo "AURA API deployment completed"
+          echo "Checking both Next.js containers..."
+          web_healthy=false
+          for attempt in $(seq 1 12); do
+            if docker compose "${compose_args[@]}" exec -T web node -e \
+                 "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" \
+              && docker compose "${compose_args[@]}" exec -T web2 node -e \
+                 "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
+              web_healthy=true
+              break
+            fi
+            echo "Next.js containers not ready yet (attempt $attempt/12)"
+            sleep 5
+          done
+
+          if [ "$web_healthy" != "true" ]; then
+            echo "Next.js health check failed"
+            exit 1
+          fi
+
+          echo "Checking public HTTPS route..."
+          public_healthy=false
+          for attempt in $(seq 1 12); do
+            if curl -fsS -o /dev/null https://aura.dev.crasnec.com; then
+              public_healthy=true
+              break
+            fi
+            echo "Public route not ready yet (attempt $attempt/12)"
+            sleep 5
+          done
+
+          if [ "$public_healthy" != "true" ]; then
+            echo "Public HTTPS health check failed"
+            exit 1
+          fi
+
+          echo "AURA HA deployment completed"
 
           REMOTE
