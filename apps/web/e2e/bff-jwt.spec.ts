@@ -325,3 +325,19 @@ test("browser tabs share one refresh after access expiry and keep the member sig
     await other.close();
   }
 });
+
+test("repeated login failures are limited through the BFF without revealing the account", async ({
+  request,
+}) => {
+  const data = { email: `locked-${randomUUID()}@example.com`, password: "wrong-password123" };
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    expect((await request.post("/api/auth/login", { data })).status()).toBe(401);
+  }
+
+  const locked = await request.post("/api/auth/login", { data });
+  expect(locked.status()).toBe(429);
+  const body = await locked.json();
+  expect(body.error.code).toBe("LOGIN_LOCKED");
+  expect(JSON.stringify(body)).not.toContain(data.email);
+  expect(locked.headers()["set-cookie"] ?? "").not.toContain("aura_access=");
+});

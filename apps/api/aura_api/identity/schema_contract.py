@@ -9,6 +9,22 @@ REQUIRED_COLUMNS = {
         "email": "varchar!",
         "password_hash": "varchar!",
         "is_active": "bool!",
+        # Deletion grace period and purge (migration 0005).
+        "deletion_requested_at": "timestamptz?",
+        "deletion_scheduled_at": "timestamptz?",
+        "deleted_at": "timestamptz?",
+    },
+    "login_failures": {
+        "email_hash": "varchar!",
+        "failure_count": "int4!",
+        "locked_until": "timestamptz?",
+        "updated_at": "timestamptz!",
+    },
+    "member_deletion_runs": {
+        "id": "uuid!",
+        "status": "varchar!",
+        "dry_run": "bool!",
+        "failed_user_ids": "_uuid!",
     },
     "revoked_tokens": {"jti": "uuid!", "expires_at": "timestamptz!"},
     "auth_token_families": {
@@ -45,6 +61,8 @@ PRIMARY_KEYS = {
     "refresh_tokens": ("id",),
     "admins": ("id",),
     "admin_sessions": ("jti",),
+    "login_failures": ("email_hash",),
+    "member_deletion_runs": ("id",),
 }
 FOREIGN_KEYS = (
     ("auth_token_families", ("user_id",), "users", ("id",)),

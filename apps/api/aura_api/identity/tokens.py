@@ -14,6 +14,9 @@ class UserRecord:
     id: UUID
     password_hash: str = field(repr=False)
     is_active: bool
+    # Deletion request time; restorable is computed with the DB clock (grace period, not purged).
+    deletion_requested_at: datetime | None = None
+    restorable: bool = False
 
 
 @dataclass(frozen=True)
@@ -32,6 +35,11 @@ class IssuedTokens:
 
 def hash_refresh_token(token: str) -> str:
     return hashlib.sha256(("aura-refresh-v1:" + token).encode()).hexdigest()
+
+
+def hash_login_email(email: str) -> str:
+    """Key for login failure limits; callers pass the normalized (lower-cased) email."""
+    return hashlib.sha256(("aura-login-v1:" + email).encode()).hexdigest()
 
 
 def issue_tokens(settings: Settings, user_id: UUID, family_id: UUID) -> IssuedTokens:
