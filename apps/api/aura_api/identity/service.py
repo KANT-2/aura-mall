@@ -7,8 +7,8 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 
 from aura_api.config import Settings
-from aura_api.domain.errors import Conflict
-from aura_api.domain.identity import Registration
+from aura_api.domain.errors import Conflict, InvalidInput
+from aura_api.domain.identity import Registration, validate_name
 from aura_api.identity.repository import AuthRepository, AuthStorageUnavailable
 from aura_api.identity.tokens import IssuedTokens, hash_refresh_token, issue_tokens
 
@@ -68,6 +68,30 @@ class AuthLifecycleService:
         except ValueError:
             raise AuthenticationRejected() from None
         profile = await self.repository.profile(user_uuid)
+        if profile is None:
+            raise AuthenticationRejected()
+        return profile
+
+    async def update_profile(
+        self, user_id: str, *, name: str | None = None, marketing: bool | None = None
+    ) -> dict:
+        if name is None and marketing is None:
+            raise InvalidInput("PROFILE_INVALID", "수정할 정보를 입력해 주세요.")
+        if name is not None:
+            name = validate_name(name)
+            try:
+                name.encode("utf-8")
+            except UnicodeEncodeError:
+                raise InvalidInput("NAME_INVALID", "이름을 입력해 주세요.") from None
+            if "\x00" in name:
+                raise InvalidInput("NAME_INVALID", "이름을 입력해 주세요.")
+        if marketing is not None and type(marketing) is not bool:
+            raise InvalidInput("PROFILE_INVALID", "마케팅 동의 값을 확인해 주세요.")
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise AuthenticationRejected() from None
+        profile = await self.repository.update_profile(user_uuid, name=name, marketing=marketing)
         if profile is None:
             raise AuthenticationRejected()
         return profile

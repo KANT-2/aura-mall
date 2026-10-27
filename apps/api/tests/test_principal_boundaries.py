@@ -33,6 +33,7 @@ def boundary(monkeypatch):
         jwt_signing_key=KEY,
         jwt_issuer="cra22-test",
         jwt_audience="cra22-api",
+        csrf_allowed_origins=["https://cra31.test"],
     )
     shared_id = uuid4()
     member = issue_tokens(settings, shared_id, uuid4())
@@ -54,6 +55,7 @@ def boundary(monkeypatch):
             "role": "member",
         }
     )
+    repository.update_profile = AsyncMock()
     session = SimpleNamespace(rollback=AsyncMock())
 
     async def test_session():
@@ -172,4 +174,27 @@ def test_admin_principal_cannot_read_member_profile_with_shared_uuid(boundary, m
     assert response.headers["www-authenticate"] == "Bearer"
     assert "member-only@example.com" not in response.text
     assert token not in response.text
+    boundary.repository.profile.assert_not_awaited()
+
+
+@pytest.mark.parametrize("missing_marker", [None, "principal_type", "permissions"])
+def test_admin_principal_cannot_patch_member_profile_with_shared_uuid(boundary, missing_marker):
+    token = boundary.operator.access_token
+    if missing_marker is not None:
+        claims = jwt.decode(
+            token,
+            KEY,
+            algorithms=["HS256"],
+            issuer="cra22-test",
+            audience="cra22-api",
+        )
+        del claims[missing_marker]
+        token = jwt.encode(claims, KEY, algorithm="HS256")
+    response = boundary.client.patch(
+        "/api/v1/auth/me",
+        json={"name": "blocked"},
+        headers={**bearer(token), "Origin": "https://cra31.test"},
+    )
+    assert response.status_code == 401
+    boundary.repository.update_profile.assert_not_awaited()
     boundary.repository.profile.assert_not_awaited()

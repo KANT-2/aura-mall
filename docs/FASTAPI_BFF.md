@@ -128,6 +128,20 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
 - BFF 로그인·회원가입은 TokenPair를 검증한 뒤 새 Access로 `/auth/me`를 조회해 공개 회원 필드만 반환합니다. TokenPair JSON·비밀번호·해시는 브라우저 응답에 포함하지 않습니다. 잘못된 토큰·프로필 응답은 502입니다.
 - 브라우저 `GET /api/auth/me`는 `AccountState`를 반환합니다. 토큰이 전혀 없으면 `user: null`이며 서버에 인증 세션을 생성하지 않습니다. Access가 만료돼 사라졌고 Refresh가 남아 있으면 401로 갱신을 요구합니다.
 
+### 회원 정보 수정 — FastAPI CRA-31
+
+- FastAPI `PATCH /api/v1/auth/me`는 회원 Bearer JWT로 자신의 `name`, `marketing`만 수정하고
+  200으로 기존 `MemberResponse`(`id`, `email`, `name`, `coupon`, `marketing`, `role`)를 반환합니다.
+- 생략 필드는 유지하며 `marketing: false`도 적용합니다. 빈 요청·명시적 null·추가 필드·잘못된 타입은
+  422입니다. 기존 이름 도메인 규칙(공백 이름 금지·최대 100자)에 어긋나면 400 `NAME_INVALID`입니다.
+  인코딩 불가능한 이름과 NUL 문자는 422로 거절합니다.
+- 미인증·무효·폐기 Token·관리자 principal·비활성/삭제 회원은 401, CSRF 거절은 403,
+  저장소 실패는 503입니다. 요청 ID·공통 오류·보안 헤더는 유지합니다.
+- JWT·Refresh를 재발급하거나 폐기하지 않습니다. 쿠폰·이메일·권한 등은 수정할 수 없습니다.
+- **이번 구현은 FastAPI만 제공합니다.** BFF `/api/auth/me`의 PATCH와 마이페이지 수정 UI는
+  아직 이 작업에서 연결하지 않았습니다. 조정민님 후속 연결 시 `MemberResponse`와 공개
+  `AccountState` 변환·계정 캐시 갱신을 맞춰야 합니다.
+
 ### 토큰 보관과 전달
 
 - Access 쿠키는 `aura_access; Path=/`, Refresh 쿠키는 `aura_refresh; Path=/api/auth`입니다. 모두 `HttpOnly; SameSite=Lax`이며 HTTPS 공개 origin에서는 `Secure`를 적용합니다. `Max-Age`는 발급 응답의 수명입니다. 운영은 `APP_ORIGIN=https://...`를 지정합니다.
