@@ -53,3 +53,62 @@ jobs:
             -o StrictHostKeyChecking=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" \
             "hostname && test -d '$DEPLOY_PATH' && echo 'SSH connection OK'"
+
+        - name: Deploy AURA to Debian
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            bash -se -- "$DEPLOY_PATH" <<'REMOTE'
+          set -euo pipefail
+
+          cd "$1"
+
+          echo "Checking deployment directory..."
+          test -f compose.yaml
+          test -f .env
+
+          echo "Checking Git working tree..."
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+          echo "Updating develop..."
+          git fetch origin develop
+          git switch develop
+          git pull --ff-only origin develop
+
+          echo "Validating Compose configuration..."
+          docker compose config --quiet
+
+          echo "Building and deploying AURA API..."
+          docker compose up -d --build --no-deps api
+
+          echo "Checking AURA API..."
+          docker compose ps api
+
+          echo "Waiting for AURA API health check..."
+
+          healthy=false
+          for attempt in $(seq 1 12); do
+            if docker compose exec -T api python -c \
+              "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read().decode())"; then
+              healthy=true
+              break
+            fi
+
+            echo "API not ready yet (attempt $attempt/12)"
+            sleep 5
+          done
+
+          if [ "$healthy" != "true" ]; then
+            echo "AURA API health check failed"
+            exit 1
+          fi
+
+          echo "AURA API deployment completed"
+
+          REMOTE
