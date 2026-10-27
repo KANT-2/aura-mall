@@ -25,6 +25,8 @@ erDiagram
     users ||--o{ user_coupons : "보유"
     users ||--o{ recipes : "저장"
     users ||--o{ orders : "주문"
+    users ||--o{ auth_token_families : "로그인"
+    auth_token_families ||--o{ refresh_tokens : "회전"
 
     collections ||--o{ products : "분류"
     product_types ||--o{ products : "분류"
@@ -52,6 +54,7 @@ erDiagram
         varchar password_hash
         boolean marketing
         timestamptz created_at
+        boolean is_active
     }
     user_coupons {
         uuid id PK
@@ -75,6 +78,24 @@ erDiagram
     revoked_tokens {
         uuid jti PK
         timestamptz expires_at
+    }
+    auth_token_families {
+        uuid id PK
+        uuid user_id FK
+        timestamptz created_at
+        timestamptz revoked_at
+    }
+    refresh_tokens {
+        uuid id PK
+        uuid user_id FK
+        uuid family_id FK
+        varchar token_hash UK
+        timestamptz created_at
+        timestamptz expires_at
+        timestamptz consumed_at
+        timestamptz revoked_at
+        uuid access_jti UK
+        timestamptz access_expires_at
     }
     collections {
         varchar id PK
@@ -265,6 +286,7 @@ erDiagram
 | password_hash | VARCHAR(255) | NOT NULL                     | 서버 해시값(Argon2id 등). 평문 저장 금지 |
 | marketing     | BOOLEAN      | NOT NULL DEFAULT false       | 마케팅 수신 동의                         |
 | created_at    | TIMESTAMPTZ  | NOT NULL DEFAULT now()       | 가입 시각                                |
+| is_active     | BOOLEAN      | NOT NULL DEFAULT true        | false면 로그인 거절 (마이그레이션 0002)  |
 
 **user_coupons** — 신규 회원 배송비 쿠폰
 
@@ -288,7 +310,34 @@ erDiagram
 | jti        | UUID        | PK              | 토큰 고유 번호. API가 발급하는 모든 토큰의 jti는 UUID. UUID가 아니면 조회 전에 거절(401) |
 | expires_at | TIMESTAMPTZ | NOT NULL, INDEX | 원래 만료 시각. 지난 행은 주기적으로 삭제                                                |
 
+**auth_token_families** — 로그인 한 번에 하나인 Refresh Token 계열 (마이그레이션 0002)
+
+| 컬럼       | 타입        | 제약                                  | 설명                                             |
+| ---------- | ----------- | ------------------------------------- | ------------------------------------------------ |
+| id         | UUID        | PK                                    | 계열 ID                                          |
+| user_id    | UUID        | FK → users (ON DELETE CASCADE), INDEX |                                                  |
+| created_at | TIMESTAMPTZ | NOT NULL DEFAULT now()                | 로그인 시각                                      |
+| revoked_at | TIMESTAMPTZ | NULL                                  | 재사용 감지·로그아웃으로 계열 전체를 폐기한 시각 |
+|            |             | UK(id, user_id)                       | refresh_tokens 복합 FK 대상                      |
+
+**refresh_tokens** — Refresh Token과 함께 발급한 Access Token 기록 (마이그레이션 0002)
+
+| 컬럼              | 타입        | 제약                                                   | 설명                                                    |
+| ----------------- | ----------- | ------------------------------------------------------ | ------------------------------------------------------- |
+| id                | UUID        | PK                                                     |                                                         |
+| user_id           | UUID        | NOT NULL                                               |                                                         |
+| family_id         | UUID        | NOT NULL, INDEX                                        | (family_id, user_id) FK → auth_token_families (CASCADE) |
+| token_hash        | VARCHAR(64) | NOT NULL, UK, CHECK 소문자 16진수 64자                 | 토큰 원문이 아닌 SHA-256 해시만 저장                    |
+| created_at        | TIMESTAMPTZ | NOT NULL DEFAULT now()                                 |                                                         |
+| expires_at        | TIMESTAMPTZ | NOT NULL, INDEX, CHECK > created_at                    | Refresh Token 만료                                      |
+| consumed_at       | TIMESTAMPTZ | NULL                                                   | 재발급에 쓰인 시각(회전)                                |
+| revoked_at        | TIMESTAMPTZ | NULL                                                   | 폐기 시각                                               |
+| access_jti        | UUID        | NOT NULL, UK                                           | 같이 발급한 Access Token의 jti                          |
+| access_expires_at | TIMESTAMPTZ | NOT NULL, INDEX, CHECK > created_at                    | Access Token 만료                                       |
+|                   |             | UNIQUE(family_id) WHERE consumed_at·revoked_at IS NULL | 계열마다 쓸 수 있는 토큰은 1개                          |
+
 > 인증은 JWT로 결정했다(쿠키 값 = 서명된 JWT). 서버 세션 테이블은 두지 않는다. 비회원 식별값 `guestId`는 JWT 안에 있고 별도 테이블은 두지 않는다.
+> Access Token은 저장하지 않고 검증한다(로그아웃은 `revoked_tokens`). Refresh Token은 재발급할 때마다 새것으로 바꾸고(회전), 이미 쓰인 토큰이 다시 오면 같은 계열 전체를 폐기한다. 관리자 Refresh는 범위 밖이다.
 
 ### 3.2 상품 (공용 카탈로그)
 
@@ -542,9 +591,10 @@ erDiagram
 | `GET /catalog`                              | collections, product_types, products, ingredients, scent_families, scent_family_ingredients, suggested_names, promotions | —                                                                                                           |
 | `GET /catalog/products/{id}`                | products                                                                                                                 | —                                                                                                           |
 | `GET /session`                              | users, user_coupons, revoked_tokens                                                                                      | —                                                                                                           |
-| `POST /auth/register`                       | users                                                                                                                    | users, user_coupons                                                                                         |
-| `POST /auth/login`                          | users                                                                                                                    | —                                                                                                           |
-| `POST /auth/logout`                         | —                                                                                                                        | revoked_tokens                                                                                              |
+| `POST /auth/register`                       | users                                                                                                                    | users, user_coupons, auth_token_families, refresh_tokens                                                    |
+| `POST /auth/login`                          | users                                                                                                                    | auth_token_families, refresh_tokens                                                                         |
+| Refresh 재발급                              | refresh_tokens, auth_token_families                                                                                      | refresh_tokens, auth_token_families(재사용 시 폐기), revoked_tokens                                         |
+| `POST /auth/logout`                         | —                                                                                                                        | revoked_tokens, auth_token_families, refresh_tokens                                                         |
 | `GET·POST /recipes`, `DELETE /recipes/{id}` | recipes, recipe_ingredients, ingredients                                                                                 | recipes, recipe_ingredients                                                                                 |
 | `GET·PUT·DELETE /atelier/draft`             | atelier_drafts, ingredients                                                                                              | atelier_drafts                                                                                              |
 | `GET·POST /orders`                          | orders, order_items, order_item_selections, products                                                                     | orders, order_items, order_item_selections, products(재고), user_coupons                                    |

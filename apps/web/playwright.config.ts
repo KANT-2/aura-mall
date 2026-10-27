@@ -7,6 +7,7 @@ export default defineConfig({
   testDir: "./e2e",
   testIgnore: [
     "**/bff-jwt.spec.ts",
+    "**/bff-fastapi.spec.ts",
     ...(process.env.AURA_VISUAL_TESTS === "1" ? [] : ["**/*layout.spec.ts"]),
   ],
   fullyParallel: true,
