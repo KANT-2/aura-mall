@@ -1,11 +1,9 @@
 """30-day deletion grace period: restore by login, expiry and the purge job (real PostgreSQL)."""
 
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
-import anyio
 import pytest
 from test_deactivation import (
     ALICE,
@@ -23,7 +21,9 @@ from test_deactivation import (
 from test_deactivation import business_sessions as business_sessions
 from test_deactivation import client as client
 from test_deactivation import repository as repository
+from test_lifecycle import PASSWORD_HASH
 
+from aura_api.identity import service as auth_service
 from aura_api.infra.purge_members import purge_expired_members
 
 
@@ -45,6 +45,13 @@ def pending(client, repository):
     )
     pair = login(client).json()
     assert deactivate(client, pair["accessToken"]).status_code == 204
+    # Historical schedule fixture only: new permanent withdrawals have no purge deadline.
+    query(
+        repository,
+        "UPDATE users SET deactivated_at=NULL, deletion_requested_at=now(), "
+        "deletion_scheduled_at=now()+interval '30 days', password_hash=%s WHERE id=%s",
+        (PASSWORD_HASH, ALICE),
+    )
     return {"pair": pair, "recipe": recipe, "coupon": coupon}
 
 
@@ -85,22 +92,12 @@ def test_pending_member_tokens_stay_blocked_and_data_is_kept(client, repository,
     assert kept(repository, pending) == ([(pending["recipe"],)], [(pending["coupon"],)])
 
 
-def test_login_inside_grace_restores_account_and_data(client, repository, pending):
-    response = login(client)
-    assert response.status_code == 200
-    pair = response.json()
-    assert protected(client, pair["accessToken"]).status_code == 200
-    assert refresh(client, pair["refreshToken"]).status_code == 200
-    assert account(repository) == (True, True, True)
-    assert query(repository, "SELECT deletion_scheduled_at FROM users WHERE id=%s", (ALICE,)) == [
-        (None,)
-    ]
+def test_legacy_pending_account_cannot_restore_with_correct_password(client, repository, pending):
+    assert login(client).status_code == 401
+    assert account(repository) == (False, False, True)
     assert kept(repository, pending) == ([(pending["recipe"],)], [(pending["coupon"],)])
-    # Restoring issues a new login; tokens revoked by the deactivation stay revoked.
     assert protected(client, pending["pair"]["accessToken"]).status_code == 401
     assert refresh(client, pending["pair"]["refreshToken"]).status_code == 401
-    me = client.get("/api/v1/auth/me", headers={"Authorization": "Bearer " + pair["accessToken"]})
-    assert me.status_code == 200 and me.json()["coupon"] is True
 
 
 def test_wrong_password_inside_grace_does_not_restore(client, repository, pending):
@@ -116,67 +113,44 @@ def test_expired_grace_cannot_restore(client, repository, pending):
     assert account(repository) == (False, False, True)
 
 
-def test_restore_committing_first_makes_purge_skip(client, repository, pending, monkeypatch):
-    schedule_in(repository, 2)
-    reached, resume = threading.Event(), threading.Event()
-    original = repository._insert_tokens
-
-    async def paused(connection, tokens):
-        # Inside the restore transaction, after the user row lock and reactivation.
-        reached.set()
-        assert await anyio.to_thread.run_sync(resume.wait, 10)
-        await original(connection, tokens)
-
-    monkeypatch.setattr(repository, "_insert_tokens", paused)
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        restoring = pool.submit(login, client)
-        assert reached.wait(10)
-        time.sleep(2.5)  # The committed row is now due for the purge job.
-        assert client.portal.call(repository.due_member_ids, 10) == [ALICE]
-        purging = pool.submit(purge, client, repository)
-        time.sleep(0.5)
-        assert not purging.done()  # Waits for the restore's user row lock.
-        resume.set()
-        assert restoring.result(timeout=15).status_code == 200
-        assert purging.result(timeout=15) is False
-    assert account(repository) == (True, True, True)
-    assert kept(repository, pending) == ([(pending["recipe"],)], [(pending["coupon"],)])
+def test_repository_restore_boundary_is_fail_closed(client, repository, pending):
+    tokens = client.app.state.auth_service._issue(ALICE, uuid4())
+    assert (
+        client.portal.call(
+            lambda: repository.restore_token_family(
+                tokens, expected_password_hash=PASSWORD_HASH, expected_deletion_requested_at=None
+            )
+        )
+        is False
+    )
+    assert account(repository) == (False, False, True)
+    assert protected(client, tokens.access_token).status_code == 401
 
 
-def test_purge_committing_first_rejects_restore(client, repository, pending, monkeypatch):
-    schedule_in(repository, 2)
-    checked, resume_restore = threading.Event(), threading.Event()
-    locked, resume_purge = threading.Event(), threading.Event()
-    original_restore = repository.restore_token_family
-    original_revoke = repository._revoke_user_families
+def test_purge_during_password_verification_never_restores_account(
+    client, repository, pending, monkeypatch
+):
+    checked, resume = threading.Event(), threading.Event()
+    original = auth_service.check_password
 
-    async def restore_after_purge(tokens, **expected):
-        # The password was verified while the account was still restorable.
+    def paused(stored, password):
+        valid = original(stored, password)
         checked.set()
-        assert await anyio.to_thread.run_sync(resume_restore.wait, 10)
-        return await original_restore(tokens, **expected)
+        assert resume.wait(10)
+        return valid
 
-    async def purge_holding_lock(connection, user_id):
-        await original_revoke(connection, user_id)
-        locked.set()
-        assert await anyio.to_thread.run_sync(resume_purge.wait, 10)
-
-    monkeypatch.setattr(repository, "restore_token_family", restore_after_purge)
-    monkeypatch.setattr(repository, "_revoke_user_families", purge_holding_lock)
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        restoring = pool.submit(login, client)
+    monkeypatch.setattr(auth_service, "check_password", paused)
+    expire_grace(repository)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        logging_in = pool.submit(login, client)
         assert checked.wait(10)
-        time.sleep(2.5)
-        purging = pool.submit(purge, client, repository)
-        assert locked.wait(10)
-        resume_restore.set()
-        time.sleep(0.5)
-        resume_purge.set()
-        assert purging.result(timeout=15) is True
-        assert restoring.result(timeout=15).status_code == 401
+        try:
+            assert purge(client, repository) is True
+        finally:
+            resume.set()
+        assert logging_in.result(timeout=15).status_code == 401
     assert account(repository) == (False, False, False)
     assert kept(repository, pending) == ([], [])
-    assert query(repository, "SELECT id FROM auth_token_families WHERE user_id=%s", (ALICE,)) == []
 
 
 def test_purge_anonymizes_only_due_members_and_is_idempotent(client, repository, pending):

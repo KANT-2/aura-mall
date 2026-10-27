@@ -9,6 +9,7 @@ REQUIRED_COLUMNS = {
         "email": "varchar!",
         "password_hash": "varchar!",
         "is_active": "bool!",
+        "deactivated_at": "timestamptz?",
         # Deletion grace period and purge (migration 0005).
         "deletion_requested_at": "timestamptz?",
         "deletion_scheduled_at": "timestamptz?",
@@ -119,7 +120,11 @@ def contract_gaps(
     for requirement in FOREIGN_KEYS:
         if requirement not in foreign:
             gaps.append(f"{requirement[0]}: missing ownership foreign key")
-    unique = {(row["table_name"], tuple(row["columns"])) for row in indexes}
+    unique = {
+        (row["table_name"], tuple(row["columns"]))
+        for row in indexes
+        if row.get("predicate") is None
+    }
     if ("refresh_tokens", ("token_hash",)) not in unique:
         gaps.append("refresh_tokens.token_hash: missing unconditional unique index")
     if ("refresh_tokens", ("access_jti",)) not in unique:
@@ -128,9 +133,10 @@ def contract_gaps(
         row["table_name"] == "users"
         and row["key_count"] == 1
         and re.sub(r'[\s"()]|::text', "", row["expression"] or "") == "loweremail"
+        and re.sub(r'[\s"()]', "", row.get("predicate") or "").lower() == "deactivated_atisnull"
         for row in indexes
     ):
-        gaps.append("users.email: missing unconditional lower(email) unique index")
+        gaps.append("users.email: missing non-deactivated lower(email) unique index")
     return gaps
 
 
@@ -161,12 +167,13 @@ async def inspect_contract(connection, schema: str) -> list[str]:
     cursor = await connection.execute(
         """SELECT t.relname AS table_name, i.indnkeyatts AS key_count,
              pg_get_expr(i.indexprs,i.indrelid) AS expression,
+             pg_get_expr(i.indpred,i.indrelid) AS predicate,
              ARRAY(SELECT a.attname FROM unnest(i.indkey) WITH ORDINALITY k(num,ord)
                    LEFT JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.num
                    WHERE k.ord <= i.indnkeyatts ORDER BY k.ord) AS columns
            FROM pg_index i JOIN pg_class t ON t.oid=i.indrelid
            JOIN pg_namespace n ON n.oid=t.relnamespace
-           WHERE n.nspname=%s AND i.indisunique AND i.indisvalid AND i.indpred IS NULL""",
+           WHERE n.nspname=%s AND i.indisunique AND i.indisvalid""",
         (schema,),
     )
     indexes = await cursor.fetchall()

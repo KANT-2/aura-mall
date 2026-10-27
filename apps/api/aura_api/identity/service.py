@@ -59,27 +59,14 @@ class AuthLifecycleService:
             )
         user = await self.repository.find_user(email)
         valid = await run_sync(check_password, user.password_hash if user else None, password)
-        if (
-            not valid
-            or user is None
-            or (user.is_active is not True and user.restorable is not True)
-        ):
+        if not valid or user is None or user.is_active is not True:
             raise AuthenticationRejected()
         await self.repository.clear_login_failures(email_hash)
         tokens = self._issue(user.id, uuid4())
         # Recheck credentials under the user lock, not just before Argon2 verification.
-        if user.is_active is True:
-            saved = await self.repository.create_token_family(
-                tokens, expected_password_hash=user.password_hash
-            )
-        else:
-            # A correct password inside the grace period cancels the pending deletion. The
-            # request time must match, so a check made before deactivation cannot restore.
-            saved = await self.repository.restore_token_family(
-                tokens,
-                expected_password_hash=user.password_hash,
-                expected_deletion_requested_at=user.deletion_requested_at,
-            )
+        saved = await self.repository.create_token_family(
+            tokens, expected_password_hash=user.password_hash
+        )
         if not saved:
             raise AuthenticationRejected()
         return tokens

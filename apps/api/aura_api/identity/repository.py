@@ -34,7 +34,7 @@ class AuthRepository(Protocol):
         expected_password_hash: str,
         expected_deletion_requested_at: datetime,
     ) -> bool:
-        """Cancel a pending deletion and save the new family in one transaction."""
+        """Legacy compatibility boundary. Permanent deactivation always returns False."""
         ...
 
     async def reserve_login_attempt(self, email_hash: str) -> int:

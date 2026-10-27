@@ -8,7 +8,6 @@ from psycopg.rows import dict_row
 
 from aura_api.domain.identity import Registration
 from aura_api.identity.repository import (
-    DELETION_GRACE,
     LOGIN_FAILURE_LIMIT,
     LOGIN_LOCK,
     AuthStorageUnavailable,
@@ -20,10 +19,8 @@ from aura_api.identity.tokens import IssuedTokens, UserRecord, hash_login_email
 if TYPE_CHECKING:
     from aura_api.infra.database_rotation import RotatingDatabase
 
-# Restorable = deactivated, grace period not over (DB clock) and not yet purged.
-USER_COLUMNS = """id, password_hash, is_active, deletion_requested_at,
-    (NOT is_active AND deletion_requested_at IS NOT NULL AND deleted_at IS NULL
-     AND deletion_scheduled_at > clock_timestamp()) AS restorable"""
+# The legacy field remains compatible with UserRecord, but restoration is disabled.
+USER_COLUMNS = "id, password_hash, is_active, deletion_requested_at, false AS restorable"
 # Purged accounts keep their row for retained orders; nothing identifies the member.
 DELETED_NAME = "탈퇴회원"
 DELETED_PASSWORD_HASH = "!deleted"
@@ -88,7 +85,9 @@ class PostgresAuthRepository:
     async def find_user(self, email: str) -> UserRecord | None:
         async with self._connection() as connection:
             cursor = await connection.execute(
-                f"SELECT {USER_COLUMNS} FROM users WHERE lower(email) = %s", (email,)
+                f"SELECT {USER_COLUMNS} FROM users WHERE lower(email) = %s "
+                "AND deactivated_at IS NULL",
+                (email,),
             )
             return user_record(await cursor.fetchone())
 
@@ -163,7 +162,8 @@ class PostgresAuthRepository:
             cursor = await connection.execute(
                 """INSERT INTO users (id, email, name, password_hash, marketing, is_active)
                    VALUES (%s, %s, %s, %s, %s, true)
-                   ON CONFLICT (lower(email)) DO NOTHING RETURNING id""",
+                   ON CONFLICT (lower(email)) WHERE deactivated_at IS NULL
+                   DO NOTHING RETURNING id""",
                 (
                     tokens.user_id,
                     registration.email,
@@ -241,33 +241,8 @@ class PostgresAuthRepository:
         expected_password_hash: str,
         expected_deletion_requested_at,
     ) -> bool:
-        accepted = False
-        async with self._connection() as connection:
-            # The purge job takes the same row lock and rechecks the schedule, so either the
-            # whole restore or the whole purge commits.
-            cursor = await connection.execute(
-                """SELECT id FROM users
-                   WHERE id = %s AND NOT is_active AND password_hash = %s
-                     AND deletion_requested_at = %s AND deleted_at IS NULL
-                     AND deletion_scheduled_at > clock_timestamp()
-                   FOR UPDATE""",
-                (tokens.user_id, expected_password_hash, expected_deletion_requested_at),
-            )
-            if await cursor.fetchone() is not None:
-                await connection.execute(
-                    """UPDATE users SET is_active = true, deletion_requested_at = NULL,
-                         deletion_scheduled_at = NULL
-                       WHERE id = %s""",
-                    (tokens.user_id,),
-                )
-                await connection.execute(
-                    """INSERT INTO auth_token_families (id, user_id, created_at)
-                       VALUES (%s, %s, %s)""",
-                    (tokens.family_id, tokens.user_id, tokens.issued_at),
-                )
-                await self._insert_tokens(connection, tokens)
-                accepted = True
-        return accepted
+        # Compatibility boundary: permanent deactivation is never restored.
+        return False
 
     async def change_password(
         self, user_id: UUID, *, expected_password_hash: str, new_password_hash: str
@@ -308,12 +283,12 @@ class PostgresAuthRepository:
                 return None
             if user["password_hash"] != expected_password_hash:
                 return False
-            # Recipes and coupons stay for a possible restore; the purge job removes them.
+            # No automatic restore or deletion deadline. Retained data needs a reviewed policy.
             await connection.execute(
                 """UPDATE users SET is_active = false, marketing = false,
-                     deletion_requested_at = now(), deletion_scheduled_at = now() + %s
+                     deactivated_at = clock_timestamp(), password_hash = %s
                    WHERE id = %s""",
-                (DELETION_GRACE, user_id),
+                (DELETED_PASSWORD_HASH, user_id),
             )
             await self._revoke_user_families(connection, user_id)
         return True
@@ -322,7 +297,7 @@ class PostgresAuthRepository:
         async with self._connection() as connection:
             cursor = await connection.execute(
                 """SELECT id FROM users
-                   WHERE NOT is_active AND deleted_at IS NULL
+                   WHERE NOT is_active AND deleted_at IS NULL AND deactivated_at IS NULL
                      AND deletion_scheduled_at <= clock_timestamp()
                    ORDER BY deletion_scheduled_at, id LIMIT %s""",
                 (limit,),
@@ -335,7 +310,7 @@ class PostgresAuthRepository:
             # Recheck under the user lock: a restore that committed first wins.
             cursor = await connection.execute(
                 """SELECT email FROM users
-                   WHERE id = %s AND NOT is_active AND deleted_at IS NULL
+                   WHERE id = %s AND NOT is_active AND deleted_at IS NULL AND deactivated_at IS NULL
                      AND deletion_scheduled_at <= clock_timestamp()
                    FOR UPDATE""",
                 (user_id,),

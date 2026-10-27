@@ -77,11 +77,19 @@ def test_existing_orders_are_migrated_as_received(client):
     """Runs first: steps back to 0005, adds a pre-0006 order, then upgrades again."""
     config = alembic_config()
     command.downgrade(config, "0005")
-    member = new_customer()
+    member = uuid.uuid4()
     order_id = uuid.uuid4()
 
     async def legacy(sessionmaker):
         async with sessionmaker() as session, session.begin():
+            # Raw SQL: the ORM User also maps columns added by later migrations (0010).
+            await session.execute(
+                text(
+                    "INSERT INTO users (id, email, name, password_hash) "
+                    "VALUES (:user, :email, 'Legacy', 'x')"
+                ),
+                {"user": member, "email": f"{member.hex}@aura.com"},
+            )
             await session.execute(
                 text(
                     "INSERT INTO orders (id, user_id, recipient, address, items_amount, "

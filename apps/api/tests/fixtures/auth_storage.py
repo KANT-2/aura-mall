@@ -18,12 +18,15 @@ class MemoryAuthRepository:
         self.lock = threading.RLock()
         self.login_failures = {}
         self.profiles = {}
+        self.retired = {}
 
     async def find_user(self, email):
         return self.users.get(email)
 
     async def find_user_by_id(self, user_id):
-        return next((user for user in self.users.values() if user.id == user_id), None)
+        return self.retired.get(user_id) or next(
+            (user for user in self.users.values() if user.id == user_id), None
+        )
 
     async def reserve_login_attempt(self, email_hash):
         with self.lock:
@@ -55,7 +58,12 @@ class MemoryAuthRepository:
         return await self._end_sessions(user_id, expected_password_hash, new_password_hash)
 
     async def deactivate(self, user_id, *, expected_password_hash):
-        return await self._end_sessions(user_id, expected_password_hash, None)
+        with self.lock:
+            result = await self._end_sessions(user_id, expected_password_hash, None)
+            if result:
+                email = next(email for email, row in self.users.items() if row.id == user_id)
+                self.retired[user_id] = self.users.pop(email)
+            return result
 
     async def _end_sessions(self, user_id, expected_password_hash, new_password_hash):
         with self.lock:

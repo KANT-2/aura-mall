@@ -1,5 +1,5 @@
 export const AUTH_CHANGED_KEY = "aura_member_changed_v1";
-type MemberChange = { owner: string; kind: "profile" | "ended"; remote: boolean };
+type MemberChange = { owner: string; kind: "profile" | "ended" | "session"; remote: boolean };
 const listeners = new Set<(event: MemberChange) => void>();
 
 export function publishMemberChange(owner: string, kind: MemberChange["kind"]) {
@@ -30,7 +30,7 @@ export function subscribeMemberChanges(listener: (event: MemberChange) => void) 
       if (
         typeof value?.owner === "string" &&
         value.owner.length <= 128 &&
-        (value.kind === "profile" || value.kind === "ended")
+        (value.kind === "profile" || value.kind === "ended" || value.kind === "session")
       ) {
         listener({ owner: value.owner, kind: value.kind, remote: true });
       }
