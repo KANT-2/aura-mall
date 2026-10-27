@@ -38,12 +38,15 @@ aura_api/
     orders.py         # GET·POST /orders
     deps.py           # DB 세션, 로그인 회원 확인(토큰 sub = users.id)
     errors.py         # 도메인 규칙 위반 → 공통 오류 형식(code·message)
+    admin/            # /admin/**: 상품·재고(products.py), 주문·문의·현황(operations.py), 관리자 확인(deps.py)
   services/           # 서비스 계층: 유스케이스·트랜잭션
     catalog.py        # 카탈로그 조회, 예전 상품 ID 별칭
     partner.py        # 입점 문의 검증·저장
     recipes.py        # 레시피 저장·다시 만들기(버전 +1)·삭제
     orders.py         # 주문 접수(가격·재고·쿠폰 한 트랜잭션)·주문 내역
-  domain/             # 도메인 계층: 순수 Python 업무 규칙 (영역별 파일)
+    admin_products.py # 관리자 상품 수정(낙관적 잠금)·재고 조정(요청 키로 1회만)
+    admin_operations.py # 관리자 주문 조회·문의 처리·현황
+  domain/             # 도메인 계층: 순수 Python 업무 규칙 (영역별 파일, 관리자 입력 규칙은 admin.py)
   infra/              # 인프라 계층
     database.py       # SQLAlchemy Base·비동기 엔진·요청별 세션
     models/           # 영역별 ORM 모델 (__init__.py가 전체 등록)
