@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from aura_api.config import Settings
 from aura_api.infra.database import get_session
 from aura_api.infra.models import PartnerInquiry
+from aura_api.infra.repositories import partner as repository
 from aura_api.main import create_app
 
 ORIGIN = "http://localhost:3000"
@@ -50,10 +51,14 @@ def session():
 
 
 @pytest.fixture
-def client(session):
+def client(session, monkeypatch):
     async def override():
         yield session
 
+    async def lock_and_count_recent(_, email, window):
+        return sum(row.email.lower() == email.lower() for row in session.added)
+
+    monkeypatch.setattr(repository, "lock_and_count_recent", lock_and_count_recent)
     app = create_app(Settings(_env_file=None, csrf_allowed_origins=[ORIGIN]))
     app.dependency_overrides[get_session] = override
     with TestClient(app, headers={"Origin": ORIGIN}) as client:
@@ -104,3 +109,26 @@ def test_cross_site_post_is_rejected(client, session):
 
     assert response.status_code == 403
     assert session.added == []
+
+
+def test_fourth_inquiry_for_the_same_email_is_rate_limited(client, session):
+    for index in range(3):
+        response = client.post(
+            "/api/v1/partner",
+            json={**VALID, "brand": f"브랜드 {index}", "email": "Partner@Brand.com"},
+        )
+        assert response.status_code == 201
+
+    limited = client.post("/api/v1/partner", json={**VALID, "email": "partner@brand.com"})
+    other = client.post("/api/v1/partner", json={**VALID, "email": "other@brand.com"})
+
+    assert limited.status_code == 429
+    assert limited.headers["retry-after"] == "600"
+    assert limited.json() == {
+        "error": {
+            "code": "INQUIRY_RATE_LIMITED",
+            "message": "문의가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+        }
+    }
+    assert other.status_code == 201
+    assert len(session.added) == 4

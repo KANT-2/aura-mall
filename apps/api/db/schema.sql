@@ -329,6 +329,8 @@ CREATE TABLE partner_inquiries (
     CONSTRAINT partner_inquiries_version_check CHECK (version >= 1)
 );
 CREATE INDEX partner_inquiries_status_created_idx ON partner_inquiries (status, created_at DESC);
+CREATE INDEX partner_inquiries_email_created_idx
+    ON partner_inquiries (lower(email), created_at DESC);
 
 -- ---------------------------------------------------------------------------
 -- Admin: stock adjustments and audit log

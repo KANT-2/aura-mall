@@ -30,6 +30,11 @@ class PartnerInquiry(Base):
         CheckConstraint("status IN ('received', 'reviewing', 'done')", name="status"),
         CheckConstraint("version >= 1", name="version"),
         Index("partner_inquiries_status_created_idx", "status", text("created_at DESC")),
+        Index(
+            "partner_inquiries_email_created_idx",
+            text("lower(email)"),
+            text("created_at DESC"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

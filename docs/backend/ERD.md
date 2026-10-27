@@ -553,6 +553,8 @@ erDiagram
 | created_at    | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                                  |                                                   |
 | updated_at    | TIMESTAMPTZ  | NULL                                                                    | 마지막 관리자 수정 시각                           |
 
+이메일별 요청 제한 조회를 위해 `lower(email), created_at DESC` 인덱스를 둔다(마이그레이션 0004). 같은 이메일의 동시 요청은 트랜잭션 advisory lock으로 직렬화하며 별도 제한 테이블은 사용하지 않는다.
+
 ### 3.6 관리자 (관리자 계정·재고 조정·감사 기록)
 
 관리자 API 계약([FASTAPI_BFF.md](../FASTAPI_BFF.md) "관리자 API")을 위한 확장이다. 관리자 계정은 고객(`users`)과 **분리된 `admins` 테이블**에 두고, 로그인·회원가입 API와 토큰도 고객과 따로 쓴다. 관리자 API는 요청마다 토큰의 관리자 ID로 `admins`를 다시 조회해 `active`인지 확인한다.
