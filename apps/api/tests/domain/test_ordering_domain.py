@@ -224,7 +224,6 @@ def test_order_needs_items(catalog, items):
 
 ALLOWED = {
     ("received", "paid"),
-    ("received", "preparing"),
     ("received", "cancelled"),
     ("paid", "preparing"),
     ("paid", "cancelled"),
@@ -243,11 +242,24 @@ def test_status_transitions_cover_every_status():
 @pytest.mark.parametrize("new", ORDER_STATUSES)
 def test_only_listed_transitions_are_allowed(current, new):
     if (current, new) in ALLOWED:
-        assert ensure_status_change(current, new) is None
+        assert ensure_status_change(current, new, payment_verified=new == "paid") is None
     else:
         with pytest.raises(Conflict) as error:
-            ensure_status_change(current, new)
+            ensure_status_change(current, new, payment_verified=True)
         assert error.value.code == "ORDER_STATUS_CONFLICT"
+
+
+def test_unpaid_orders_cannot_skip_to_preparing():
+    with pytest.raises(Conflict) as error:
+        ensure_status_change("received", "preparing")
+    assert error.value.code == "ORDER_STATUS_CONFLICT"
+
+
+@pytest.mark.parametrize("current", ORDER_STATUSES)
+def test_paid_needs_a_verified_payment(current):
+    with pytest.raises(Conflict) as error:
+        ensure_status_change(current, "paid")
+    assert error.value.code == "ORDER_PAYMENT_REQUIRED"
 
 
 @pytest.mark.parametrize("new", ["refunded", "RECEIVED", "", None, 1, ["paid"]])

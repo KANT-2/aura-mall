@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     admin_access_ttl_seconds: int = Field(default=3600, ge=1, le=86400)
     csrf_allowed_origins: list[str] = Field(default_factory=list)
     bff_shared_key: SecretStr | None = None
+    # Payments (Toss Payments). Without a provider the payment API answers 503.
+    payment_provider: Literal["toss"] | None = None
+    toss_secret_key: SecretStr | None = None
+    toss_api_url: str = "https://api.tosspayments.com"
+    payment_timeout_seconds: float = Field(default=30, gt=0, le=60)
 
     @model_validator(mode="before")
     @classmethod
@@ -83,6 +88,20 @@ class Settings(BaseSettings):
                 raise ValueError("JWT key must be 32-128 URL-safe ASCII characters")
             if not self.jwt_issuer.strip() or not self.jwt_audience.strip():
                 raise ValueError("JWT issuer and audience must be nonempty")
+        return self
+
+    @model_validator(mode="after")
+    def validate_payment_configuration(self):
+        if self.payment_provider is None:
+            if self.toss_secret_key is not None:
+                raise ValueError("Set AURA_PAYMENT_PROVIDER=toss to use the Toss secret key")
+            return self
+        key = self.toss_secret_key.get_secret_value() if self.toss_secret_key else ""
+        # Live keys are refused until real payments are approved for this service.
+        if not re.fullmatch(r"test_g?sk_[A-Za-z0-9_-]{8,200}", key):
+            raise ValueError("Toss payments require a test secret key (test_sk_ or test_gsk_)")
+        if not self.toss_api_url.startswith("https://"):
+            raise ValueError("The Toss API URL must use HTTPS")
         return self
 
     @field_validator("csrf_allowed_origins")
