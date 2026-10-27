@@ -2,7 +2,7 @@ import re
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 from aura_api.api.deps import bearer_claims, is_member_principal
 from aura_api.core.auth import CurrentUser, JWTVerifier, get_jwt_verifier
@@ -46,6 +46,32 @@ class RefreshInput(BaseModel):
 class RegistrationInput(LoginInput):
     name: str = Field(min_length=1, max_length=100)
     marketing: bool = False
+
+
+class ProfileUpdateInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, hide_input_in_errors=True)
+    name: str | None = None
+    marketing: bool | None = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name_encoding(cls, value: str | None) -> str | None:
+        if value is not None:
+            try:
+                value.encode("utf-8")
+            except UnicodeEncodeError:
+                raise ValueError("Invalid profile input") from None
+            if "\x00" in value:
+                raise ValueError("Invalid profile input")
+        return value
+
+    @model_validator(mode="after")
+    def require_changes(self):
+        if not self.model_fields_set or any(
+            getattr(self, name) is None for name in self.model_fields_set
+        ):
+            raise ValueError("At least one non-null profile field is required")
+        return self
 
 
 class MemberResponse(BaseModel):
@@ -103,6 +129,24 @@ async def me(
         raise HTTPException(401, headers={"WWW-Authenticate": "Bearer"})
     try:
         return await service.me(user.user_id)
+    except AuthenticationRejected:
+        raise HTTPException(401, headers={"WWW-Authenticate": "Bearer"}) from None
+    except AuthStorageUnavailable:
+        raise HTTPException(503) from None
+
+
+@router.patch("/me", response_model=MemberResponse)
+async def update_me(
+    body: ProfileUpdateInput,
+    request: Request,
+    user: CurrentUser,
+    service: Service,
+    verifier: Annotated[JWTVerifier, Depends(get_jwt_verifier)],
+):
+    if not is_member_principal(bearer_claims(request, verifier)):
+        raise HTTPException(401, headers={"WWW-Authenticate": "Bearer"})
+    try:
+        return await service.update_profile(user.user_id, name=body.name, marketing=body.marketing)
     except AuthenticationRejected:
         raise HTTPException(401, headers={"WWW-Authenticate": "Bearer"}) from None
     except AuthStorageUnavailable:
