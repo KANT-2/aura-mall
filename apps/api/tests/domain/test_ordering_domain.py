@@ -1,8 +1,11 @@
 import pytest
 
-from aura_api.domain.errors import InvalidInput
+from aura_api.domain.errors import Conflict, InvalidInput
 from aura_api.domain.ordering import (
+    ORDER_STATUSES,
+    ORDER_TRANSITIONS,
     build_line,
+    ensure_status_change,
     price_order,
     shipping_fee,
 )
@@ -217,3 +220,53 @@ def test_order_needs_items(catalog, items):
         order(catalog, items)
 
     assert error.value.code == "ITEMS_REQUIRED"
+
+
+ALLOWED = {
+    ("received", "paid"),
+    ("received", "preparing"),
+    ("received", "cancelled"),
+    ("paid", "preparing"),
+    ("paid", "cancelled"),
+    ("preparing", "shipped"),
+    ("preparing", "cancelled"),
+    ("shipped", "delivered"),
+}
+
+
+def test_status_transitions_cover_every_status():
+    assert set(ORDER_TRANSITIONS) == set(ORDER_STATUSES)
+    assert all(targets <= set(ORDER_STATUSES) for targets in ORDER_TRANSITIONS.values())
+
+
+@pytest.mark.parametrize("current", ORDER_STATUSES)
+@pytest.mark.parametrize("new", ORDER_STATUSES)
+def test_only_listed_transitions_are_allowed(current, new):
+    if (current, new) in ALLOWED:
+        assert ensure_status_change(current, new) is None
+    else:
+        with pytest.raises(Conflict) as error:
+            ensure_status_change(current, new)
+        assert error.value.code == "ORDER_STATUS_CONFLICT"
+
+
+@pytest.mark.parametrize("new", ["refunded", "RECEIVED", "", None, 1, ["paid"]])
+def test_unknown_status_is_invalid(new):
+    with pytest.raises(InvalidInput) as error:
+        ensure_status_change("received", new)
+    assert error.value.code == "ORDER_STATUS_INVALID"
+
+
+@pytest.mark.parametrize(
+    "reason,expected",
+    [(None, None), ("  고객 요청 ", "고객 요청"), ("   ", None), ("x" * 200, "x" * 200)],
+)
+def test_status_reason_is_trimmed(reason, expected):
+    assert ensure_status_change("received", "cancelled", reason) == expected
+
+
+@pytest.mark.parametrize("reason", ["x" * 201, 3, ["memo"]])
+def test_invalid_status_reason(reason):
+    with pytest.raises(InvalidInput) as error:
+        ensure_status_change("received", "cancelled", reason)
+    assert error.value.code == "ORDER_STATUS_REASON_INVALID"
