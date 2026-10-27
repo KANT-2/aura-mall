@@ -9,6 +9,8 @@ services:
           - aura-api
 
   web:
+    deploy:
+      replicas: ${AURA_WEB_REPLICAS:-2}
     environment:
       API_URL: ${AURA_API_PROXY_URL:-http://caddy:8080}
     ports: !reset []

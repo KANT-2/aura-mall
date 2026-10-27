@@ -82,7 +82,6 @@ jobs:
           git pull --ff-only origin develop
 
           echo "Validating Compose configuration..."
-          test -f compose.web2.yaml
 
           compose_args=(-f compose.yaml)
           if test -f .db-ops/client/database-url; then
@@ -91,13 +90,14 @@ jobs:
           if test -f compose.lb.yaml; then
             compose_args+=(-f compose.lb.yaml)
           fi
-          compose_args+=(-f compose.web2.yaml)
           docker compose "${compose_args[@]}" config --quiet
           caddy_network=$(docker compose "${compose_args[@]}" config --format json |
             python3 -c 'import json,sys; print(json.load(sys.stdin)["networks"]["caddy"]["name"])')
           docker network inspect "$caddy_network" > /dev/null
           api_replicas=$(docker compose "${compose_args[@]}" config --format json |
             python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["api"]["deploy"]["replicas"])')
+          web_replicas=$(docker compose "${compose_args[@]}" config --format json |
+            python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["web"]["deploy"]["replicas"])')
 
           echo "Checking AURA database..."
           if test -f .db-ops/client/database-url; then
@@ -127,11 +127,11 @@ jobs:
           echo "Applying Alembic migrations..."
           docker compose "${compose_args[@]}" run --rm --no-deps api alembic upgrade head
 
-          echo "Deploying $api_replicas FastAPI and two Next.js containers..."
+          echo "Deploying $api_replicas FastAPI and $web_replicas Next.js containers..."
           if test -f .db-ops/client/database-url; then
             python3 ops/database.py deploy-api
           fi
-          docker compose "${compose_args[@]}" up -d --no-deps api web web2
+          docker compose "${compose_args[@]}" up -d --no-deps --remove-orphans api web
 
           echo "Checking all API containers..."
           healthy=false
@@ -161,15 +161,24 @@ jobs:
             exit 1
           fi
 
-          echo "Checking both Next.js containers..."
+          echo "Checking all Next.js containers..."
           web_healthy=false
           for attempt in $(seq 1 12); do
-            if docker compose "${compose_args[@]}" exec -T web node -e \
-                 "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" \
-              && docker compose "${compose_args[@]}" exec -T web2 node -e \
-                 "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
+            mapfile -t web_containers < <(
+              docker compose "${compose_args[@]}" ps --status running -q web
+            )
+            if [ "${#web_containers[@]}" -eq "$web_replicas" ]; then
               web_healthy=true
-              break
+              for container in "${web_containers[@]}"; do
+                if ! docker exec "$container" node -e \
+                  "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
+                  web_healthy=false
+                  break
+                fi
+              done
+              if [ "$web_healthy" = "true" ]; then
+                break
+              fi
             fi
             echo "Next.js containers not ready yet (attempt $attempt/12)"
             sleep 5
