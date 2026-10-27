@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from aura_api.api.catalog import CamelModel, ProductOut
 from aura_api.api.deps import Session, member_required
 from aura_api.core.errors import ErrorResponse
+from aura_api.domain.ordering import OrderStatus
 from aura_api.infra.repositories.orders import SavedOrder
 from aura_api.services import orders as service
 
@@ -92,6 +93,7 @@ class OrderOut(CamelModel):
     recipient: str
     address: str
     created: datetime
+    status: OrderStatus
 
 
 def order_out(order: SavedOrder) -> OrderOut:
@@ -115,6 +117,7 @@ def order_out(order: SavedOrder) -> OrderOut:
         recipient=order.recipient,
         address=order.address,
         created=order.created_at,
+        status=order.status,
     )
 
 

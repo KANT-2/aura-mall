@@ -361,6 +361,7 @@ async def add_order(session, member_id, priced, snapshots, selection_names, coup
         recipient=priced.recipient,
         address=priced.address,
         created_at=datetime.now(UTC),
+        status="received",
     )
     orders_by_member.setdefault(member_id, []).insert(0, order)
     if key:

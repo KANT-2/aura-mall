@@ -14,7 +14,7 @@ from typing import Literal
 
 from aura_api.domain.atelier import mix_color, normalize_label, validate_counts
 from aura_api.domain.catalog import CUSTOM_PRODUCT_TYPE, Catalog, Product
-from aura_api.domain.errors import InvalidInput
+from aura_api.domain.errors import Conflict, InvalidInput
 
 MAX_QUANTITY = 15
 GIFT_SET_SIZE = 3
@@ -25,6 +25,30 @@ ADDRESS_MAX = 500
 IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 
 LineKind = Literal["product", "gift_set", "custom"]
+OrderStatus = Literal["received", "paid", "preparing", "shipped", "delivered", "cancelled"]
+ActorType = Literal["member", "admin", "system"]
+
+# Order lifecycle (draft rules; payment, cancellation and admin changes use them later).
+# received: accepted without payment (every order today) · paid: payment approved
+# preparing: made/packed · shipped · delivered · cancelled. Terminal states allow nothing.
+ORDER_STATUSES: tuple[OrderStatus, ...] = (
+    "received",
+    "paid",
+    "preparing",
+    "shipped",
+    "delivered",
+    "cancelled",
+)
+INITIAL_ORDER_STATUS: OrderStatus = "received"
+ORDER_TRANSITIONS: dict[str, frozenset[str]] = {
+    "received": frozenset({"paid", "preparing", "cancelled"}),
+    "paid": frozenset({"preparing", "cancelled"}),
+    "preparing": frozenset({"shipped", "cancelled"}),
+    "shipped": frozenset({"delivered"}),
+    "delivered": frozenset(),
+    "cancelled": frozenset(),
+}
+STATUS_REASON_MAX = 200
 
 
 @dataclass(frozen=True)
@@ -261,3 +285,16 @@ def idempotency_key(value: object) -> str | None:
     if not isinstance(value, str) or not IDEMPOTENCY_KEY.match(value):
         raise InvalidInput("IDEMPOTENCY_KEY_INVALID", "요청 식별자를 확인해 주세요.")
     return value
+
+
+def ensure_status_change(current: str, new: object, reason: object = None) -> str | None:
+    """Check one order status change and return its optional reason."""
+    if new not in ORDER_STATUSES:
+        raise InvalidInput("ORDER_STATUS_INVALID", "주문 상태를 확인해 주세요.")
+    if new not in ORDER_TRANSITIONS[current]:
+        raise Conflict("ORDER_STATUS_CONFLICT", "현재 주문 상태에서는 변경할 수 없어요.")
+    if reason is None:
+        return None
+    if not isinstance(reason, str) or len(reason.strip()) > STATUS_REASON_MAX:
+        raise InvalidInput("ORDER_STATUS_REASON_INVALID", "변경 사유를 확인해 주세요.")
+    return reason.strip() or None

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from aura_api.api.catalog import CamelModel
 from aura_api.domain.admin import INQUIRY_STATUSES
+from aura_api.domain.ordering import ActorType, OrderStatus
 from aura_api.infra.models import AdminAuditLog, PartnerInquiry, Product
 from aura_api.services.admin_operations import InquiryView, OrderView, Overview, line_name
 from aura_api.services.admin_products import ProductDetail
@@ -119,6 +120,15 @@ class AdminOrderSummaryOut(CamelModel):
     title: str
     item_count: int
     total: int
+    status: OrderStatus
+
+
+class AdminOrderStatusChangeOut(CamelModel):
+    from_status: OrderStatus | None
+    status: OrderStatus
+    actor_type: ActorType
+    reason: str | None
+    changed: datetime
 
 
 class AdminOrderItemOut(CamelModel):
@@ -134,6 +144,7 @@ class AdminOrderItemOut(CamelModel):
 class AdminOrderOut(AdminOrderSummaryOut):
     address: str
     items: list[AdminOrderItemOut]
+    status_history: list[AdminOrderStatusChangeOut]
 
 
 class AdminInquirySummaryOut(CamelModel):
@@ -199,6 +210,7 @@ def order_summary_out(view: OrderView) -> AdminOrderSummaryOut:
         title=view.title,
         item_count=view.item_count,
         total=order.total,
+        status=order.status,
     )
 
 
@@ -221,8 +233,21 @@ def order_out(view: OrderView) -> AdminOrderOut:
                 unit_price=item.unit_price,
             )
         )
+    history = [
+        AdminOrderStatusChangeOut(
+            from_status=change.from_status,
+            status=change.to_status,
+            actor_type=change.actor_type,
+            reason=change.reason,
+            changed=change.changed_at,
+        )
+        for change in view.history
+    ]
     return AdminOrderOut(
-        **order_summary_out(view).model_dump(), address=view.order.address, items=items
+        **order_summary_out(view).model_dump(),
+        address=view.order.address,
+        items=items,
+        status_history=history,
     )
 
 
