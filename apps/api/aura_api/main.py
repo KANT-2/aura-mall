@@ -17,6 +17,7 @@ from aura_api.identity.repository import UnavailableAuthRepository
 from aura_api.identity.service import AuthLifecycleService
 from aura_api.infra.database import create_engine, create_sessionmaker
 from aura_api.infra.database_rotation import RotatingDatabase
+from aura_api.infra.payment_gateway import TossPaymentsGateway
 from aura_api.openapi import DESCRIPTION, ERROR_RESPONSES, TAGS, configure_openapi
 
 
@@ -77,6 +78,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         else UnavailableAuthRepository()
     )
     app.state.auth_service = AuthLifecycleService(settings, app.state.auth_repository)
+    app.state.payment_gateway = (
+        TossPaymentsGateway(
+            settings.toss_secret_key.get_secret_value(),
+            settings.toss_api_url,
+            settings.payment_timeout_seconds,
+        )
+        if settings.payment_provider == "toss"
+        else None
+    )
     app.add_middleware(
         CSRFMiddleware,
         allowed_origins=settings.csrf_allowed_origins,
