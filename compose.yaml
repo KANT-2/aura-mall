@@ -27,7 +27,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      AURA_DATABASE_URL: ${AURA_DATABASE_URL:?Set AURA_DATABASE_URL in .env}
+      AURA_DATABASE_URL: ${AURA_DATABASE_URL:-}
       AURA_BFF_SHARED_KEY: ${AURA_BFF_SHARED_KEY:?Set AURA_BFF_SHARED_KEY in .env}
       AURA_JWT_ALGORITHM: HS256
       AURA_JWT_SIGNING_KEY: ${AURA_JWT_SIGNING_KEY:?Set AURA_JWT_SIGNING_KEY in .env}
@@ -65,4 +65,4 @@ networks:
   aura-internal:
     ipam:
       config:
-        - subnet: 10.250.50.0/24
+        - subnet: ${AURA_DOCKER_SUBNET:-10.250.50.0/24}

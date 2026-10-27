@@ -59,3 +59,25 @@ jobs:
 
       - name: Build Next.js image
         run: docker build -f apps/web/Dockerfile -t aura-web:ci .
+
+  database-operations:
+    name: Database TLS, rotation and recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      - name: Check operations scripts
+        run: |
+          uv sync --directory apps/api --locked
+          apps/api/.venv/bin/ruff check ops
+          apps/api/.venv/bin/ruff format --check ops
+          for script in ops/postgres/*.sh; do sh -n "$script"; done
+
+      - name: Exercise disposable database cluster
+        run: python3 ops/test_database.py
