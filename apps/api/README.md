@@ -127,9 +127,9 @@ API_AUTH_MODE=jwt
 # API_BFF_SHARED_KEY=<AURA_BFF_SHARED_KEY와 같은 무작위 서버 비밀값>
 ```
 
-이후 `npm run dev:web`으로 웹 서버를 실행합니다. 브라우저는 동일 출처 `/api`를 호출하고 Next BFF가 FastAPI에 연결합니다. 현재 헬스 체크만 구현된 FastAPI로는 상품·세션 조회를 제공할 수 없습니다.
+이후 `npm run dev:web`으로 웹 서버를 실행합니다. 브라우저는 동일 출처 `/api`를 호출하고 Next BFF가 FastAPI에 연결합니다. 현재 FastAPI에는 헬스 체크·카탈로그·입점 문의·레시피·주문 API와 JWT 인증 생명주기 기능이 구현되어 있습니다. 다만 BFF의 실제 회원 Session·쿠키 연동은 아직 완료되지 않았습니다.
 
-JWT 모드의 BFF는 설정한 쿠키의 토큰을 Bearer로 바꿉니다. 인증 업무 API는 공개 `Session` JSON과 JWT `Set-Cookie`를 반환해야 하며, 서명·수명·폐기·익명 방문자 보존은 FastAPI가 담당합니다. 실제 검증기를 연결한 테스트 전용 HTTP 검증은 루트의 `npm run build && npm run test:e2e:jwt`로 실행합니다. 테스트 앱의 발급·메모리 폐기 저장소는 운영 앱에 등록되지 않습니다.
+JWT 모드의 BFF는 설정한 쿠키의 JWT를 Bearer로 변환해 FastAPI에 전달합니다. 백엔드 로그인·Refresh API는 TokenPair JSON을 반환하며, 로그아웃 API는 토큰 폐기 후 204를 반환합니다. 현재 BFF가 요구하는 공개 Session JSON·쿠키 발급 및 Refresh 자동 갱신은 별도 연동 작업으로 남아 있습니다. 테스트 전용 HTTP 검증은 저장소 루트에서 `npm run build`와 `npm run test:e2e:jwt`로 실행합니다. 실제 PostgreSQL 인증 저장소는 전용 테스트 DB에서 JWT 생명주기 테스트를 통과했으나 운영 BFF 연동이 완료된 것은 아닙니다.
 
 ## 검증과 의존성 변경
 

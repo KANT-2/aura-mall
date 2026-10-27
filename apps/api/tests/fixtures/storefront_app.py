@@ -31,7 +31,9 @@ from aura_api.infra.repositories.recipes import SavedRecipe
 from aura_api.main import create_app
 
 ROOT = Path(__file__).resolve().parents[4]
-SOURCE = json.loads((ROOT / "apps/web/mock-server/fixtures/catalog.json").read_text())
+SOURCE = json.loads(
+    (ROOT / "apps/web/mock-server/fixtures/catalog.json").read_text(encoding="utf-8")
+)
 app = create_app(Settings(database_url=None))
 
 # Use the same fixture that generates db/seed.sql, mapped to real ORM row shapes.

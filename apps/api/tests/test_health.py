@@ -27,6 +27,9 @@ def test_openapi_exposes_versioned_routes(client):
     assert schema["info"]["title"] == "AURA test API"
     assert set(schema["paths"]) == {
         "/api/v1/health",
+        "/api/v1/auth/login",
+        "/api/v1/auth/refresh",
+        "/api/v1/auth/logout",
         "/api/v1/catalog",
         "/api/v1/catalog/products/{product_id}",
         "/api/v1/partner",
