@@ -1,5 +1,7 @@
 from typing import Protocol
 
+from fastapi import Request
+
 
 class TokenRevocationStore(Protocol):
     async def is_revoked(self, *, issuer: str, jti: str) -> bool:
@@ -16,6 +18,5 @@ class UnavailableRevocationStore:
         raise RevocationLookupUnavailable("Token revocation store is not connected")
 
 
-def get_token_revocation_store() -> TokenRevocationStore:
-    # No database adapter exists yet. Never default to an empty/allow-all blacklist.
-    return UnavailableRevocationStore()
+def get_token_revocation_store(request: Request) -> TokenRevocationStore:
+    return request.app.state.auth_repository

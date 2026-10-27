@@ -97,7 +97,7 @@ def session_data(guest_id: str, member_id: str | None = None) -> dict:
 @app.get("/api/v1/catalog")
 async def catalog():
     path = Path(__file__).resolve().parents[4] / "apps/web/mock-server/fixtures/catalog.json"
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 @app.get("/api/v1/session")
