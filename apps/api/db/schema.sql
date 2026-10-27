@@ -3,7 +3,7 @@
 -- contract in docs/FASTAPI_BFF.md. Run once on an empty database (PostgreSQL 13+):
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/schema.sql
 -- Then load initial catalog data with db/seed.sql. The cart is not stored (browser only).
--- This file is the latest full schema (migrations 0001 + 0002). Alembic applies the same
+-- This file is the latest full schema (migrations 0001 + 0002 + 0003). Alembic applies the same
 -- DDL step by step from migrations/sql/; tests/db checks that both give the same tables.
 
 BEGIN;
@@ -60,7 +60,7 @@ CREATE TABLE revoked_tokens (
 );
 CREATE INDEX revoked_tokens_expires_at_idx ON revoked_tokens (expires_at);
 
--- JWT refresh tokens (0002). Access tokens stay stateless.
+-- JWT refresh tokens (0002). Each row also records the access token issued with it.
 -- One family per login. Reusing a consumed refresh token revokes the whole family.
 -- The row is also the lock target when two refreshes race.
 CREATE TABLE auth_token_families (
@@ -99,6 +99,20 @@ CREATE INDEX refresh_tokens_access_expires_at_idx ON refresh_tokens (access_expi
 -- At most one usable refresh token per family at any time.
 CREATE UNIQUE INDEX refresh_tokens_family_active_key ON refresh_tokens (family_id)
     WHERE consumed_at IS NULL AND revoked_at IS NULL;
+
+-- Admin access tokens (0003).
+-- The JWT verifier only accepts tokens it has a record of; customer tokens are recorded in
+-- refresh_tokens, admin tokens here. Admins get no refresh token (access only).
+CREATE TABLE admin_sessions (
+    jti        UUID        PRIMARY KEY,
+    admin_id   UUID        NOT NULL REFERENCES admins (id) ON DELETE CASCADE,
+    issued_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,              -- set by logout
+    CONSTRAINT admin_sessions_expires_check CHECK (expires_at > issued_at)
+);
+CREATE INDEX admin_sessions_admin_id_idx ON admin_sessions (admin_id);
+CREATE INDEX admin_sessions_expires_at_idx ON admin_sessions (expires_at);
 
 -- ---------------------------------------------------------------------------
 -- Catalog: original string IDs from apps/web/mock-server/fixtures/catalog.json

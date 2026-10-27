@@ -29,16 +29,27 @@ REQUIRED_COLUMNS = {
         "access_jti": "uuid!",
         "access_expires_at": "timestamptz!",
     },
+    # Admin access tokens (migration 0003): is_revoked also accepts a live admin session.
+    "admins": {"id": "uuid!", "status": "varchar!"},
+    "admin_sessions": {
+        "jti": "uuid!",
+        "admin_id": "uuid!",
+        "expires_at": "timestamptz!",
+        "revoked_at": "timestamptz?",
+    },
 }
 PRIMARY_KEYS = {
     "users": ("id",),
     "revoked_tokens": ("jti",),
     "auth_token_families": ("id",),
     "refresh_tokens": ("id",),
+    "admins": ("id",),
+    "admin_sessions": ("jti",),
 }
 FOREIGN_KEYS = (
     ("auth_token_families", ("user_id",), "users", ("id",)),
     ("refresh_tokens", ("family_id", "user_id"), "auth_token_families", ("id", "user_id")),
+    ("admin_sessions", ("admin_id",), "admins", ("id",)),
 )
 
 

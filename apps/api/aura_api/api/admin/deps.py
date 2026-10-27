@@ -1,4 +1,4 @@
-"""Who may call /admin/**: an active account in `admins`, looked up on every request."""
+"""Who may call /admin/**: an admin token whose session and account are both active."""
 
 import uuid
 from dataclasses import dataclass
@@ -6,10 +6,11 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from aura_api.api.deps import Session
+from aura_api.api.deps import Session, bearer_claims
 from aura_api.core.auth import JWTVerifier, get_jwt_verifier, require_authenticated_user
 from aura_api.core.revocation import TokenRevocationStore, get_token_revocation_store
 from aura_api.domain.errors import Forbidden, Unauthorized
+from aura_api.identity.tokens import ADMIN_PERMISSION, ADMIN_PRINCIPAL
 from aura_api.infra.repositories import admin as repository
 
 
@@ -17,6 +18,22 @@ from aura_api.infra.repositories import admin as repository
 class AdminActor:
     id: uuid.UUID
     name: str
+    email: str
+    jti: uuid.UUID
+
+
+def is_admin_token(claims: dict) -> bool:
+    permissions = claims.get("permissions")
+    return claims.get("principal_type") == ADMIN_PRINCIPAL and (
+        isinstance(permissions, list) and ADMIN_PERMISSION in permissions
+    )
+
+
+def _uuid(value: object) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(value) if isinstance(value, str) else None
+    except ValueError:
+        return None
 
 
 async def current_admin(
@@ -25,19 +42,25 @@ async def current_admin(
     verifier: Annotated[JWTVerifier, Depends(get_jwt_verifier)],
     revocations: Annotated[TokenRevocationStore, Depends(get_token_revocation_store)],
 ) -> AdminActor:
-    """Missing, bad or revoked token → 401. A customer's token → 403.
+    """Missing, bad, expired, revoked or logged-out token → 401. A customer's token → 403.
 
-    The admin token's `sub` is the admin ID; how admin tokens are issued is decided with the
-    JWT login work, and only this function needs to change if that differs.
+    The revocation store already checks the admin session (not expired, not revoked, admin
+    active); here the session must also belong to the token's subject.
     """
     user = await require_authenticated_user(request, verifier, revocations)
-    try:
-        subject = uuid.UUID(user.user_id)
-    except ValueError:
-        raise Unauthorized("LOGIN_REQUIRED", "로그인이 필요해요.") from None
-    admin = await repository.active_admin(session, subject)
-    actor = AdminActor(admin.id, admin.name) if admin is not None else None
-    customer = actor is None and await repository.is_customer(session, subject)
+    claims = bearer_claims(request, verifier) or {}
+    subject, jti = _uuid(user.user_id), _uuid(claims.get("jti"))
+    if subject is None:
+        raise Unauthorized("LOGIN_REQUIRED", "로그인이 필요해요.")
+    actor = None
+    customer = False
+    if is_admin_token(claims) and jti is not None:
+        row = await repository.admin_session(session, jti)
+        admin = await repository.active_admin(session, subject)
+        if row is not None and row.admin_id == subject and admin is not None:
+            actor = AdminActor(admin.id, admin.name, admin.email, jti)
+    else:
+        customer = await repository.is_customer(session, subject)
     # End the read so the service can open its own transaction on this session.
     await session.rollback()
     if actor is not None:

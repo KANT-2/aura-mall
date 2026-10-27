@@ -5,6 +5,7 @@ The test database is wiped: every table is dropped and recreated by the migratio
 
 import asyncio
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,10 @@ from alembic.config import Config
 from aura_api.infra.seed import load_seed
 
 URL = os.environ.get("AURA_TEST_DATABASE_URL")
+
+if sys.platform == "win32":
+    # psycopg (JWT auth storage) cannot run async on the default Proactor loop on Windows.
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 API_DIR = Path(__file__).resolve().parents[2]
 
 

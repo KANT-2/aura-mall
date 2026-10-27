@@ -12,6 +12,7 @@ from sqlalchemy import select, update
 
 from aura_api.config import Settings
 from aura_api.core.revocation import get_token_revocation_store
+from aura_api.identity.service import PASSWORD_HASHER
 from aura_api.infra.database import create_engine, create_sessionmaker
 from aura_api.infra.models import Admin, Product, StockAdjustment, User
 from aura_api.main import create_app
@@ -63,10 +64,22 @@ def insert(row):
     return db(write)
 
 
-def new_admin(status: str = "active") -> uuid.UUID:
-    return insert(
-        Admin(email=f"{uuid.uuid4().hex}@aura.com", name="운영자", password_hash="x", status=status)
+ADMIN_PASSWORD = "admin-password-1"
+ADMIN_HASH = PASSWORD_HASHER.hash(ADMIN_PASSWORD)
+
+
+def new_admin(status: str = "active") -> tuple[uuid.UUID, str]:
+    email = f"{uuid.uuid4().hex}@aura.com"
+    admin_id = insert(Admin(email=email, name="운영자", password_hash=ADMIN_HASH, status=status))
+    return admin_id, email
+
+
+def admin_login(client, email: str) -> dict[str, str]:
+    response = client.post(
+        "/api/v1/admin/auth/login", json={"email": email, "password": ADMIN_PASSWORD}
     )
+    assert response.status_code == 200, response.text
+    return {"Authorization": f"Bearer {response.json()['accessToken']}"}
 
 
 def new_customer() -> uuid.UUID:
@@ -102,7 +115,7 @@ def client(migrated):
 
 @pytest.fixture(scope="module")
 def admin(client):
-    return bearer(new_admin())
+    return admin_login(client, new_admin()[1])
 
 
 def test_only_active_admins_get_in(client):
@@ -114,7 +127,7 @@ def test_only_active_admins_get_in(client):
         "message": "관리자 권한이 필요해요.",
     }
     assert (
-        client.get("/api/v1/admin/overview", headers=bearer(new_admin("disabled"))).status_code
+        client.get("/api/v1/admin/overview", headers=bearer(new_admin("disabled")[0])).status_code
         == 401
     )
     assert client.get("/api/v1/admin/overview", headers=bearer(uuid.uuid4())).status_code == 401

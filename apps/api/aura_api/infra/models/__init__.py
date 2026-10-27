@@ -15,6 +15,7 @@ from aura_api.infra.models.catalog import (
 )
 from aura_api.infra.models.identity import (
     Admin,
+    AdminSession,
     AuthTokenFamily,
     RefreshToken,
     RevokedToken,
@@ -27,6 +28,7 @@ from aura_api.infra.models.partner import PartnerInquiry
 __all__ = [
     "Admin",
     "AdminAuditLog",
+    "AdminSession",
     "AtelierDraft",
     "AuthTokenFamily",
     "Base",
