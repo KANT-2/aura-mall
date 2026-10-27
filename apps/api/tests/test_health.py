@@ -40,6 +40,7 @@ def test_openapi_exposes_versioned_routes(client):
         "/api/v1/recipes/{recipe_id}",
         "/api/v1/atelier/draft",
         "/api/v1/orders",
+        "/api/v1/orders/{order_id}/cancel",
         "/api/v1/payments",
         "/api/v1/payments/confirm",
         "/api/v1/payments/{payment_id}",

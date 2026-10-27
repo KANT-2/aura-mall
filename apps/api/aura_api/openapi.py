@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 from aura_api.core.errors import ErrorResponse
 
-CONTRACT_VERSION = "1.2.0"
+CONTRACT_VERSION = "1.3.0"
 ERROR_RESPONSES = {
     code: {"model": ErrorResponse} for code in (400, 401, 403, 404, 409, 422, 500, 503)
 }
@@ -74,7 +74,7 @@ def configure_openapi(app: FastAPI, prefix: str) -> None:
                     operation["security"] = [{"AdminJWT": []}]
                 elif (
                     relative in {"/auth/me", "/auth/logout", "/orders"}
-                    or relative.startswith("/payments")
+                    or relative.startswith(("/payments", "/orders/"))
                     or (relative.startswith("/recipes") and method != "get")
                 ):
                     operation["security"] = [{"MemberJWT": []}]

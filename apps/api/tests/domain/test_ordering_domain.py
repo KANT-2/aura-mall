@@ -7,6 +7,7 @@ from aura_api.domain.ordering import (
     build_line,
     ensure_status_change,
     price_order,
+    restock_needs,
     shipping_fee,
 )
 
@@ -282,3 +283,26 @@ def test_invalid_status_reason(reason):
     with pytest.raises(InvalidInput) as error:
         ensure_status_change("received", "cancelled", reason)
     assert error.value.code == "ORDER_STATUS_REASON_INVALID"
+
+
+def test_restock_gives_back_exactly_what_the_order_took(catalog):
+    priced = order(
+        catalog,
+        [
+            {**GIFT, "quantity": 2},
+            {"productId": "fresh-hand-cream", "quantity": 3},
+            {"custom": {"name": "느린 오후", "counts": {"bergamot": 1}}, "quantity": 1},
+        ],
+    )
+    stored = [
+        (
+            line.kind,
+            line.product.id if line.product else "custom-atelier",
+            line.quantity,
+            list(line.selection),
+        )
+        for line in priced.lines
+    ]
+    assert restock_needs(stored) == priced.stock_needs
+    assert restock_needs(stored)["fresh-hand-cream"] == 3 + 2  # single + Gift Set content
+    assert "custom-atelier" not in restock_needs(stored)

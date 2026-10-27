@@ -193,6 +193,72 @@ async def order_by_key(
     return (await _saved(session, [order]))[0] if order else None
 
 
+async def member_order(
+    session: AsyncSession, user_id: uuid.UUID, order_id: uuid.UUID
+) -> SavedOrder | None:
+    order = await session.scalar(
+        select(Order)
+        .where(Order.id == order_id, Order.user_id == user_id)
+        .execution_options(populate_existing=True)
+    )
+    return (await _saved(session, [order]))[0] if order else None
+
+
+async def stored_lines(
+    session: AsyncSession, order_id: uuid.UUID
+) -> list[tuple[str, str, int, list[str]]]:
+    """(kind, product ID, quantity, Gift Set product IDs) for each item of the order."""
+    rows = list(
+        await session.scalars(
+            select(OrderItem).where(OrderItem.order_id == order_id).order_by(OrderItem.position)
+        )
+    )
+    chosen: dict[uuid.UUID, list[str]] = {}
+    if rows:
+        selections = await session.scalars(
+            select(OrderItemSelection).where(
+                OrderItemSelection.order_item_id.in_([row.id for row in rows])
+            )
+        )
+        for selection in selections:
+            chosen.setdefault(selection.order_item_id, []).append(selection.product_id)
+    return [(row.kind, row.product_id, row.quantity, chosen.get(row.id, [])) for row in rows]
+
+
+async def give_back_stock(session: AsyncSession, product_id: str, quantity: int) -> None:
+    await session.execute(
+        update(Product).where(Product.id == product_id).values(stock=Product.stock + quantity)
+    )
+
+
+async def give_back_coupon(
+    session: AsyncSession, coupon_id: uuid.UUID, order_id: uuid.UUID
+) -> bool:
+    """Make the coupon usable again, only if this order is the one that used it."""
+    result = await session.execute(
+        update(UserCoupon)
+        .where(
+            UserCoupon.id == coupon_id,
+            UserCoupon.status == "USED",
+            UserCoupon.used_order_id == order_id,
+        )
+        .values(status="AVAILABLE", used_order_id=None, used_at=None)
+    )
+    return result.rowcount == 1
+
+
+async def unpaid_before(session: AsyncSession, cutoff: datetime, limit: int) -> list[uuid.UUID]:
+    """`received` orders placed before `cutoff`, oldest first."""
+    return list(
+        await session.scalars(
+            select(Order.id)
+            .where(Order.status == "received", Order.created_at < cutoff)
+            .order_by(Order.created_at, Order.id)
+            .limit(limit)
+        )
+    )
+
+
 async def _saved(session: AsyncSession, orders: list[Order]) -> list[SavedOrder]:
     if not orders:
         return []
