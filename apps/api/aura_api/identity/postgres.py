@@ -108,15 +108,33 @@ class PostgresAuthRepository:
 
     async def profile(self, user_id: UUID) -> dict | None:
         async with self._connection() as connection:
-            cursor = await connection.execute(
-                """SELECT id, email, name, marketing,
+            return await self._profile(connection, user_id)
+
+    async def _profile(self, connection, user_id: UUID) -> dict | None:
+        cursor = await connection.execute(
+            """SELECT id, email, name, marketing,
                      EXISTS (SELECT 1 FROM user_coupons c WHERE c.user_id = u.id
                        AND c.type = 'FREE_SHIPPING' AND c.status = 'AVAILABLE') AS coupon
                    FROM users u WHERE id = %s AND is_active""",
-                (user_id,),
-            )
-            row = await cursor.fetchone()
+            (user_id,),
+        )
+        row = await cursor.fetchone()
         return {**row, "id": str(row["id"]), "role": "member"} if row else None
+
+    async def update_profile(
+        self, user_id: UUID, *, name: str | None = None, marketing: bool | None = None
+    ) -> dict | None:
+        result = None
+        async with self._connection() as connection:
+            # Row-level UPDATE serialization preserves omitted fields, including false booleans.
+            cursor = await connection.execute(
+                """UPDATE users SET name = COALESCE(%s, name), marketing = COALESCE(%s, marketing)
+                   WHERE id = %s AND is_active RETURNING id""",
+                (name, marketing, user_id),
+            )
+            if await cursor.fetchone() is not None:
+                result = await self._profile(connection, user_id)
+        return result
 
     async def create_token_family(self, tokens: IssuedTokens) -> bool:
         accepted = False

@@ -4,14 +4,17 @@ These checks validate bindings and security predicates, not SQL execution or loc
 """
 
 from contextlib import asynccontextmanager
+from copy import deepcopy
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import anyio
+import psycopg
 import pytest
 
 from aura_api.config import Settings
 from aura_api.identity.postgres import PostgresAuthRepository
+from aura_api.identity.repository import AuthStorageUnavailable
 from aura_api.identity.tokens import issue_tokens
 
 
@@ -101,3 +104,57 @@ def test_access_operations_use_recorded_access_lifetime_and_family(pair, monkeyp
     else:
         assert "f.user_id = %s" in query
         assert "FOR UPDATE OF f" in query
+
+
+@pytest.mark.parametrize("failure", ["read", "commit"])
+def test_profile_update_failure_exits_transaction_without_returning_success(monkeypatch, failure):
+    class Connection:
+        def __init__(self):
+            self.row = {"id": uuid4(), "name": "Before", "marketing": False}
+            self.before = deepcopy(self.row)
+            self.rolled_back = False
+            self.updated = False
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            # Driver double: verify transaction error propagation, not real PostgreSQL rollback.
+            if exc_type is not None or failure == "commit":
+                self.row = deepcopy(self.before)
+                self.rolled_back = True
+            if exc_type is None and failure == "commit":
+                raise psycopg.OperationalError("private-commit-secret")
+
+        async def execute(self, query, params=None):
+            cursor = AsyncMock()
+            if isinstance(query, str) and query.startswith("UPDATE users"):
+                assert params == ("After", True, self.row["id"])
+                assert "WHERE id = %s AND is_active" in query
+                self.updated = True
+                self.row.update(name=params[0], marketing=params[1])
+                cursor.fetchone.return_value = {"id": self.row["id"]}
+            elif isinstance(query, str) and "SELECT id, email, name, marketing" in query:
+                assert self.updated
+                if failure == "read":
+                    raise psycopg.OperationalError("private-read-secret")
+                cursor.fetchone.return_value = {
+                    **self.row,
+                    "email": "member@example.com",
+                    "coupon": True,
+                }
+            return cursor
+
+    connection = Connection()
+    monkeypatch.setattr(psycopg.AsyncConnection, "connect", AsyncMock(return_value=connection))
+    monkeypatch.setattr("aura_api.identity.postgres.inspect_contract", AsyncMock(return_value=[]))
+    repository = PostgresAuthRepository("never-connect", "sql-test")
+
+    async def run():
+        with pytest.raises(AuthStorageUnavailable) as error:
+            await repository.update_profile(connection.row["id"], name="After", marketing=True)
+        assert "private" not in str(error.value)
+
+    anyio.run(run)
+    assert connection.updated and connection.rolled_back
+    assert connection.row == connection.before

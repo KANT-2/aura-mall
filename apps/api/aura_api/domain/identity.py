@@ -39,11 +39,16 @@ def normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
+def validate_name(name: object) -> str:
+    if not isinstance(name, str) or not name.strip() or len(name) > NAME_MAX:
+        raise InvalidInput("NAME_INVALID", "이름을 입력해 주세요.")
+    return name.strip()
+
+
 def validate_registration(
     name: object, email: object, password: object, marketing: object = False
 ) -> Registration:
-    if not isinstance(name, str) or not name.strip() or len(name) > NAME_MAX:
-        raise InvalidInput("NAME_INVALID", "이름을 입력해 주세요.")
+    name = validate_name(name)
     if not isinstance(email, str) or not email.strip() or len(email) > EMAIL_MAX:
         raise InvalidInput("EMAIL_INVALID", "이메일을 확인해 주세요.")
     if not isinstance(password, str) or len(password) > PASSWORD_MAX:
