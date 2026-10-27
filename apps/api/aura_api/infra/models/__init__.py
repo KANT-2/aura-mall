@@ -24,7 +24,12 @@ from aura_api.infra.models.identity import (
     User,
     UserCoupon,
 )
-from aura_api.infra.models.ordering import Order, OrderItem, OrderItemSelection
+from aura_api.infra.models.ordering import (
+    Order,
+    OrderItem,
+    OrderItemSelection,
+    OrderStatusHistory,
+)
 from aura_api.infra.models.partner import PartnerInquiry
 
 __all__ = [
@@ -41,6 +46,7 @@ __all__ = [
     "Order",
     "OrderItem",
     "OrderItemSelection",
+    "OrderStatusHistory",
     "PartnerInquiry",
     "Product",
     "ProductType",

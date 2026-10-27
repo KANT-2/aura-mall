@@ -3,7 +3,7 @@
 -- contract in docs/FASTAPI_BFF.md. Run once on an empty database (PostgreSQL 13+):
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/schema.sql
 -- Then load initial catalog data with db/seed.sql. The cart is not stored (browser only).
--- This file is the latest full schema (migrations 0001 through 0005). Alembic applies the same
+-- This file is the latest full schema (migrations 0001 through 0006). Alembic applies the same
 -- DDL step by step from migrations/sql/; tests/db checks that both give the same tables.
 
 BEGIN;
@@ -305,6 +305,9 @@ CREATE TABLE orders (
     coupon_id       UUID         REFERENCES user_coupons (id),
     idempotency_key VARCHAR(64),
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    status          VARCHAR(20)  NOT NULL DEFAULT 'received',  -- 0006, accepted without payment
+    CONSTRAINT orders_status_check
+        CHECK (status IN ('received', 'paid', 'preparing', 'shipped', 'delivered', 'cancelled')),
     CONSTRAINT orders_amounts_check
         CHECK (items_amount >= 0 AND shipping_fee >= 0 AND total = items_amount + shipping_fee),
     CONSTRAINT orders_user_idempotency_key UNIQUE (user_id, idempotency_key)
@@ -341,6 +344,27 @@ CREATE TABLE order_item_selections (
     position      SMALLINT     NOT NULL,
     PRIMARY KEY (order_item_id, product_id)
 );
+
+-- Every order status change, including the first 'received' entry (from_status NULL) (0006).
+-- Rows are only added.
+CREATE TABLE order_status_history (
+    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id    UUID         NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
+    from_status VARCHAR(20),
+    to_status   VARCHAR(20)  NOT NULL,
+    actor_type  VARCHAR(10)  NOT NULL,
+    actor_id    UUID,                    -- member or admin id; NULL for system changes
+    reason      VARCHAR(200),
+    changed_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT order_status_history_from_status_check CHECK (from_status IS NULL OR
+        from_status IN ('received', 'paid', 'preparing', 'shipped', 'delivered', 'cancelled')),
+    CONSTRAINT order_status_history_to_status_check
+        CHECK (to_status IN ('received', 'paid', 'preparing', 'shipped', 'delivered', 'cancelled')),
+    CONSTRAINT order_status_history_actor_type_check
+        CHECK (actor_type IN ('member', 'admin', 'system')),
+    CONSTRAINT order_status_history_actor_check CHECK ((actor_type = 'system') = (actor_id IS NULL))
+);
+CREATE INDEX order_status_history_order_idx ON order_status_history (order_id, changed_at, id);
 
 -- ---------------------------------------------------------------------------
 -- Partner inquiries (+ admin handling status)
