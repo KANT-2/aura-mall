@@ -78,6 +78,7 @@ BFF 어댑터는 아직 이 필드를 브라우저에 전달하지 않으며, �
 ## 후속 작업에서 필요한 것
 
 - 주문 취소: 0008에서 구현했습니다. [주문 취소 문서](ORDER_CANCELLATION.md)를 봅니다.
+- 결제 완료 주문 취소: 0009에서 PG 전액 환불 뒤 `paid → cancelled`로 구현했습니다. [환불 문서](REFUNDS.md)를 봅니다.
 - 관리자 상태 변경 API: `PATCH /admin/orders/{id}` + 기존 `admin_audit_logs`와의 기록 관계.
 - 대시보드 매출·주문 수에서 `cancelled` 제외 여부.
 - BFF·웹: `Order.status`, `AdminOrderSummary.status`, `AdminOrder.statusHistory` 타입·어댑터·Mock·화면.

@@ -170,7 +170,15 @@ async def _cancel(
     await repository.change_status(
         session, order.id, "cancelled", actor_type=actor_type, actor_id=actor_id, reason=reason
     )
-    # Same lock order as placing an order: the coupon first, then products by ID.
+    await release_holdings(session, order)
+
+
+async def release_holdings(session: AsyncSession, order: Order) -> None:
+    """Give back what the order took when it was placed: its coupon and its stock.
+
+    Same lock order as placing an order: the coupon first, then products by ID. The caller has
+    locked the order and runs this inside the transaction that cancels it.
+    """
     if order.coupon_id is not None:
         await repository.give_back_coupon(session, order.coupon_id, order.id)
     needs = restock_needs(await repository.stored_lines(session, order.id))
@@ -199,7 +207,8 @@ async def cancel_order(session: AsyncSession, member_id: uuid.UUID, order_id: ob
                 session, order, actor_type="member", actor_id=member_id, reason="member request"
             )
         elif order.status != "cancelled":
-            raise Conflict("ORDER_NOT_CANCELLABLE", "결제가 끝난 주문은 아직 취소할 수 없어요.")
+            # Paid orders go through refunds.py first; later states cannot be cancelled.
+            raise Conflict("ORDER_NOT_CANCELLABLE", "취소할 수 없는 주문 상태예요.")
         return await repository.member_order(session, member_id, order.id)
 
 

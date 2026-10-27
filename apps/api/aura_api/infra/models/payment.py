@@ -1,4 +1,4 @@
-"""PG payment attempts per order (db/schema.sql, migration 0007)."""
+"""PG payment attempts per order and their refunds (db/schema.sql, migrations 0007, 0009)."""
 
 import uuid
 from datetime import datetime
@@ -67,4 +67,49 @@ class Payment(Base):
     confirm_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Refund(Base):
+    """One attempt to refund a paid order in full. The refund ID is the PG idempotency key."""
+
+    __tablename__ = "refunds"
+    __table_args__ = (
+        CheckConstraint("status IN ('IN_PROGRESS', 'DONE', 'FAILED')", name="status"),
+        CheckConstraint("amount > 0", name="amount"),
+        CheckConstraint("actor_type IN ('member', 'admin', 'system')", name="actor_type"),
+        CheckConstraint("(actor_type = 'system') = (actor_id IS NULL)", name="actor"),
+        CheckConstraint("(status = 'DONE') = (refunded_at IS NOT NULL)", name="refunded"),
+        Index(
+            "refunds_payment_active_key",
+            "payment_id",
+            unique=True,
+            postgresql_where=text("status IN ('IN_PROGRESS', 'DONE')"),
+        ),
+        Index("refunds_order_idx", "order_id", text("requested_at DESC")),
+        Index(
+            "refunds_in_progress_idx",
+            "requested_at",
+            postgresql_where=text("status = 'IN_PROGRESS'"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    payment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("payments.id"))
+    order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"))
+    amount: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[str] = mapped_column(String(200))
+    actor_type: Mapped[str] = mapped_column(String(10))
+    actor_id: Mapped[uuid.UUID | None]
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'IN_PROGRESS'"))
+    transaction_key: Mapped[str | None] = mapped_column(String(64))
+    failure_code: Mapped[str | None] = mapped_column(String(100))
+    failure_message: Mapped[str | None] = mapped_column(String(500))
+    review_reason: Mapped[str | None] = mapped_column(String(100))
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
