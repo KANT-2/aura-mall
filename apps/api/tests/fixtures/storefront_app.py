@@ -207,7 +207,15 @@ async def delete_recipe(session, member_id, recipe_id):
     return previous != len(saved[member_id])
 
 
+partner_inquiries = []
+
+
+async def lock_and_count_recent(session, email, window):
+    return sum(item.email.lower() == email.lower() for item in partner_inquiries)
+
+
 async def add_inquiry(session, inquiry):
+    partner_inquiries.append(inquiry)
     return uuid.uuid4()
 
 
@@ -221,6 +229,7 @@ recipes.find_recipe = find_recipe
 recipes.add_recipe = add_recipe
 recipes.delete_recipe = delete_recipe
 partner.add_inquiry = add_inquiry
+partner.lock_and_count_recent = lock_and_count_recent
 app.dependency_overrides[get_session] = session
 app.dependency_overrides[get_token_revocation_store] = Revocations
 

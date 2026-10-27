@@ -104,7 +104,7 @@ FastAPI 내부 인증 응답은 TokenPair 또는 회원 프로필이며, BFF가 
 | DELETE | `/api/atelier/draft`         | `null` 또는 본문 없는 204                                                                         |
 | GET    | `/api/orders`                | 회원의 `Order[]`                                                                                  |
 | POST   | `/api/orders`                | `{ recipient, address, coupon?, items: OrderItemInput[] }` → 201 `Order`; 현재 화면 결제는 비활성 |
-| POST   | `/api/partner`               | `{ brand, name, email, introduction, message, type, consent, website? }` → 201 `{ id }`           |
+| POST   | `/api/partner`               | 문의 저장 → 201 `{ id }`; 이메일별 10분 3건을 넘으면 429 `INQUIRY_RATE_LIMITED`                   |
 
 JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내부 이름은 snake_case를 사용할 수 있으나 요청과 응답의 JSON 별칭을 계약에 맞춰야 합니다. 정의 위치:
 
@@ -209,6 +209,10 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
 같은 회원·같은 키의 재요청은 기존 주문을 200으로 반환합니다. 새 주문은 201입니다. 서버는 기존 주문이 있으면 달라진 본문도 다시 처리하지 않으므로, 클라이언트는 하나의 주문 시도에 키 하나를 만들고 재시도에만 같은 키를 사용해야 합니다. 헤더를 생략하면 중복 방지를 보장하지 않습니다. 회원 간 같은 키는 격리합니다.
 
 주문 BFF는 `recipient`, `address`, `coupon`, `items`만 전달하고 서버 계산 가격·스냅샷의 공개 DTO를 반환합니다. 관리자 응답도 경로별 DTO로 검증하며 잘못된 중첩 타입은 502입니다. 토큰·소유자 키·DB 내부 필드를 추가로 노출하지 않습니다. 결제·주문 접수 UI 버튼은 계속 비활성 상태입니다.
+
+## 입점 문의 요청 제한
+
+FastAPI는 정규화된 이메일별로 최근 10분 문의를 최대 3건까지 저장합니다. 같은 이메일의 동시 요청도 PostgreSQL 트랜잭션 잠금으로 합산하며, 초과 요청은 429 `INQUIRY_RATE_LIMITED`와 `Retry-After: 600`을 반환합니다. BFF는 허용한 문의 필드만 전달하고 429 상태와 공개 오류 메시지를 보존합니다. 이 식별자는 요청 제한에만 사용하며 인증·회원 소유권 근거가 아닙니다.
 
 ## 조향 초안
 

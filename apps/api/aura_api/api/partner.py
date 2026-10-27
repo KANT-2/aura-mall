@@ -34,7 +34,7 @@ class InquiryCreated(BaseModel):
     "/partner",
     status_code=201,
     response_model=InquiryCreated,
-    responses={400: {"model": ErrorResponse}},
+    responses={400: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
 )
 async def submit_inquiry(
     body: InquiryIn, session: Annotated[AsyncSession, Depends(get_session)]
