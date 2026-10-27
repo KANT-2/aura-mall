@@ -84,6 +84,9 @@ test("BFF authenticates with JWTs and isolates recipes, drafts and orders", asyn
 });
 
 test("BFF returns invalid order errors and does not expose cart endpoints", async ({ request }) => {
+  await request.post("/api/auth/register", {
+    data: { name: "회원", email: `orders-${randomUUID()}@example.com`, password: "password123" },
+  });
   for (const items of [
     [],
     [{ productId: "fresh-hand-cream", quantity: 16 }],

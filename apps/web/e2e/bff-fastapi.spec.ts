@@ -162,3 +162,119 @@ test("production recipe service supports save, remake, ownership and delete thro
     await stranger.dispose();
   }
 });
+
+test("admin BFF uses production JWT login, registration, authorization and revocation", async ({
+  request,
+  playwright,
+}) => {
+  expect(await (await request.get("/api/admin/auth/me")).json()).toEqual({ admin: null });
+  expect((await request.get("/api/admin/products")).status()).toBe(401);
+  const credentials = { email: "operator@example.com", password: "admin-password123" };
+  const login = await request.post("/api/admin/auth/login", { data: credentials });
+  expect(login.status()).toBe(200);
+  const state = await login.json();
+  expect(state.admin.email).toBe(credentials.email);
+  expect(state).not.toHaveProperty("accessToken");
+  const access = (await request.storageState()).cookies.find(
+    (cookie) => cookie.name === "aura_admin_access",
+  )!;
+  expect(access.path).toBe("/api/admin");
+  expect(access.httpOnly).toBe(true);
+  expect(
+    (await request.storageState()).cookies.some((cookie) => cookie.name === "aura_access"),
+  ).toBe(false);
+  expect(await (await request.get("/api/auth/me")).json()).toMatchObject({ user: null });
+  const page = await request.get("/api/admin/products?collection=fresh&page=1&role=attacker");
+  expect(page.status()).toBe(200);
+  expect((await page.json()).items[0]).toMatchObject({ collection: "fresh", version: 1 });
+  const email = `new-admin-${randomUUID()}@example.com`;
+  const created = await request.post("/api/admin/admins", {
+    data: { name: "추가 운영자", email, password: "new-admin-password123", createdBy: "attacker" },
+  });
+  expect(created.status()).toBe(201);
+  expect(await created.json()).toMatchObject({ email, name: "추가 운영자" });
+  expect(
+    (
+      await request.post("/api/admin/auth/logout", {
+        headers: { Origin: "https://attacker.invalid" },
+      })
+    ).status(),
+  ).toBe(403);
+  const other = await playwright.request.newContext({ baseURL: "http://127.0.0.1:3300" });
+  try {
+    expect(
+      (
+        await other.post("/api/admin/auth/login", {
+          data: { email, password: "new-admin-password123" },
+        })
+      ).status(),
+    ).toBe(200);
+    const rejected = await other.get("/api/admin/products", {
+      headers: { Cookie: `aura_admin_access=${token(randomUUID())}` },
+    });
+    expect(rejected.status()).toBe(403);
+    expect((await request.post("/api/admin/auth/logout")).status()).toBe(200);
+    expect(
+      (await request.storageState()).cookies.some((cookie) => cookie.name === "aura_admin_access"),
+    ).toBe(false);
+    const replay = await other.get("/api/admin/products", {
+      headers: { Cookie: `aura_admin_access=${access.value}` },
+    });
+    expect(replay.status()).toBe(401);
+  } finally {
+    await other.dispose();
+  }
+});
+
+test("order BFF forwards idempotency through production service and returns one saved order", async ({
+  playwright,
+}) => {
+  const memberId = randomUUID();
+  const member = await playwright.request.newContext({
+    baseURL: "http://127.0.0.1:3300",
+    extraHTTPHeaders: { Cookie: `aura_access=${token(memberId)}` },
+  });
+  try {
+    const key = randomUUID();
+    const data = {
+      recipient: "회원",
+      address: "서울",
+      items: [{ productId: "fresh-hand-cream", quantity: 2 }],
+      total: 1,
+      userId: randomUUID(),
+    };
+    const first = await member.post("/api/orders", { headers: { "Idempotency-Key": key }, data });
+    expect(first.status()).toBe(201);
+    const saved = await first.json();
+    expect(saved.total).toBe(56000);
+    expect(saved.items[0].unitPrice).toBe(28000);
+    expect(saved).not.toHaveProperty("userId");
+    const replay = await member.post("/api/orders", {
+      headers: { "Idempotency-Key": key },
+      data: { ...data, items: [] },
+    });
+    expect(replay.status()).toBe(200);
+    expect(await replay.json()).toEqual(saved);
+    expect(await (await member.get("/api/orders")).json()).toEqual([saved]);
+    const custom = await member.post("/api/orders", {
+      headers: { "Idempotency-Key": randomUUID() },
+      data: {
+        recipient: "회원",
+        address: "서울",
+        items: [
+          { custom: { name: "내 향", counts: { bergamot: 2 }, label: "paper" }, quantity: 1 },
+        ],
+      },
+    });
+    expect(custom.status()).toBe(201);
+    expect((await custom.json()).items[0].custom).toMatchObject({
+      name: "내 향",
+      productType: "eau-de-parfum",
+    });
+    expect(
+      (await member.post("/api/orders", { headers: { "Idempotency-Key": "bad" }, data })).status(),
+    ).toBe(400);
+  } finally {
+    await member.dispose();
+  }
+});

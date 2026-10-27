@@ -353,3 +353,26 @@ it("rejects recipe commands captured before an account change", async () => {
   ).toBe(409);
   expect((await api("/api/recipes")).body).toEqual([]);
 });
+
+it("replays a member's idempotent order without adding a second order or consuming another coupon", async () => {
+  const api = client();
+  await api("/api/auth/register", "POST", credentials("idempotent-owner"));
+  const data = {
+    recipient: "회원",
+    address: "서울",
+    coupon: true,
+    items: [{ productId: "fresh-hand-cream", quantity: 1 }],
+  };
+  const first = await api("/api/orders", "POST", data, { "Idempotency-Key": "same-order-request" });
+  expect(first.status).toBe(201);
+  const replay = await api(
+    "/api/orders",
+    "POST",
+    { ...data, items: [] },
+    { "Idempotency-Key": "same-order-request" },
+  );
+  expect(replay.status).toBe(200);
+  expect(replay.body).toEqual(first.body);
+  expect((await api("/api/orders")).body).toEqual([first.body]);
+  expect((await api("/api/auth/me")).body.coupon).toBe(false);
+});
