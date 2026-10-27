@@ -155,21 +155,47 @@ it("does not use the admin credential for customer account or order APIs", async
   expect(calls[0].headers.authorization).toBeUndefined();
 });
 
-it("clears only the admin cookie on expiry or successful logout", async () => {
+it("keeps cookies on expired lookups and clears only the admin cookie on logout", async () => {
   respond = (res) => json(res, { detail: "Expired" }, 401);
   const expired = await me(req("/api/admin/auth/me"));
   expect(await expired.json()).toEqual({ admin: null });
-  expect(expired.headers.getSetCookie()).toEqual([
-    "aura_admin_access=; Path=/api/admin; HttpOnly; SameSite=Lax; Max-Age=0; Secure",
-  ]);
+  expect(expired.headers.getSetCookie()).toEqual([]);
   respond = (res) => {
     res.writeHead(204);
     res.end();
   };
   const response = await logout(req("/api/admin/auth/logout", "POST"));
   expect(await response.json()).toEqual({ admin: null });
-  expect(response.headers.getSetCookie()).toEqual(expired.headers.getSetCookie());
+  expect(response.headers.getSetCookie()).toEqual([
+    "aura_admin_access=; Path=/api/admin; HttpOnly; SameSite=Lax; Max-Age=0; Secure",
+  ]);
   expect(calls.at(-1)?.headers.authorization).toBe(`Bearer ${token}`);
+});
+
+it("never deletes a newer login cookie when an old lookup finishes with 401", async () => {
+  let started!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  let lookup!: ServerResponse;
+  respond = (res) => {
+    lookup = res;
+    started();
+  };
+  const stale = me(req("/api/admin/auth/me"));
+  await pending;
+  const freshToken = "new.payload.signature";
+  respond = (res) =>
+    json(res, { accessToken: freshToken, expiresIn: 3600, tokenType: "Bearer", admin });
+  const signedIn = await login(
+    req("/api/admin/auth/login", "POST", { email: admin.email, password: "password123" }),
+  );
+  expect(signedIn.status).toBe(200);
+  expect(signedIn.headers.get("set-cookie")).toContain(freshToken);
+  json(lookup, { detail: "Expired" }, 401);
+  const late = await stale;
+  expect(await late.json()).toEqual({ admin: null });
+  expect(late.headers.getSetCookie()).toEqual([]);
 });
 
 it("preserves credentials on failed logout and rejects malformed tokens and auth responses", async () => {
@@ -181,9 +207,9 @@ it("preserves credentials on failed logout and rejects malformed tokens and auth
     "aura_admin_access=bad",
     `aura_admin_access=${token}; aura_admin_access=${token}`,
   ]) {
-    expect((await me(req("/api/admin/auth/me", "GET", undefined, { Cookie: cookie }))).status).toBe(
-      401,
-    );
+    const response = await me(req("/api/admin/auth/me", "GET", undefined, { Cookie: cookie }));
+    expect(response.status).toBe(401);
+    expect(response.headers.getSetCookie()).toEqual([]);
   }
 
   for (const value of [

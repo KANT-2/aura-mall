@@ -117,6 +117,29 @@ AURA_TEST_DATABASE_URL=postgresql+asyncpg://postgres:aura@127.0.0.1:5432/aura_te
 | `GET /docs`          | Swagger UI                           |
 | `GET /openapi.json`  | 현재 구현한 API의 OpenAPI 스키마     |
 
+## Swagger와 OpenAPI 계약
+
+FastAPI 실행 후 `http://localhost:8000/docs`에서 Swagger UI를 사용할 수 있습니다. 회원과 관리자의 로그인 API 응답에서 받은 `accessToken`을 **Authorize**의 `MemberJWT` 또는 `AdminJWT`에 입력합니다. 토큰 문자열만 입력하며 Refresh Token은 사용하지 않습니다. 회원 토큰과 관리자 토큰은 서로 대체할 수 없고 인증 정보는 Swagger에 영구 저장하지 않습니다.
+
+Swagger에서 변경 요청을 실행하려면 실제 접속하는 FastAPI 출처를 `AURA_CSRF_ALLOWED_ORIGINS`에 추가합니다. 예를 들어 아래 설정으로 실행하면 `http://localhost:8000/docs`에서 호출할 수 있습니다. 기존 웹 origin도 함께 유지합니다.
+
+```sh
+AURA_CSRF_ALLOWED_ORIGINS='["http://localhost:3000","http://localhost:8000"]' npm run dev:api
+```
+
+DB·JWT 설정과 최초 관리자 생성은 위 안내대로 준비합니다. `/atelier/draft`에는 무작위 UUID v4 `X-Guest-ID`를 입력합니다. 이 값은 방문자의 비민감 조향 초안에만 사용하며 회원 인증 수단이 아닙니다. 허용 Origin이 없는 서버 간 호출은 별도의 BFF 공유 키가 필요하며, Swagger에서도 CSRF 검사를 우회하지 않습니다.
+
+오류는 Swagger의 공통 `ErrorResponse`를 따릅니다. 주문·재고 조정의 신규 처리 201과 중복 요청 200을 각각 표시합니다. `/admin/session`은 관리자 JWT 프로필 조회이며 서버 세션 로그인이 아닙니다.
+
+```sh
+# 저장소 루트에서 실행: DB 없이 스키마·타입 생성 및 프런트 계약 검사
+npm run check:contract
+# 스키마만 내보내기
+uv run --directory apps/api --locked python -m aura_api.openapi --output /tmp/aura-openapi.json
+```
+
+계약 버전·변경 검토와 생성 파일 정책은 [계약 검사 안내](../web/contracts/README.md)를 따릅니다.
+
 API 접두사를 변경해도 `/health`는 유지됩니다. OpenAPI에는 접두사를 붙인 헬스 체크가 노출됩니다. 경로 끝의 `/`를 자동으로 리다이렉트하지 않습니다.
 
 ## 업무 API 추가와 웹 연결

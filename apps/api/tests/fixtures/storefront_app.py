@@ -29,7 +29,7 @@ from aura_api.infra.models import (
     SuggestedName,
 )
 from aura_api.infra.repositories import admin as admin_repository
-from aura_api.infra.repositories import catalog, partner, recipes, users
+from aura_api.infra.repositories import catalog, drafts, partner, recipes, users
 from aura_api.infra.repositories import orders as order_repository
 from aura_api.infra.repositories.catalog import CatalogRows
 from aura_api.infra.repositories.orders import SavedItem, SavedOrder
@@ -106,6 +106,25 @@ RULE_CATALOG = catalog_domain.Catalog(
     },
 )
 saved: dict[uuid.UUID, list[SavedRecipe]] = {}
+visitor_drafts = {}
+
+
+async def get_draft(session, guest_id):
+    return visitor_drafts.get(guest_id)
+
+
+async def save_draft(session, guest_id, draft):
+    visitor_drafts[guest_id] = draft
+    return draft
+
+
+async def delete_draft(session, guest_id):
+    visitor_drafts.pop(guest_id, None)
+
+
+drafts.get_draft = get_draft
+drafts.save_draft = save_draft
+drafts.delete_draft = delete_draft
 
 
 class Session:

@@ -4,6 +4,8 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
+from pydantic import BaseModel, Field
+
 from aura_api.api.catalog import CamelModel
 from aura_api.domain.admin import INQUIRY_STATUSES
 from aura_api.infra.models import AdminAuditLog, PartnerInquiry, Product
@@ -20,11 +22,17 @@ class AdminPage[T](CamelModel):
     page_size: int
 
 
+class HistoryChangeOut(BaseModel):
+    field: str
+    from_value: Any = Field(alias="from")
+    to: Any
+
+
 class HistoryEntryOut(CamelModel):
     id: uuid.UUID
-    action: str
+    action: Literal["product.update", "product.stock", "inquiry.update"]
     actor: str
-    changes: list[dict[str, Any]]  # [{ field, from, to }]
+    changes: list[HistoryChangeOut]
     reason: str | None = None  # left out when the action had no reason
     created: datetime
 

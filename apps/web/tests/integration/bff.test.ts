@@ -106,9 +106,11 @@ beforeEach(() => {
           ? fixtureCatalog
           : path.endsWith("/auth/me")
             ? member
-            : /\/auth\/(login|register|refresh)$/.test(path)
-              ? pair
-              : [],
+            : path.endsWith("/atelier/draft")
+              ? { counts: { rose: 2 }, name: "초안", label: "paper", step: "select" }
+              : /\/auth\/(login|register|refresh)$/.test(path)
+                ? pair
+                : [],
       );
     }
   };

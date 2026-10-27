@@ -17,3 +17,4 @@ docs/product/PRD.md
 **/.pytest_cache
 **/.ruff_cache
 **/uv.lock
+apps/web/contracts/generated/

@@ -1,5 +1,32 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { test, expect } from "@playwright/test";
+import { testIds } from "@/lib/test-ids";
+
+test("production draft API opens the atelier and preserves a visitor's composition", async ({
+  page,
+  playwright,
+}) => {
+  await page.goto("/atelier");
+  await expect(page.getByTestId(testIds.atelier.start)).toBeVisible();
+  expect(await (await page.request.get("/api/atelier/draft")).json()).toBeNull();
+  const draft = { counts: { bergamot: 2 }, name: "이어 만들 향", label: "paper", step: "select" };
+  const saved = await page.request.put("/api/atelier/draft", {
+    data: { ...draft, guestId: "forged" },
+  });
+  expect(saved.status()).toBe(200);
+  expect(await saved.json()).toEqual(draft);
+  await page.reload();
+  await expect(page.getByTestId(testIds.atelier.resume)).toBeVisible();
+  await page.getByTestId(testIds.atelier.resume).click();
+  const other = await playwright.request.newContext({ baseURL: "http://127.0.0.1:3300" });
+  try {
+    expect(await (await other.get("/api/atelier/draft")).json()).toBeNull();
+    expect(await (await page.request.get("/api/atelier/draft")).json()).toEqual(draft);
+    expect(await (await page.request.delete("/api/atelier/draft")).json()).toBeNull();
+  } finally {
+    await other.dispose();
+  }
+});
 
 function token(subject: string, expired = false) {
   const now = Math.floor(Date.now() / 1000);
