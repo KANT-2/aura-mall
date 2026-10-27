@@ -142,6 +142,24 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
   아직 이 작업에서 연결하지 않았습니다. 조정민님 후속 연결 시 `MemberResponse`와 공개
   `AccountState` 변환·계정 캐시 갱신을 맞춰야 합니다.
 
+### 비밀번호 변경 — FastAPI CRA-33
+
+- `POST /api/v1/auth/change-password`는 회원 Bearer JWT와
+  `{ currentPassword, newPassword }`를 받습니다. 새 비밀번호는 기존 8~256자 정책을
+  적용하며 공백 제거·Unicode 정규화를 하지 않습니다. null·추가 필드·잘못된 타입·길이·
+  인코딩 불가능한 문자는 422입니다.
+- 성공은 **204, 본문 없음**입니다. 비밀번호 해시 변경과 해당 회원의 모든 로그인 계열,
+  모든 미만료 Access 및 Refresh 폐기를 하나의 트랜잭션으로 커밋합니다. 현재 기기도
+  로그아웃되며 새 토큰은 발급하지 않습니다. 다른 회원·관리자 세션은 유지합니다.
+- 현재 비밀번호 불일치와 동시 변경으로 검증 당시 해시가 달라진 경우는
+  **400 `CURRENT_PASSWORD_INVALID`**입니다. 인증 토큰 실패를 뜻하는 401과 구분해
+  자동 Refresh·쓰기 재시도를 유발하지 않습니다. 미인증·폐기 토큰·관리자·비활성/삭제
+  회원은 401, CSRF 차단은 403, 저장소 실패는 503입니다. 공통 오류 형식과 요청 ID를 유지합니다.
+- **BFF 경로·화면은 이번 작업에 포함하지 않습니다.** 후속 BFF 연결에서는 백엔드 204를
+  확인한 뒤 Access/Refresh 쿠키 삭제·계정 상태 초기화·재로그인 안내를 처리해야 합니다.
+  실패 응답에서 성공으로 처리하거나 새 토큰을 자동 발급해서는 안 됩니다. 인증 Web Lock을
+  사용해 Refresh 및 로그아웃과 브라우저 상태 변경을 직렬화하는 연결이 필요합니다.
+
 ### 토큰 보관과 전달
 
 - Access 쿠키는 `aura_access; Path=/`, Refresh 쿠키는 `aura_refresh; Path=/api/auth`입니다. 모두 `HttpOnly; SameSite=Lax`이며 HTTPS 공개 origin에서는 `Secure`를 적용합니다. `Max-Age`는 발급 응답의 수명입니다. 운영은 `APP_ORIGIN=https://...`를 지정합니다.

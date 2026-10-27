@@ -54,9 +54,14 @@ class MemoryAuthRepository:
             "access_expires_at": pair.access_expires_at,
         }
 
-    async def create_token_family(self, pair):
+    async def create_token_family(self, pair, *, expected_password_hash):
         with self.lock:
-            if not self.active(pair.user_id):
+            if not any(
+                user.id == pair.user_id
+                and user.is_active
+                and user.password_hash == expected_password_hash
+                for user in self.users.values()
+            ):
                 return False
             self.families[pair.family_id] = False
             self.save(pair)
