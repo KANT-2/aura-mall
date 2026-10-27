@@ -3,6 +3,65 @@ import { test, expect, type APIRequestContext } from "@playwright/test";
 
 const credentials = { email: "member-a@example.com", password: "bff-password123" };
 
+test("password and deactivation confirmations are independent and empty deactivation never submits", async ({
+  page,
+  context,
+}) => {
+  expect(
+    (
+      await context.request.post("/api/auth/register", {
+        data: {
+          name: "Separate forms",
+          email: `cra36-${randomUUID()}@example.com`,
+          password: credentials.password,
+        },
+      })
+    ).status(),
+  ).toBe(201);
+  await page.goto("/mypage");
+  await page.getByRole("button", { name: "계정 관리", exact: true }).click();
+  const current = page.getByLabel("현재 비밀번호", { exact: true });
+  const confirmation = page.getByLabel("확인용 현재 비밀번호", { exact: true });
+  const deactivate = page.getByRole("button", { name: "계정 사용 중지", exact: true });
+  await current.fill(credentials.password);
+  await expect(confirmation).toHaveValue("");
+  await expect(deactivate).toBeDisabled();
+  await confirmation.fill("separate-confirmation");
+  await expect(current).toHaveValue(credentials.password);
+  await current.fill("");
+  await expect(confirmation).toHaveValue("separate-confirmation");
+  await confirmation.fill("");
+  await current.fill(credentials.password);
+  await page.getByLabel("계정 사용 중지 확인").check();
+  await expect(confirmation).toHaveValue("");
+  await expect(deactivate).toBeDisabled();
+  const deletions: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "DELETE" && new URL(request.url()).pathname === "/api/auth/me") {
+      deletions.push(request.url());
+    }
+  });
+  // Also exercise the React boundary without relying on native required/disabled controls.
+  await page
+    .locator("form")
+    .filter({ has: confirmation })
+    .evaluate((form) => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+  await expect(
+    page.getByRole("region", { name: "회원 계정 관리" }).getByRole("alert"),
+  ).toContainText("현재 비밀번호를 1~256자로");
+  expect(deletions).toHaveLength(0);
+  // A correct password in the other form must not rescue a wrong confirmation here.
+  await confirmation.fill("wrong-confirmation-password");
+  await deactivate.click();
+  await expect(
+    page.getByRole("region", { name: "회원 계정 관리" }).getByRole("alert"),
+  ).toContainText("현재 비밀번호를 확인해 주세요.");
+  expect(deletions).toHaveLength(1);
+  expect((await context.request.get("/api/auth/me")).status()).toBe(200);
+});
+
 test("member settings update across tabs, reject bad passwords, and end sessions only on success", async ({
   page,
   context,

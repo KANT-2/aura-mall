@@ -20,6 +20,7 @@ export function MemberSettings({ member }: { member: Member }) {
   const [name, setName] = useState(member.name);
   const [marketing, setMarketing] = useState(member.marketing ?? false);
   const [current, setCurrent] = useState("");
+  const [deactivationPassword, setDeactivationPassword] = useState("");
   const [next, setNext] = useState("");
   const [confirmation, setConfirmation] = useState(false);
   const [error, setError] = useState("");
@@ -30,12 +31,13 @@ export function MemberSettings({ member }: { member: Member }) {
     }
 
     setError("");
+    const password = action === "deactivate" ? deactivationPassword : current;
     if (action === "profile" && (!name.trim() || [...name].length > 100)) {
       setError("이름은 공백이 아닌 1~100자로 입력해 주세요.");
       return;
     }
 
-    if (action !== "profile" && (!current || [...current].length > 256)) {
+    if (action !== "profile" && (!password || [...password].length > 256)) {
       setError("현재 비밀번호를 1~256자로 입력해 주세요.");
       return;
     }
@@ -64,7 +66,7 @@ export function MemberSettings({ member }: { member: Member }) {
         if (action === "password") {
           await changePassword(member.id, current, next);
         } else {
-          await deactivateAccount(member.id, current);
+          await deactivateAccount(member.id, deactivationPassword);
         }
 
         notify(
@@ -77,6 +79,7 @@ export function MemberSettings({ member }: { member: Member }) {
       setError(failure instanceof Error ? failure.message : "요청을 처리하지 못했어요.");
     } finally {
       setCurrent("");
+      setDeactivationPassword("");
       setNext("");
       busy.current = false;
       setPending(false);
@@ -164,12 +167,12 @@ export function MemberSettings({ member }: { member: Member }) {
             <input
               type="password"
               autoComplete="current-password"
-              value={current}
-              onChange={(event) => setCurrent(event.target.value)}
+              value={deactivationPassword}
+              onChange={(event) => setDeactivationPassword(event.target.value)}
               required
             />
           </label>
-          <button className="button" type="submit">
+          <button className="button" type="submit" disabled={!deactivationPassword}>
             계정 사용 중지
           </button>
         </fieldset>
