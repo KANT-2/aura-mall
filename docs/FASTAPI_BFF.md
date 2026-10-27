@@ -266,22 +266,24 @@ FastAPI는 카탈로그 향료·합계 1~20방울·이름 30자와 상태를 검
 
 ### 경로
 
-| 메서드 | BFF 경로                                     | 요청 / 성공 응답                                                                                 |
-| ------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| POST   | `/api/admin/auth/login`                      | `{ email, password }` → `{ admin }`, 관리자 JWT 쿠키 설정                                        |
-| GET    | `/api/admin/auth/me`                         | `{ admin: AdminAccount \| null }`                                                                |
-| POST   | `/api/admin/auth/logout`                     | `{ admin: null }`, 관리자 JWT 쿠키 삭제                                                          |
-| POST   | `/api/admin/admins`                          | `{ name, email, password }` → 201 `AdminAccount`, 관리자 인증 필수                               |
-| GET    | `/api/admin/overview`                        | `AdminOverview`: 최근 7일 주문 수·금액, 문의 상태별 건수, 재고 5개 이하 상품                     |
-| GET    | `/api/admin/products`                        | 쿼리 `q`, `collection`, `stock=low\|out`, `page` → `AdminPage<AdminProduct>`                     |
-| GET    | `/api/admin/products/{id}`                   | `AdminProductDetail`: 상품, 선택 가능한 이미지 경로, 변경 이력                                   |
-| PATCH  | `/api/admin/products/{id}`                   | `{ version, name?, englishName?, description?, price?, image?, featured?, isNew? }`              |
-| POST   | `/api/admin/products/{id}/stock-adjustments` | `{ version, delta, reason, key }` → 201 `AdminProductDetail`, 같은 `key` 재전송은 200            |
-| GET    | `/api/admin/orders`                          | 쿼리 `from`, `to`(`YYYY-MM-DD`, 한국 시간, 종료일 포함), `page` → `AdminPage<AdminOrderSummary>` |
-| GET    | `/api/admin/orders/{id}`                     | `AdminOrder`: 주문 당시 상품명·단가 스냅샷, 주문자 이름·이메일, 받는 분·배송지                   |
-| GET    | `/api/admin/inquiries`                       | 쿼리 `status=received\|reviewing\|done`, `page` → `AdminPage<AdminInquirySummary>`               |
-| GET    | `/api/admin/inquiries/{id}`                  | `AdminInquiry`: 문의 원문, 처리 상태, 내부 메모, 변경 이력                                       |
-| PATCH  | `/api/admin/inquiries/{id}`                  | `{ version, status?, memo? }` → `AdminInquiry`                                                   |
+| 메서드 | BFF 경로                                     | 요청 / 성공 응답                                                                                                   |
+| ------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| POST   | `/api/admin/auth/login`                      | `{ email, password }` → `{ admin }`, 관리자 JWT 쿠키 설정                                                          |
+| GET    | `/api/admin/auth/me`                         | `{ admin: AdminAccount \| null }`                                                                                  |
+| POST   | `/api/admin/auth/logout`                     | `{ admin: null }`, 관리자 JWT 쿠키 삭제                                                                            |
+| POST   | `/api/admin/admins`                          | `{ name, email, password }` → 201 `AdminAccount`, 관리자 인증 필수                                                 |
+| GET    | `/api/admin/overview`                        | `AdminOverview`: 최근 7일 주문 수·금액, 문의 상태별 건수, 재고 5개 이하 상품                                       |
+| GET    | `/api/admin/products`                        | 쿼리 `q`, `collection`, `stock=low\|out`, `page` → `AdminPage<AdminProduct>`                                       |
+| GET    | `/api/admin/products/{id}`                   | `AdminProductDetail`: 상품, 선택 가능한 이미지 경로, 변경 이력                                                     |
+| PATCH  | `/api/admin/products/{id}`                   | `{ version, name?, englishName?, description?, price?, image?, featured?, isNew? }`                                |
+| POST   | `/api/admin/products/{id}/stock-adjustments` | `{ version, delta, reason, key }` → 201 `AdminProductDetail`, 같은 `key` 재전송은 200                              |
+| GET    | `/api/admin/orders`                          | 쿼리 `from`, `to`(`YYYY-MM-DD`, 한국 시간, 종료일 포함), `page` → `AdminPage<AdminOrderSummary>`                   |
+| GET    | `/api/admin/orders/{id}`                     | `AdminOrder`: 주문 당시 상품명·단가 스냅샷, 주문자 이름·이메일, 받는 분·배송지                                     |
+| GET    | `/api/admin/payments/review`                 | 쿼리 `status`, `reason`, `page` → `AdminPage<AdminPaymentReview>`: 검토 사유가 있거나 PG 결과를 확인하지 못한 결제 |
+| GET    | `/api/admin/refunds/review`                  | 쿼리 `status`, `reason`, `page` → `AdminPage<AdminRefundReview>`: PG 거절·검토 사유·결과 불명 환불                 |
+| GET    | `/api/admin/inquiries`                       | 쿼리 `status=received\|reviewing\|done`, `page` → `AdminPage<AdminInquirySummary>`                                 |
+| GET    | `/api/admin/inquiries/{id}`                  | `AdminInquiry`: 문의 원문, 처리 상태, 내부 메모, 변경 이력                                                         |
+| PATCH  | `/api/admin/inquiries/{id}`                  | `{ version, status?, memo? }` → `AdminInquiry`                                                                     |
 
 DTO는 [관리자 모델](../apps/web/src/features/admin/model/admin.ts)에 정의합니다. `AdminPage<T>`는 `{ items, total, page, pageSize }`이며 `pageSize`는 20입니다. 소비자 DTO와 분리하며 `version`·이력·메모·문의 상태를 공개 카탈로그·회원·문의 접수 응답에 포함하지 않습니다.
 
@@ -292,6 +294,7 @@ DTO는 [관리자 모델](../apps/web/src/features/admin/model/admin.ts)에 정�
 - 모든 변경 요청은 읽은 시점의 `version`을 보내고, 현재 버전과 다르면 409로 거절합니다. 웹은 409에서 최신 데이터를 다시 조회하고 사용자에게 재확인을 요청합니다. 실제 DB에서는 같은 트랜잭션 안에서 버전 비교·재고 변경·이력 기록을 수행합니다(조건부 UPDATE 또는 행 잠금).
 - `key`는 재고 조정 1건의 idempotency 키(8~64자 영숫자·하이픈)입니다. 같은 키·같은 내용의 재전송은 다시 적용하지 않고 현재 상태를 200으로 반환하며, 같은 키로 다른 내용을 보내면 409입니다.
 - 가격 변경은 기존 주문의 상품·단가 스냅샷을 바꾸지 않습니다. 주문 상태 변경·취소·재고 복구는 정책·DB 확장 합의 후 추가하며 현재는 조회만 제공합니다.
+- 계약 1.5.0(DB 변경 없음): 관리자 읽기 전용 `GET /admin/payments/review`·`GET /admin/refunds/review`를 추가했습니다. 응답에 PG `paymentKey`·`transactionKey`는 없습니다. BFF 경로는 아직 없습니다. 상세는 [결제·환불 검토 문서](backend/ADMIN_PAYMENT_REVIEW.md)입니다.
 - 계약 1.4.0(마이그레이션 0009): `POST /orders/{orderId}/cancel`이 결제 완료(`paid`) 주문도 처리합니다. 토스에 전액 취소를 요청하고 PG가 환불을 확인한 뒤에만 `cancelled`(200)로 바꾸며 재고·쿠폰을 되돌립니다. 결과가 불명확하면 202 `OrderOut`(`status: "paid"`)이고 같은 요청을 다시 보냅니다. PG 거절은 409 `REFUND_FAILED`, 준비 중 이후는 409 `ORDER_NOT_CANCELLABLE`, PG 미설정은 503입니다. 응답 필드와 결제 `status` 값은 바뀌지 않았습니다. BFF 경로는 아직 없습니다. 상세는 [환불 문서](backend/REFUNDS.md)입니다.
 - 계약 1.3.0(마이그레이션 0008): 회원 `POST /orders/{orderId}/cancel` → 200 `OrderOut`(`status: "cancelled"`)을 추가했습니다. `received` 주문만 취소하며 재고·쿠폰을 같은 트랜잭션에서 되돌립니다. 이미 취소된 주문은 그대로 200, 결제 확인 중이면 409 `PAYMENT_IN_PROGRESS`, 결제가 끝난 주문은 409 `ORDER_NOT_CANCELLABLE`, 다른 회원 주문은 404입니다. 결제 응답 `status`에 `CANCELED`가 추가됐습니다. BFF 경로는 아직 없습니다. 상세는 [주문 취소 문서](backend/ORDER_CANCELLATION.md)입니다.
 - 계약 1.2.0(마이그레이션 0007): 회원 결제 API `POST /payments`(`{ orderId }` → 결제 대기 발급·재사용), `POST /payments/confirm`(`{ paymentKey, orderId, amount }` → 200 `DONE`·`FAILED`, 결과 확인 중이면 202 `IN_PROGRESS`), `GET /payments/{id}`를 추가했습니다. 금액은 서버의 주문 합계만 사용하며 클라이언트 금액은 비교만 합니다. PG 미설정 시 503입니다. BFF 경로 `POST /api/payments`·`POST /api/payments/confirm`·`GET /api/payments/{id}`와 개발용 테스트 결제 화면(`/payments/test`)은 연결했고, 정식 결제 화면은 아직 없습니다. 상세는 [결제 문서](backend/PAYMENTS.md)입니다.

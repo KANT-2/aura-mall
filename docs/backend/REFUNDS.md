@@ -109,4 +109,4 @@ uv run --directory apps/api python -m aura_api.infra.reconcile_refunds [--older-
 - 위 정책 확정(준비 중 취소, 쿠폰·재고, 부분 환불, 관리자 취소)과 `reconcile_refunds` 스케줄 등록
 - BFF `POST /api/orders/{id}/cancel`과 주문 내역 화면의 취소 버튼(202 재시도 안내 포함)
 - 환불 웹훅(`CANCEL_STATUS_CHANGED`)과 가상계좌 환불 계좌 입력
-- 관리자 화면의 환불·`review_reason` 표시
+- 관리자 화면의 환불·`review_reason` 표시(조회 API는 [검토 문서](ADMIN_PAYMENT_REVIEW.md))
