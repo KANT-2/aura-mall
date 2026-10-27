@@ -1,12 +1,12 @@
 """Errors raised by domain rules.
 
 Domain code never imports FastAPI. The presentation layer maps `kind` to an HTTP status
-(invalid → 400, unauthorized → 401, not_found → 404, conflict → 409).
+(invalid → 400, unauthorized → 401, forbidden → 403, not_found → 404, conflict → 409).
 """
 
 from typing import Literal
 
-ErrorKind = Literal["invalid", "unauthorized", "not_found", "conflict"]
+ErrorKind = Literal["invalid", "unauthorized", "forbidden", "not_found", "conflict"]
 
 
 class DomainError(Exception):
@@ -24,6 +24,10 @@ class InvalidInput(DomainError):
 
 class Unauthorized(DomainError):
     kind: ErrorKind = "unauthorized"
+
+
+class Forbidden(DomainError):
+    kind: ErrorKind = "forbidden"
 
 
 class NotFound(DomainError):

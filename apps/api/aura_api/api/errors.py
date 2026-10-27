@@ -10,7 +10,13 @@ from starlette.responses import JSONResponse
 from aura_api.core.errors import ErrorDetail, ErrorResponse
 from aura_api.domain.errors import DomainError
 
-STATUS = {"invalid": 400, "unauthorized": 401, "not_found": 404, "conflict": 409}
+STATUS = {
+    "invalid": 400,
+    "unauthorized": 401,
+    "forbidden": 403,
+    "not_found": 404,
+    "conflict": 409,
+}
 
 
 async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
