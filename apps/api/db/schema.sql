@@ -3,7 +3,7 @@
 -- contract in docs/FASTAPI_BFF.md. Run once on an empty database (PostgreSQL 13+):
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/schema.sql
 -- Then load initial catalog data with db/seed.sql. The cart is not stored (browser only).
--- This file is the latest full schema (migrations 0001 through 0006). Alembic applies the same
+-- This file is the latest full schema (migrations 0001 through 0007). Alembic applies the same
 -- DDL step by step from migrations/sql/; tests/db checks that both give the same tables.
 
 BEGIN;
@@ -365,6 +365,41 @@ CREATE TABLE order_status_history (
     CONSTRAINT order_status_history_actor_check CHECK ((actor_type = 'system') = (actor_id IS NULL))
 );
 CREATE INDEX order_status_history_order_idx ON order_status_history (order_id, changed_at, id);
+
+-- PG payment attempts per order (0007). The amount is copied from orders.total when issued.
+CREATE TABLE payments (
+    id                 UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id           UUID         NOT NULL REFERENCES orders (id),
+    provider           VARCHAR(20)  NOT NULL,
+    pg_order_id        VARCHAR(64)  NOT NULL,   -- orderId sent to the PG, one per attempt
+    payment_key        VARCHAR(200),            -- PG paymentKey, set when approval is claimed
+    amount             INTEGER      NOT NULL,
+    status             VARCHAR(20)  NOT NULL DEFAULT 'READY',
+    method             VARCHAR(30),
+    failure_code       VARCHAR(100),
+    failure_message    VARCHAR(500),
+    review_reason      VARCHAR(100),            -- approved at the PG but needs manual handling
+    confirm_started_at TIMESTAMPTZ,
+    approved_at        TIMESTAMPTZ,
+    created_at         TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at         TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT payments_pg_order_id_key UNIQUE (pg_order_id),
+    CONSTRAINT payments_payment_key_key UNIQUE (payment_key),
+    CONSTRAINT payments_status_check
+        CHECK (status IN ('READY', 'IN_PROGRESS', 'DONE', 'FAILED')),
+    CONSTRAINT payments_amount_check CHECK (amount > 0),
+    CONSTRAINT payments_pg_order_id_check CHECK (pg_order_id ~ '^[A-Za-z0-9_-]{6,64}$'),
+    CONSTRAINT payments_claimed_check
+        CHECK (status = 'READY' OR (payment_key IS NOT NULL AND confirm_started_at IS NOT NULL)),
+    CONSTRAINT payments_approved_check CHECK ((status = 'DONE') = (approved_at IS NOT NULL))
+);
+-- One open or approved attempt per order: a second approval for the same order cannot exist.
+CREATE UNIQUE INDEX payments_order_open_key ON payments (order_id)
+    WHERE status IN ('READY', 'IN_PROGRESS', 'DONE');
+CREATE INDEX payments_order_idx ON payments (order_id, created_at DESC);
+-- Attempts whose result is still unknown, for the reconciliation job.
+CREATE INDEX payments_in_progress_idx ON payments (confirm_started_at)
+    WHERE status = 'IN_PROGRESS';
 
 -- ---------------------------------------------------------------------------
 -- Partner inquiries (+ admin handling status)

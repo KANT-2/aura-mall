@@ -66,6 +66,8 @@ def change(order_id, new_status, *, actor="admin", actor_id=None, reason=None, o
                 actor_id=actor_id if actor_id or actor == "system" else uuid.uuid4(),
                 reason=reason,
                 owner_id=owner,
+                # Stands in for the payment service, the only caller allowed to set `paid`.
+                payment_verified=new_status == "paid",
             )
 
     return db(work)
@@ -135,18 +137,21 @@ def test_new_orders_start_received_with_member_entry(client, admin):
 def test_allowed_changes_are_recorded_in_order(client, admin):
     order_id = place(new_customer())
     admin_id = uuid.uuid4()
+    assert change(order_id, "paid", actor="system").status == "paid"
     for new_status in ("preparing", "shipped", "delivered"):
         assert change(order_id, new_status, actor_id=admin_id).status == new_status
     assert status_of(order_id) == "delivered"
     assert [row[:2] for row in history(order_id)] == [
         (None, "received"),
-        ("received", "preparing"),
+        ("received", "paid"),
+        ("paid", "preparing"),
         ("preparing", "shipped"),
         ("shipped", "delivered"),
     ]
     detail = client.get(f"/api/v1/admin/orders/{order_id}", headers=admin).json()
     assert [entry["status"] for entry in detail["statusHistory"]] == [
         "received",
+        "paid",
         "preparing",
         "shipped",
         "delivered",
@@ -158,7 +163,8 @@ def test_allowed_changes_are_recorded_in_order(client, admin):
     [
         ((), "delivered", Conflict),  # skipping ahead
         (("cancelled",), "received", Conflict),  # terminal
-        (("preparing", "shipped"), "cancelled", Conflict),  # shipped cannot be cancelled
+        (("paid", "preparing", "shipped"), "cancelled", Conflict),  # shipped cannot be cancelled
+        ((), "preparing", Conflict),  # an unpaid order cannot be prepared
         ((), "refunded", InvalidInput),  # unknown status
         ((), None, InvalidInput),
     ],
@@ -201,13 +207,18 @@ def test_simultaneous_changes_apply_exactly_one():
             await asyncio.sleep(delay)
             async with sessionmaker() as session, session.begin():
                 await repository.change_status(
-                    session, order_id, new_status, actor_type="admin", actor_id=uuid.uuid4()
+                    session,
+                    order_id,
+                    new_status,
+                    actor_type="admin",
+                    actor_id=uuid.uuid4(),
+                    payment_verified=new_status == "paid",
                 )
                 await asyncio.sleep(0.3)  # hold the row lock so the other attempt waits
             return new_status
 
         return await asyncio.gather(
-            attempt("cancelled", 0), attempt("preparing", 0.05), return_exceptions=True
+            attempt("cancelled", 0), attempt("paid", 0.05), return_exceptions=True
         )
 
     first, second = db(race)
@@ -258,7 +269,7 @@ def test_members_and_admins_keep_their_boundaries(client, admin):
 
 def test_downgrade_and_upgrade_keep_orders(client):
     order_id = place(new_customer())
-    change(order_id, "preparing")
+    change(order_id, "cancelled")
     config = alembic_config()
     command.downgrade(config, "0005")
     command.upgrade(config, "head")

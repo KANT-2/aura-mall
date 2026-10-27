@@ -263,6 +263,7 @@ async def change_status(
     actor_id: uuid.UUID | None,
     reason: object = None,
     owner_id: uuid.UUID | None = None,
+    payment_verified: bool = False,
 ) -> Order | None:
     """Apply one status change under the order row lock and record it.
 
@@ -281,7 +282,7 @@ async def change_status(
     order = await session.scalar(query)
     if order is None:
         return None
-    note = ensure_status_change(order.status, new_status, reason)
+    note = ensure_status_change(order.status, new_status, reason, payment_verified=payment_verified)
     session.add(
         OrderStatusHistory(
             order_id=order.id,
