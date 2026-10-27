@@ -8,7 +8,7 @@ import hashlib
 import json
 import re
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -227,6 +227,21 @@ def stock_needs(lines: Sequence[OrderLine]) -> dict[str, int]:
         needs[line.product.id] += line.quantity
         for product_id in line.selection:
             needs[product_id] += line.quantity
+    return dict(needs)
+
+
+def restock_needs(lines: Iterable[tuple[str, str, int, Sequence[str]]]) -> dict[str, int]:
+    """Stock to give back for stored order lines (kind, product ID, quantity, Gift Set picks).
+
+    Mirrors `stock_needs`: products and Gift Set contents were taken, custom lines took none.
+    """
+    needs: Counter[str] = Counter()
+    for kind, product_id, quantity, selection in lines:
+        if kind == "custom":
+            continue
+        needs[product_id] += quantity
+        for chosen in selection:
+            needs[chosen] += quantity
     return dict(needs)
 
 

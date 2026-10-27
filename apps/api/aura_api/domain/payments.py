@@ -9,10 +9,17 @@ from typing import Literal
 
 from aura_api.domain.errors import InvalidInput
 
-PaymentStatus = Literal["READY", "IN_PROGRESS", "DONE", "FAILED"]
+PaymentStatus = Literal["READY", "IN_PROGRESS", "DONE", "FAILED", "CANCELED"]
 # READY: issued, waiting for the PG window · IN_PROGRESS: approval claimed, result pending
 # DONE: approved (approved_at set) · FAILED: definitely not approved. A new payment may follow.
-PAYMENT_STATUSES: tuple[PaymentStatus, ...] = ("READY", "IN_PROGRESS", "DONE", "FAILED")
+# CANCELED: a READY attempt closed because its order was cancelled; never sent for approval.
+PAYMENT_STATUSES: tuple[PaymentStatus, ...] = (
+    "READY",
+    "IN_PROGRESS",
+    "DONE",
+    "FAILED",
+    "CANCELED",
+)
 # Statuses that hold the order: at most one per order (partial unique index).
 OPEN_PAYMENT_STATUSES: tuple[PaymentStatus, ...] = ("READY", "IN_PROGRESS", "DONE")
 
