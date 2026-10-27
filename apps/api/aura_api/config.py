@@ -34,9 +34,8 @@ class Settings(BaseSettings):
     toss_secret_key: SecretStr | None = None
     toss_api_url: str = "https://api.tosspayments.com"
     payment_timeout_seconds: float = Field(default=30, gt=0, le=60)
-    # Unpaid orders older than this are cancelled by the expiry job. No default on purpose:
-    # the operating value is a policy decision, and the job refuses to run without it.
-    unpaid_order_ttl_minutes: int | None = Field(default=None, ge=1, le=43200)
+    # Confirmed operating policy. The expiry CLI remains dry-run by default; no scheduler.
+    unpaid_order_ttl_minutes: int = Field(default=10, ge=1, le=43200)
 
     @model_validator(mode="before")
     @classmethod

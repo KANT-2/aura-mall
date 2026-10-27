@@ -255,9 +255,10 @@ async def overview_counts(session: AsyncSession, since: datetime) -> OverviewCou
     orders = await session.scalar(select(func.count()).select_from(Order))
     recent, revenue = (
         await session.execute(
-            select(func.count(), func.coalesce(func.sum(Order.total), 0)).where(
-                Order.created_at >= since
-            )
+            select(
+                func.count(),
+                func.coalesce(func.sum(Order.total).filter(Order.status != "cancelled"), 0),
+            ).where(Order.created_at >= since)
         )
     ).one()
     statuses = dict(

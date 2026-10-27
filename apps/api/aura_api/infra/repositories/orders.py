@@ -15,6 +15,7 @@ from aura_api.infra.models import (
     OrderItem,
     OrderItemSelection,
     OrderStatusHistory,
+    Payment,
     Product,
     ProductType,
     UserCoupon,
@@ -250,11 +251,17 @@ async def give_back_coupon(
 
 
 async def unpaid_before(session: AsyncSession, cutoff: datetime, limit: int) -> list[uuid.UUID]:
-    """`received` orders placed before `cutoff`, oldest first."""
+    """Eligible `received` orders, excluding unknown/approved payments before LIMIT."""
     return list(
         await session.scalars(
             select(Order.id)
-            .where(Order.status == "received", Order.created_at < cutoff)
+            .where(
+                Order.status == "received",
+                Order.created_at <= cutoff,
+                ~select(Payment.id)
+                .where(Payment.order_id == Order.id, Payment.status.in_(("IN_PROGRESS", "DONE")))
+                .exists(),
+            )
             .order_by(Order.created_at, Order.id)
             .limit(limit)
         )
@@ -351,7 +358,9 @@ async def change_status(
     if order is None:
         return None
     note = ensure_status_change(order.status, new_status, reason, payment_verified=payment_verified)
-    if order.status == "paid" and await payments.has_pending_refund(session, order.id):
+    if order.status in ("paid", "preparing") and await payments.has_pending_refund(
+        session, order.id
+    ):
         # The PG may be returning the money right now: the refund decides what the order becomes.
         raise Conflict("REFUND_IN_PROGRESS", "환불을 확인하고 있어 주문 상태를 바꿀 수 없어요.")
     session.add(

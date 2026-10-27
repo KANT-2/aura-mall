@@ -1,0 +1,132 @@
+"""Confirmed operating policies on a disposable PostgreSQL database."""
+
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
+
+import pytest
+from sqlalchemy import select, update
+from test_admin_api import URL, db, new_customer
+from test_admin_api import client as client
+from test_order_cancellation import cancel, order
+from test_payments_api import confirm, order_status, payment_row, start
+from test_payments_api import pg as pg
+
+from aura_api.config import Settings
+from aura_api.infra.models import Order, Product
+from aura_api.infra.repositories import admin as admin_repository
+from aura_api.services import orders as order_service
+
+pytestmark = pytest.mark.skipif(not URL, reason="AURA_TEST_DATABASE_URL is not set")
+ITEMS = [{"productId": "fresh-hand-cream", "quantity": 1}]
+
+
+def test_expiry_boundary_at_exactly_ten_minutes(client, pg, monkeypatch):
+    now = datetime.now(UTC)
+    ids, payments = [], []
+    for _ in range(3):
+        member = new_customer()
+        placed = order(client, member, items=ITEMS)
+        ids.append(uuid.UUID(placed["id"]))
+        payment = start(client, member, placed["id"]).json()
+        assert payment["status"] == "READY"
+        payments.append(payment["id"])
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now
+
+    monkeypatch.setattr(order_service, "datetime", Clock)
+
+    async def run(maker):
+        async with maker() as session:
+            async with session.begin():
+                for target, seconds in zip(ids, (599, 600, 601), strict=True):
+                    await session.execute(
+                        update(Order)
+                        .where(Order.id == target)
+                        .values(created_at=now - timedelta(seconds=seconds))
+                    )
+            ttl = timedelta(minutes=Settings(_env_file=None).unpaid_order_ttl_minutes)
+            assert ttl == timedelta(minutes=10)
+            dry = await order_service.expire_unpaid_orders(session, older_than=ttl)
+            result = await order_service.expire_unpaid_orders(session, older_than=ttl, execute=True)
+            assert dry == result
+
+    db(run)
+    assert [order_status(target) for target in ids] == ["received", "cancelled", "cancelled"]
+    assert [payment_row(target).status for target in payments] == ["READY", "CANCELED", "CANCELED"]
+    assert pg.calls == []  # No approval request has reached the PG.
+
+
+def test_revenue_excludes_only_confirmed_cancel_and_preserves_order_counts(client, pg):
+    member = new_customer()
+    placed = order(client, member, items=ITEMS)
+    payment = start(client, member, placed["id"]).json()
+    assert confirm(client, member, payment).status_code == 200
+    key = "pk_" + uuid.UUID(payment["id"]).hex
+
+    async def counts(maker):
+        async with maker() as session:
+            return await admin_repository.overview_counts(
+                session, datetime.now(UTC) - timedelta(days=1)
+            )
+
+    before = db(counts)
+    pg.refund_behavior[key] = "down"
+    assert cancel(client, member, placed["id"]).status_code == 202
+    pending = db(counts)
+    assert pending.recent_revenue == before.recent_revenue
+    pg.refund_behavior[key] = "refund"
+    assert cancel(client, member, placed["id"]).status_code == 200
+    after = db(counts)
+    assert after.recent_revenue == before.recent_revenue - placed["total"]
+    assert (after.orders, after.recent_orders) == (before.orders, before.recent_orders)
+    assert cancel(client, member, placed["id"]).status_code == 200
+    assert db(counts).recent_revenue == after.recent_revenue
+
+
+@pytest.mark.parametrize("round_", range(4))
+def test_ten_minute_expiry_racing_approval_never_restocks_a_paid_order(client, pg, round_):
+    member = new_customer()
+    # A distinct SKU keeps the preceding boundary test's newly expired orders from
+    # changing this race's stock observation when the batch legitimately cancels them.
+    product_id = "fresh-candle"
+    placed = order(client, member, items=[{"productId": product_id, "quantity": 1}])
+    target = uuid.UUID(placed["id"])
+    payment = start(client, member, placed["id"]).json()
+
+    async def age(maker):
+        async with maker() as session, session.begin():
+            await session.execute(
+                update(Order)
+                .where(Order.id == target)
+                .values(created_at=datetime.now(UTC) - timedelta(minutes=10, seconds=1))
+            )
+
+    async def stock(maker):
+        async with maker() as session:
+            return await session.scalar(select(Product.stock).where(Product.id == product_id))
+
+    async def expire(maker):
+        async with maker() as session:
+            return await order_service.expire_unpaid_orders(
+                session, older_than=timedelta(minutes=10), execute=True
+            )
+
+    db(age)
+    before = db(stock)
+    pg.delay = 0.1
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        expiring = pool.submit(db, expire)
+        approving = pool.submit(confirm, client, member, payment)
+        expiring.result(timeout=30)
+        response = approving.result(timeout=30)
+    final = order_status(target)
+    if final == "paid":
+        assert response.status_code == 200 and pg.approvals == 1
+        assert db(stock) == before
+    else:
+        assert final == "cancelled" and response.status_code == 409
+        assert db(stock) == before + 1 and pg.approvals == 0
