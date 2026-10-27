@@ -75,6 +75,19 @@ TOSS_RETRY_CODES = frozenset(
 TOSS_PENDING = frozenset({"READY", "IN_PROGRESS", "WAITING_FOR_DEPOSIT"})
 TOSS_FAILED = frozenset({"ABORTED", "EXPIRED"})
 TOSS_CANCELED = frozenset({"CANCELED", "PARTIAL_CANCELED"})
+# Only explicit business rejections close an attempt. Authentication, lookup, rate-limit
+# and unfamiliar errors say nothing about whether a previous request moved money.
+TOSS_CONFIRM_REJECTIONS = frozenset(
+    {
+        "REJECT_CARD_PAYMENT",
+        "REJECT_ACCOUNT_PAYMENT",
+        "REJECT_CARD_COMPANY",
+        "INVALID_CARD_NUMBER",
+        "EXCEED_MAX_AUTH_COUNT",
+    }
+)
+TOSS_CANCEL_REJECTIONS = frozenset({"NOT_CANCELABLE_PAYMENT", "INVALID_REFUND_ACCOUNT_INFO"})
+PUBLIC_FAILURE_MESSAGE = "결제 요청이 거절됐어요. 결제 수단을 확인하거나 문의해 주세요."
 
 
 def _text(value: object, limit: int) -> str | None:
@@ -83,7 +96,7 @@ def _text(value: object, limit: int) -> str | None:
 
 def toss_payment(data: dict) -> GatewayResult:
     """Map a Toss Payment object to a result."""
-    status = data.get("status")
+    status = _status(data)
     common = {
         "payment_key": _text(data.get("paymentKey"), 200),
         "order_id": _text(data.get("orderId"), 64),
@@ -104,7 +117,7 @@ def toss_payment(data: dict) -> GatewayResult:
         return GatewayResult(
             "failed",
             code=_text(failure.get("code"), 100) or status,
-            message=_text(failure.get("message"), MESSAGE_MAX),
+            message=PUBLIC_FAILURE_MESSAGE,
             canceled=status in TOSS_CANCELED,
             **common,
         )
@@ -124,7 +137,7 @@ def toss_cancellation(data: dict, amount: int) -> RefundResult:
     A full refund counts only when the PG says CANCELED and the finished cancellations add up to
     exactly the amount we asked for. Anything else that is not plainly unfinished needs a person.
     """
-    status = data.get("status")
+    status = _status(data)
     cancels = data.get("cancels") if isinstance(data.get("cancels"), list) else []
     done = [
         item
@@ -147,6 +160,12 @@ def toss_cancellation(data: dict, amount: int) -> RefundResult:
     if status in TOSS_PENDING or status == "DONE":
         return RefundResult("pending", amount=total)
     raise GatewayUnavailable("Unexpected Toss payment status")
+
+
+def _status(data: object) -> str:
+    if not isinstance(data, dict) or not isinstance(data.get("status"), str):
+        raise GatewayUnavailable("Unexpected Toss payment body")
+    return data["status"]
 
 
 class TossPaymentsGateway:
@@ -174,7 +193,10 @@ class TossPaymentsGateway:
         )
         try:
             with urllib.request.urlopen(request, timeout=self._timeout) as response:
-                return response.status, json.loads(response.read() or b"{}")
+                payload = json.loads(response.read() or b"{}")
+                if not isinstance(payload, dict):
+                    raise GatewayUnavailable("Unexpected Toss payment body")
+                return response.status, payload
         except urllib.error.HTTPError as error:
             try:
                 payload = json.loads(error.read() or b"{}")
@@ -190,9 +212,9 @@ class TossPaymentsGateway:
 
     def _error(self, status: int, data: dict) -> GatewayResult:
         code = _text(data.get("code"), 100)
-        if status >= 500 or code in TOSS_RETRY_CODES or code is None:
+        if not 400 <= status < 500 or code not in TOSS_CONFIRM_REJECTIONS:
             raise GatewayUnavailable("Toss Payments result is not final")
-        return GatewayResult("failed", code=code, message=_text(data.get("message"), MESSAGE_MAX))
+        return GatewayResult("failed", code=code, message=PUBLIC_FAILURE_MESSAGE)
 
     async def confirm(
         self, *, payment_key: str, order_id: str, amount: int, idempotency_key: str
@@ -214,7 +236,7 @@ class TossPaymentsGateway:
         status, data = await self._call("GET", "/v1/payments/" + quote(payment_key, safe=""))
         if status == 200:
             return toss_payment(data)
-        return self._error(status, data)
+        raise GatewayUnavailable("Toss Payments lookup did not confirm a result")
 
     async def cancel(
         self, *, payment_key: str, amount: int, reason: str, idempotency_key: str
@@ -237,6 +259,6 @@ class TossPaymentsGateway:
                 return toss_cancellation(found, amount)
             raise GatewayUnavailable("Toss Payments result is not final")
         code = _text(data.get("code"), 100)
-        if status >= 500 or code in TOSS_RETRY_CODES or code is None:
+        if not 400 <= status < 500 or code not in TOSS_CANCEL_REJECTIONS:
             raise GatewayUnavailable("Toss Payments result is not final")
-        return RefundResult("failed", code=code, message=_text(data.get("message"), MESSAGE_MAX))
+        return RefundResult("failed", code=code, message=PUBLIC_FAILURE_MESSAGE)

@@ -11,7 +11,7 @@ called, and the order only becomes `cancelled` after the PG confirmed the money 
    leaves the order `paid`. An unknown result keeps IN_PROGRESS: resending the same request or
    the reconciliation job asks the PG again with the same key, so the money is returned once.
 
-Only the whole payment is refunded, and only while the order is `paid` (before preparation).
+Only the whole payment is refunded, while the order is `paid` or `preparing` (before shipment).
 """
 
 import uuid
@@ -78,7 +78,7 @@ async def _claim(
         order = await repository.lock_order(session, order_id, member_id) if order_id else None
         if order is None:
             raise NotFound("ORDER_NOT_FOUND", "주문을 찾을 수 없어요.")
-        if order.status != "paid":
+        if order.status not in ("paid", "preparing"):
             return None
         if not can_ask_pg:
             raise PaymentGatewayUnavailable
@@ -161,7 +161,7 @@ async def record_result(
         refund.transaction_key = result.transaction_key
         refund.refunded_at = result.refunded_at or now
         await session.flush()  # a finished refund no longer blocks the status change below
-        if order.status != "paid":
+        if order.status not in ("paid", "preparing"):
             # Money went back while the order left `paid`: nothing safe to undo automatically.
             refund.review_reason = "ORDER_NOT_PAID"
             return "DONE"

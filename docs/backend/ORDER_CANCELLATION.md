@@ -11,8 +11,8 @@
 | `received`, 결제 시도 없음             | 취소                                                                  |
 | `received`, 결제 대기 `READY`          | 취소 + 결제 시도 `CANCELED` (PG 승인 요청 전)                         |
 | `received`, 결제 확인 중 `IN_PROGRESS` | 거절 409 `PAYMENT_IN_PROGRESS` / 만료 작업은 건너뜀                   |
-| `paid`                                 | 회원 취소는 PG 전액 환불 뒤 취소([환불](REFUNDS.md)) / 만료 대상 아님 |
-| `preparing` 이후                       | 거절 409 `ORDER_NOT_CANCELLABLE` / 만료 대상 아님                     |
+| `paid`·`preparing`                     | 회원 취소는 PG 전액 환불 뒤 취소([환불](REFUNDS.md)) / 만료 대상 아님 |
+| `shipped`·`delivered`                  | 거절 409 `ORDER_NOT_CANCELLABLE` / 만료 대상 아님                     |
 | `cancelled`                            | 회원 취소는 그대로 200, 아무것도 다시 되돌리지 않음                   |
 
 결제 확인 중인 주문은 PG가 승인하고 있을 수 있으므로 절대 취소하지 않습니다. 결과 재확인 작업
@@ -44,18 +44,19 @@
 
 ```sh
 # 대상 수만 확인 (기본)
-uv run --directory apps/api python -m aura_api.infra.expire_unpaid_orders --ttl-minutes <정책값>
+uv run --directory apps/api python -m aura_api.infra.expire_unpaid_orders --ttl-minutes 10
 # 실제 취소
 uv run --directory apps/api python -m aura_api.infra.expire_unpaid_orders --execute
 ```
 
-- 만료 시간은 `AURA_UNPAID_ORDER_TTL_MINUTES`(1~43200분) 또는 `--ttl-minutes`로 받습니다.
-  **운영 기본값은 정하지 않았습니다.** 값이 없으면 작업이 실행을 거부합니다.
-- 토스 결제 인증 후 승인까지 10분 제한이 있으므로, 정책값은 결제창 체류 시간보다 충분히 길어야 합니다.
+- 확정 정책은 주문 생성 후 **10분**입니다. `AURA_UNPAID_ORDER_TTL_MINUTES=10`을 설정 예시에
+  반영했으며 코드 기본값도 10입니다. CLI의 `--ttl-minutes`는 명시적 점검용으로 사용할 수 있습니다.
+  정확히 10분이 된 주문부터 대상이며, 결제 중·PG 결과 불명·승인 완료 건은 보호합니다.
 - 결제 결과 재확인 작업을 먼저 실행해 `IN_PROGRESS`를 줄인 뒤 만료 작업을 실행하는 순서를 권장합니다.
 - 출력의 `due`는 이번 실행의 대상 수(`--limit` 이하)입니다. 더 많은 대상이 남아 있을 수 있습니다.
-  `cancelled`·`skipped`는 실행 결과이고, dry run에서는 그 시점의 예상치입니다(결제 확인 중·완료 주문은
-  건너뜀으로 셉니다). 실행 직전에 결제가 시작되면 실제 결과와 달라질 수 있습니다.
+  결제 확인 중·완료 주문은 `LIMIT` 전에 제외해 후속 주문을 막지 않습니다.
+  `cancelled`·`skipped`는 실행 결과이고 dry run에서는 그 시점의 예상치입니다.
+  실행 직전에 결제가 시작되면 잠금 아래 재검증하여 건너뛰므로 실제 결과와 달라질 수 있습니다.
 - 스케줄러는 등록하지 않았습니다.
 
 ## API (계약 1.3.0)

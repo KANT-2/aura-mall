@@ -243,17 +243,26 @@ async def reconcile_payments(
         ids = await repository.unresolved_before(session, datetime.now(UTC) - older_than, limit)
     counts = {"checked": len(ids), "done": 0, "failed": 0, "pending": 0}
     for payment_id in ids:
-        async with session.begin():
-            payment = await session.get(Payment, payment_id, populate_existing=True)
-            key, order_id, amount = payment.payment_key, payment.pg_order_id, payment.amount
         try:
+            async with session.begin():
+                payment = await session.get(Payment, payment_id, populate_existing=True)
+                if payment is None or payment.status != "IN_PROGRESS":
+                    counts["pending"] += 1
+                    continue
+                key, order_id, amount = payment.payment_key, payment.pg_order_id, payment.amount
             result = await gateway.confirm(
                 payment_key=key, order_id=order_id, amount=amount, idempotency_key=str(payment_id)
             )
+            view = await record_result(session, payment_id, result)
+        except SQLAlchemyError:
+            # A failed read/write must not close this attempt or stop the remaining batch.
+            # Do not log exception text: drivers may include connection details/parameters.
+            await session.rollback()
+            counts["pending"] += 1
+            continue
         except GatewayUnavailable:
             counts["pending"] += 1
             continue
-        view = await record_result(session, payment_id, result)
         status = view.status if view else "IN_PROGRESS"
         counts[{"DONE": "done", "FAILED": "failed"}.get(status, "pending")] += 1
     return counts

@@ -142,10 +142,13 @@ def test_simultaneous_cancels_refund_once(client, pg):
     assert {call["key"] for call in pg.refund_calls} == {str(refunds_of(order_id)[0].id)}
 
 
-def test_no_database_lock_is_held_while_the_pg_is_called(client, pg):
+@pytest.mark.parametrize("state", ["paid", "preparing"])
+def test_no_database_lock_is_held_while_the_pg_is_called(client, pg, state):
     member = new_customer()
     placed, payment, _ = pay(client, member)
     order_id = uuid.UUID(placed["id"])
+    if state == "preparing":
+        change(order_id, state)
     seen = {}
 
     async def probe(sessionmaker):
@@ -171,7 +174,7 @@ def test_no_database_lock_is_held_while_the_pg_is_called(client, pg):
     assert cancel(client, member, placed["id"]).status_code == 200
     assert seen["locked"] is True
     # The claim was already committed when the PG was asked, and the order was still paid.
-    assert seen["refunds"] == ["IN_PROGRESS"] and seen["orders"] == ["paid"]
+    assert seen["refunds"] == ["IN_PROGRESS"] and seen["orders"] == [state]
 
 
 def test_pg_unreachable_leaves_the_order_paid_and_a_resend_finishes_it(client, pg):
@@ -308,7 +311,7 @@ def test_the_order_status_cannot_change_while_a_refund_is_pending(client, pg):
     assert change_after.status == "DONE"
 
 
-@pytest.mark.parametrize("state", ["preparing", "shipped", "delivered"])
+@pytest.mark.parametrize("state", ["shipped", "delivered"])
 def test_orders_past_payment_are_not_refunded(client, pg, state):
     member = new_customer()
     placed, _, _ = pay(client, member)
@@ -322,6 +325,58 @@ def test_orders_past_payment_are_not_refunded(client, pg, state):
     assert response.status_code == 409 and error_code(response) == "ORDER_NOT_CANCELLABLE"
     assert order_status(order_id) == state and stock() == before
     assert pg.refund_calls == [] and refunds_of(order_id) == []
+
+
+def test_preparing_order_refunds_and_restores_coupon_once(client, pg):
+    member, coupon_id = member_with_coupon()
+    before = stock()
+    placed, _, key = pay(client, member, coupon=True)
+    order_id = uuid.UUID(placed["id"])
+    change(order_id, "preparing")
+    pg.refund_behavior[key] = "down"
+    response = cancel(client, member, placed["id"])
+    assert response.status_code == 202 and response.json()["status"] == "preparing"
+    assert coupon_state(coupon_id)[0] == "USED"
+    with pytest.raises(Exception) as error:
+        change(order_id, "shipped")
+    assert getattr(error.value, "code", None) == "REFUND_IN_PROGRESS"
+    pg.refund_behavior[key] = "refund"
+    assert cancel(client, member, placed["id"]).json()["status"] == "cancelled"
+    assert stock() == before and coupon_state(coupon_id)[0] == "AVAILABLE"
+    assert cancelled_entries(order_id)[0][0] == "preparing"
+    assert cancel(client, member, placed["id"]).status_code == 200
+    assert stock() == before and pg.refund_count == 1
+
+
+@pytest.mark.parametrize("round_", range(4))
+def test_shipping_racing_preparing_refund_has_one_safe_outcome(client, pg, round_):
+    member = new_customer()
+    placed, _, _ = pay(client, member)
+    order_id = uuid.UUID(placed["id"])
+    change(order_id, "preparing")
+    before = stock()
+    pg.delay = 0.1
+
+    def ship():
+        try:
+            change(order_id, "shipped")
+            return "shipped"
+        except Exception as error:
+            return getattr(error, "code", None)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        shipping = pool.submit(ship)
+        refunding = pool.submit(cancel, client, member, placed["id"])
+        shipping_result, response = shipping.result(timeout=30), refunding.result(timeout=30)
+    final = order_status(order_id)
+    if final == "shipped":
+        assert shipping_result == "shipped" and response.status_code == 409
+        assert pg.refund_count == 0 and stock() == before
+    else:
+        assert final == "cancelled" and response.status_code == 200
+        assert shipping_result in ("REFUND_IN_PROGRESS", "ORDER_STATUS_CONFLICT")
+        assert pg.refund_count == 1
+        assert {k: stock()[k] - before[k] for k in TAKEN} == TAKEN
 
 
 def test_only_the_owner_can_refund(client, pg):

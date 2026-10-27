@@ -254,12 +254,23 @@ def test_orders_are_private_and_need_a_member(client):
     assert rejected.json()["error"]["message"] == "로그인 후 주문할 수 있어요."
 
 
-def test_last_item_goes_to_exactly_one_of_two_simultaneous_orders(migrated):
+def test_last_item_goes_to_exactly_one_of_two_simultaneous_orders(migrated, monkeypatch):
     set_stock("warm-diffuser", 1)
     buyers = [create_member(), create_member()]
     body = {**ADDRESS, "items": [{"productId": "warm-diffuser", "quantity": 1}]}
 
     async def race(sessionmaker):
+        # Both requests must see the last item before racing the conditional stock UPDATE.
+        # Otherwise the second may legitimately fail earlier with PRODUCT_UNAVAILABLE.
+        barrier = asyncio.Barrier(2)
+        original = service.repository.take_stock
+
+        async def take_stock(*args, **kwargs):
+            await asyncio.wait_for(barrier.wait(), timeout=10)
+            return await original(*args, **kwargs)
+
+        monkeypatch.setattr(service.repository, "take_stock", take_stock)
+
         async def buy(member_id):
             async with sessionmaker() as session:
                 try:

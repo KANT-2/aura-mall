@@ -3,8 +3,8 @@
     uv run --directory apps/api python -m aura_api.infra.expire_unpaid_orders            # dry run
     uv run --directory apps/api python -m aura_api.infra.expire_unpaid_orders --execute  # cancel
 
-The time limit comes from AURA_UNPAID_ORDER_TTL_MINUTES (or --ttl-minutes); without one the job
-refuses to run, because the operating value is a policy decision. Orders whose payment is in
+The time limit defaults to the confirmed ten-minute policy, configurable through
+AURA_UNPAID_ORDER_TTL_MINUTES (or --ttl-minutes). Orders whose payment is in
 progress or approved are skipped: run aura_api.infra.reconcile_payments first.
 
 Output: due = candidates in this batch (at most --limit), cancelled/skipped = the result, or in
@@ -38,7 +38,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=100)
     args = parser.parse_args()
     settings = Settings()
-    ttl = args.ttl_minutes or settings.unpaid_order_ttl_minutes
+    ttl = settings.unpaid_order_ttl_minutes if args.ttl_minutes is None else args.ttl_minutes
     if ttl is None or ttl < 1 or args.limit < 1:
         raise SystemExit(
             "Set AURA_UNPAID_ORDER_TTL_MINUTES (or --ttl-minutes) and a positive limit"

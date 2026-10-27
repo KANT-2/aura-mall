@@ -265,7 +265,7 @@ def test_expiry_cancels_only_old_unpaid_orders(client, pg):
     result = expire()
     # The dry run predicts the run: same candidates, same cancel/skip split.
     assert dry == result
-    assert result["cancelled"] >= 2 and result["skipped"] >= 1
+    assert result["cancelled"] >= 2 and result["skipped"] == 0
     assert order_status(uuid.UUID(old["id"])) == "cancelled"
     assert order_status(uuid.UUID(old_ready["id"])) == "cancelled"
     assert order_status(uuid.UUID(recent["id"])) == "received"
