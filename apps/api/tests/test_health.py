@@ -32,6 +32,7 @@ def test_openapi_exposes_versioned_routes(client):
         "/api/v1/auth/me",
         "/api/v1/auth/refresh",
         "/api/v1/auth/logout",
+        "/api/v1/auth/change-password",
         "/api/v1/catalog",
         "/api/v1/catalog/products/{product_id}",
         "/api/v1/partner",
