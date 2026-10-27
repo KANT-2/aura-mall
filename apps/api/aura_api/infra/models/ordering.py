@@ -37,6 +37,9 @@ class Order(Base):
         UniqueConstraint("user_id", "idempotency_key", name="orders_user_idempotency_key"),
         Index("orders_user_created_idx", "user_id", text("created_at DESC")),
         Index("orders_created_idx", text("created_at DESC")),
+        Index(
+            "orders_unpaid_created_idx", "created_at", postgresql_where=text("status = 'received'")
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=UUID_DEFAULT)
