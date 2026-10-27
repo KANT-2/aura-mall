@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 SOURCE = Path(__file__).resolve().parents[1]
@@ -30,6 +31,19 @@ def main():
             ignore=shutil.ignore_patterns(
                 ".venv", "__pycache__", ".pytest_cache", ".ruff_cache", ".env"
             ),
+        )
+        shutil.copy2(
+            SOURCE / "apps/api/tests/fixtures/rotation_app.py",
+            root / "apps/api/aura_api/_rotation_test_app.py",
+        )
+        # Two real app workers must both observe the URL update, without a process restart.
+        overlay = root / "compose.database.yaml"
+        overlay.write_text(
+            overlay.read_text().replace(
+                "  api:\n",
+                "  api:\n    command: [uvicorn, aura_api._rotation_test_app:app, --host, "
+                "0.0.0.0, --port, '8000', --workers, '2']\n",
+            )
         )
         (root / ".env").write_text(
             "\n".join(
@@ -78,7 +92,11 @@ def main():
             db.sql(
                 "db",
                 "CREATE TABLE rotation_probe(id int PRIMARY KEY, value text); "
-                "INSERT INTO rotation_probe VALUES (1, 'preserved');",
+                "INSERT INTO rotation_probe VALUES (1, 'preserved'); "
+                "CREATE TABLE inflight_writes(tag text PRIMARY KEY); "
+                "CREATE TABLE inflight_auth_writes(tag text PRIMARY KEY); "
+                "CREATE TABLE rotation_lock(id int PRIMARY KEY, value int NOT NULL); "
+                "INSERT INTO rotation_lock VALUES (1, 0);",
             )
             db.wait_replica()
             assert db.sql("db-standby", "SELECT value FROM rotation_probe;") == "preserved"
@@ -157,7 +175,129 @@ asyncio.run(main())
             )
             old_url = db.url_file.read_text().strip()
             old_replication = db.replication_password()
-            cli("rotate")
+            identity = db.wait_api_generation()
+            assert all(len(value["processes"]) == 2 for value in identity.values())
+            tag = secrets.token_hex(8)
+            waiting_tag = secrets.token_hex(8)
+
+            def http(path):
+                result = db.dc(
+                    "exec",
+                    "-T",
+                    "api",
+                    "python",
+                    "-c",
+                    "import json,sys,urllib.request; "
+                    "print(urllib.request.urlopen('http://127.0.0.1:8000/' + "
+                    "sys.argv[1], timeout=100).read().decode())",
+                    path,
+                    timeout=110,
+                )
+                return json.loads(result.stdout)
+
+            with ThreadPoolExecutor(max_workers=3) as executor:
+                pending_request = executor.submit(http, "rotation-inflight?tag=" + tag)
+
+                def old_transactions_started():
+                    if (
+                        db.sql(
+                            "db",
+                            "SELECT count(*) FROM pg_stat_activity WHERE "
+                            f"application_name='{tag}' AND usename='aura_app_a';",
+                        )
+                        != "2"
+                    ):
+                        raise module.OperationError("In-flight request has not opened both drivers")
+
+                module.retry(old_transactions_started, 30)
+                assert db.sql("db", "SELECT count(*) FROM inflight_writes;") == "0"
+                waiting_request = executor.submit(http, "rotation-locked?tag=" + waiting_tag)
+
+                def row_lock_is_waiting():
+                    blocked = db.sql(
+                        "db",
+                        "SELECT count(*) FROM pg_stat_activity waiting WHERE "
+                        f"waiting.application_name='{waiting_tag}' "
+                        "AND waiting.usename='aura_app_a' AND waiting.wait_event_type='Lock' "
+                        "AND EXISTS (SELECT FROM pg_stat_activity holder WHERE "
+                        "holder.pid=ANY(pg_blocking_pids(waiting.pid)) "
+                        f"AND holder.application_name='{tag}' AND holder.usename='aura_app_a');",
+                    )
+                    if blocked != "1":
+                        raise module.OperationError(
+                            "The second request is not waiting on the first row lock"
+                        )
+
+                module.retry(row_lock_is_waiting, 30)
+                rotation = executor.submit(db.rotate)
+
+                def new_requests_use_new_credentials():
+                    result = http("rotation-probe")
+                    if result != {"orm_user": "aura_app_b", "auth_user": "aura_app_b"}:
+                        raise module.OperationError("New request has not switched credentials")
+
+                try:
+                    module.retry(new_requests_use_new_credentials, 45)
+                    assert not rotation.done(), "Rotation revoked a login with a live request"
+                    assert not pending_request.done(), "Original request did not stay in progress"
+                    assert not waiting_request.done(), "Row-lock waiter did not stay in progress"
+                    row_lock_is_waiting()
+                    assert db.sql("db", "SELECT value FROM rotation_lock WHERE id=1;") == "0"
+                    assert (
+                        db.sql("db", "SELECT rolcanlogin FROM pg_roles WHERE rolname='aura_app_a';")
+                        == "t"
+                    )
+                    assert (
+                        db.sql(
+                            "db",
+                            "SELECT count(*) FROM pg_stat_activity WHERE "
+                            f"application_name='{tag}' AND usename='aura_app_a';",
+                        )
+                        == "2"
+                    )
+                    for _ in range(6):
+                        new_requests_use_new_credentials()
+                finally:
+                    db.dc(
+                        "exec",
+                        "-T",
+                        "api",
+                        "python",
+                        "-c",
+                        "from pathlib import Path; import sys; "
+                        "Path('/run/aura-db-runtime/release-' + sys.argv[1]).touch()",
+                        tag,
+                    )
+                response = pending_request.result(timeout=30)
+                assert response == {
+                    "orm_user": "aura_app_a",
+                    "auth_user": "aura_app_a",
+                    "committed": True,
+                }
+                assert waiting_request.result(timeout=30) == {
+                    "orm_user": "aura_app_a",
+                    "committed": True,
+                }
+                rotation.result(timeout=60)
+            assert db.wait_api_generation() == identity, "A container or app worker restarted"
+            for table in ("inflight_writes", "inflight_auth_writes"):
+                assert db.sql("db", f"SELECT count(*) FROM {table} WHERE tag='{tag}';") == "1"
+            assert (
+                db.sql("db", f"SELECT count(*) FROM inflight_writes WHERE tag='{waiting_tag}';")
+                == "1"
+            )
+            assert db.sql("db", "SELECT value FROM rotation_lock WHERE id=1;") == "2"
+            print(
+                "PASS: request running during rotation returned 200 and both writes committed "
+                "exactly once; new requests used new credentials; both worker identities unchanged",
+                flush=True,
+            )
+            print(
+                "PASS: a second HTTP write was blocked on the first request's PostgreSQL "
+                "row lock during rotation; both requests returned 200 after unlock; "
+                "each write committed once; the row counter advanced exactly twice",
+                flush=True,
+            )
             assert db.url_file.read_text().strip() != old_url
             assert db.replication_password() != old_replication
             assert (
@@ -184,17 +324,17 @@ asyncio.run(main())
 
             print("5/10 Recover failed and interrupted password cutovers", flush=True)
             stable = db.url_file.read_text()
-            real_restart = db.restart_api
+            real_wait = db.wait_api_generation
             calls = 0
 
-            def fail_once():
+            def fail_once(*args, **kwargs):
                 nonlocal calls
                 calls += 1
                 if calls == 1:
-                    raise module.OperationError("Injected API recreation failure")
-                real_restart()
+                    raise module.OperationError("Injected worker acknowledgement failure")
+                return real_wait(*args, **kwargs)
 
-            db.restart_api = fail_once
+            db.wait_api_generation = fail_once
             try:
                 db.rotate()
             except module.OperationError:
@@ -203,10 +343,10 @@ asyncio.run(main())
                 raise AssertionError("Injected failure did not happen")
             assert calls == 2 and db.url_file.read_text() == stable and not db.journal.exists()
 
-            def interrupted():
+            def interrupted(*args, **kwargs):
                 raise SystemExit("Injected process interruption")
 
-            db.restart_api = interrupted
+            db.wait_api_generation = interrupted
             try:
                 db.rotate()
             except SystemExit:
@@ -214,7 +354,7 @@ asyncio.run(main())
             assert db.journal.exists()
             cli("maintain")
             assert db.url_file.read_text() == stable and not db.journal.exists()
-            db.restart_api = real_restart
+            db.wait_api_generation = real_wait
             real_finish = db.finish_rotation
             db.finish_rotation = lambda record: interrupted()
             try:
