@@ -1,4 +1,4 @@
-"""Identity tables: customers, admins, coupons, logout blacklist, refresh tokens (db/schema.sql)."""
+"""Identity tables: customers, admins, coupons, logout blacklist, tokens (db/schema.sql)."""
 
 import uuid
 from datetime import datetime
@@ -134,3 +134,20 @@ class RefreshToken(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     access_jti: Mapped[uuid.UUID] = mapped_column(unique=True)
     access_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AdminSession(Base):
+    """An admin access token the verifier may accept (admins get no refresh token)."""
+
+    __tablename__ = "admin_sessions"
+    __table_args__ = (
+        CheckConstraint("expires_at > issued_at", name="expires"),
+        Index("admin_sessions_admin_id_idx", "admin_id"),
+        Index("admin_sessions_expires_at_idx", "expires_at"),
+    )
+
+    jti: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    admin_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("admins.id", ondelete="CASCADE"))
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

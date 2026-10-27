@@ -214,16 +214,26 @@ class PostgresAuthRepository:
             return True
         async with self._connection() as connection:
             # A consumed/expired Refresh row still tracks its independently valid Access.
+            # Admin access tokens (no refresh) are recorded in admin_sessions instead.
             cursor = await connection.execute(
-                """SELECT NOT EXISTS (
-                     SELECT 1 FROM refresh_tokens t
-                     JOIN auth_token_families f ON f.id = t.family_id
-                     JOIN users u ON u.id = f.user_id
-                     WHERE t.access_jti = %s AND t.access_expires_at > clock_timestamp()
-                       AND f.revoked_at IS NULL AND u.is_active
-                       AND NOT EXISTS (SELECT 1 FROM revoked_tokens r WHERE r.jti = t.access_jti)
+                """SELECT NOT (
+                     EXISTS (
+                       SELECT 1 FROM refresh_tokens t
+                       JOIN auth_token_families f ON f.id = t.family_id
+                       JOIN users u ON u.id = f.user_id
+                       WHERE t.access_jti = %s AND t.access_expires_at > clock_timestamp()
+                         AND f.revoked_at IS NULL AND u.is_active
+                         AND NOT EXISTS (SELECT 1 FROM revoked_tokens r WHERE r.jti = t.access_jti)
+                     )
+                     OR EXISTS (
+                       SELECT 1 FROM admin_sessions s
+                       JOIN admins a ON a.id = s.admin_id
+                       WHERE s.jti = %s AND s.expires_at > clock_timestamp()
+                         AND s.revoked_at IS NULL AND a.status = 'active'
+                         AND NOT EXISTS (SELECT 1 FROM revoked_tokens r WHERE r.jti = s.jti)
+                     )
                    ) AS revoked""",
-                (token_id,),
+                (token_id, token_id),
             )
             row = await cursor.fetchone()
         return row["revoked"] if row and type(row["revoked"]) is bool else True

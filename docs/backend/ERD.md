@@ -46,6 +46,7 @@ erDiagram
     admins ||--o{ stock_adjustments : "조정한 관리자"
     admins ||--o{ admin_audit_logs : "작업한 관리자"
     admins |o--o{ admins : "등록한 관리자(created_by)"
+    admins ||--o{ admin_sessions : "로그인"
 
     users {
         uuid id PK
@@ -96,6 +97,13 @@ erDiagram
         timestamptz revoked_at
         uuid access_jti UK
         timestamptz access_expires_at
+    }
+    admin_sessions {
+        uuid jti PK
+        uuid admin_id FK
+        timestamptz issued_at
+        timestamptz expires_at
+        timestamptz revoked_at
     }
     collections {
         varchar id PK
@@ -336,8 +344,18 @@ erDiagram
 | access_expires_at | TIMESTAMPTZ | NOT NULL, INDEX, CHECK > created_at                    | Access Token 만료                                       |
 |                   |             | UNIQUE(family_id) WHERE consumed_at·revoked_at IS NULL | 계열마다 쓸 수 있는 토큰은 1개                          |
 
-> 인증은 JWT로 결정했다(쿠키 값 = 서명된 JWT). 서버 세션 테이블은 두지 않는다. 비회원 식별값 `guestId`는 별도 비인증 방문자 쿠키에 두며 JWT·회원 인증에 사용하지 않는다.
-> Access Token은 저장하지 않고 검증한다(로그아웃은 `revoked_tokens`). Refresh Token은 재발급할 때마다 새것으로 바꾸고(회전), 이미 쓰인 토큰이 다시 오면 같은 계열 전체를 폐기한다. 관리자 Refresh는 범위 밖이다.
+**admin_sessions** — 관리자 Access Token 발급 기록 (마이그레이션 0003)
+
+| 컬럼       | 타입        | 제약                                   | 설명                   |
+| ---------- | ----------- | -------------------------------------- | ---------------------- |
+| jti        | UUID        | PK                                     | 관리자 토큰 고유 번호  |
+| admin_id   | UUID        | FK → admins (ON DELETE CASCADE), INDEX | 토큰 `sub`와 같아야 함 |
+| issued_at  | TIMESTAMPTZ | NOT NULL DEFAULT now()                 | 발급 시각              |
+| expires_at | TIMESTAMPTZ | NOT NULL, INDEX, CHECK > issued_at     | 만료 시각 (기본 1시간) |
+| revoked_at | TIMESTAMPTZ | NULL                                   | 로그아웃 시각          |
+
+> 인증은 JWT로 결정했다(쿠키 값 = 서명된 JWT). 비회원 식별값 `guestId`는 별도 비인증 방문자 쿠키에 두며 JWT·회원 인증에 사용하지 않는다.
+> 토큰 검증기는 **발급 기록이 있는 토큰만** 통과시킨다. 회원 Access Token은 `refresh_tokens.access_jti`, 관리자 Access Token은 `admin_sessions`에 기록되고, 로그아웃한 jti는 `revoked_tokens`에 들어간다. Refresh Token은 재발급할 때마다 새것으로 바꾸고(회전), 이미 쓰인 토큰이 다시 오면 같은 계열 전체를 폐기한다. 관리자는 Refresh 없이 Access Token만 받는다.
 
 ### 3.2 상품 (공용 카탈로그)
 

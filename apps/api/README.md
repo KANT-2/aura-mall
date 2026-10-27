@@ -39,7 +39,7 @@ aura_api/
     orders.py         # GET·POST /orders
     deps.py           # DB 세션, 로그인 회원 확인(토큰 sub = users.id)
     errors.py         # 도메인 규칙 위반 → 공통 오류 형식(code·message)
-    admin/            # /admin/**: 상품·재고(products.py), 주문·문의·현황(operations.py), 관리자 확인(deps.py)
+    admin/            # /admin/**: 로그인·세션·등록(auth.py), 상품·재고(products.py), 주문·문의·현황(operations.py), 관리자 확인(deps.py)
   services/           # 서비스 계층: 유스케이스·트랜잭션
     catalog.py        # 카탈로그 조회, 예전 상품 ID 별칭
     partner.py        # 입점 문의 검증·저장
@@ -47,15 +47,17 @@ aura_api/
     orders.py         # 주문 접수(가격·재고·쿠폰 한 트랜잭션)·주문 내역
     admin_products.py # 관리자 상품 수정(낙관적 잠금)·재고 조정(요청 키로 1회만)
     admin_operations.py # 관리자 주문 조회·문의 처리·현황
+    admin_auth.py     # 관리자 로그인(Access Token만)·로그아웃·관리자 등록
   domain/             # 도메인 계층: 순수 Python 업무 규칙 (영역별 파일, 관리자 입력 규칙은 admin.py)
   infra/              # 인프라 계층
     database.py       # SQLAlchemy Base·비동기 엔진·요청별 세션
     models/           # 영역별 ORM 모델 (__init__.py가 전체 등록)
     repositories/     # 영역별 조회·저장 (커밋하지 않음)
     seed.py           # db/seed.sql 적재 명령
+    create_admin.py   # 첫 관리자 생성 명령 (관리자가 없을 때만)
   core/               # 공통 모듈: 요청 ID·오류·인증·CSRF
 db/
-  schema.sql          # 최신 전체 구조, 테이블 23개 (0001 + 0002)
+  schema.sql          # 최신 전체 구조, 테이블 24개 (0001 + 0002 + 0003)
   seed.sql            # 상품·향료 초기 데이터 (generate_seed.py로 생성)
 migrations/           # Alembic 환경과 리비전
   sql/                # 리비전별 고정 SQL (0001 초기 구조, 0002 Refresh Token)
@@ -87,9 +89,11 @@ AURA_DATABASE_URL=postgresql+asyncpg://postgres:aura@127.0.0.1:5432/aura
 # 저장소 루트에서: 테이블 생성 → 초기 데이터
 uv run --directory apps/api --locked alembic upgrade head
 uv run --directory apps/api --locked python -m aura_api.infra.seed
+# 첫 관리자 (한 번만, 이후는 POST /admin/admins). 비밀번호는 AURA_ADMIN_PASSWORD 또는 입력
+uv run --directory apps/api --locked python -m aura_api.infra.create_admin --email admin@aura.com --name 운영자
 ```
 
-- 리비전은 `migrations/sql/`의 고정 SQL을 실행합니다(`0001` 초기 21개, `0002` Refresh Token·`users.is_active`). `db/schema.sql`은 둘을 합친 최신 전체 구조입니다.
+- 리비전은 `migrations/sql/`의 고정 SQL을 실행합니다(`0001` 초기 21개, `0002` Refresh Token·`users.is_active`, `0003` 관리자 토큰 `admin_sessions`). `db/schema.sql`은 모두 합친 최신 전체 구조입니다.
 - 스키마를 바꿀 때는 새 리비전 SQL·`schema.sql`·ORM 모델(`aura_api/infra/models/<영역>.py`)을 함께 수정하고, 이미 적용된 리비전 SQL은 고치지 않습니다. `tests/db`가 마이그레이션 결과와 `schema.sql` 결과를 각각 ORM 모델과 비교합니다.
 - DB 통합 테스트는 **지워도 되는 테스트 DB**에서만 실행합니다(모든 테이블을 삭제 후 다시 만듭니다). 설정하지 않으면 건너뜁니다.
 

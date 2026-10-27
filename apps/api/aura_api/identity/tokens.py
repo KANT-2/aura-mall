@@ -66,3 +66,45 @@ def issue_tokens(settings: Settings, user_id: UUID, family_id: UUID) -> IssuedTo
         refresh,
         hash_refresh_token(refresh),
     )
+
+
+ADMIN_PERMISSION = "admin"
+ADMIN_PRINCIPAL = "admin"
+
+
+@dataclass(frozen=True)
+class AdminAccess:
+    """An admin access token. Admins get no refresh token; the jti is recorded instead."""
+
+    admin_id: UUID
+    jti: UUID
+    issued_at: datetime
+    expires_at: datetime
+    access_token: str = field(repr=False)
+
+
+def issue_admin_access(settings: Settings, admin_id: UUID) -> AdminAccess:
+    """Same signer and registered claims as member tokens, plus the admin markers.
+
+    `principal_type` and `permissions` both say "admin" so member routes can refuse it.
+    """
+    if settings.jwt_signing_key is None:
+        raise ValueError("JWT issuance is not configured")
+    now = datetime.now(UTC).replace(microsecond=0)
+    expires = now + timedelta(seconds=settings.admin_access_ttl_seconds)
+    jti = uuid4()
+    token = jwt.encode(
+        {
+            "sub": str(admin_id),
+            "jti": str(jti),
+            "iat": int(now.timestamp()),
+            "exp": int(expires.timestamp()),
+            "iss": settings.jwt_issuer,
+            "aud": settings.jwt_audience,
+            "principal_type": ADMIN_PRINCIPAL,
+            "permissions": [ADMIN_PERMISSION],
+        },
+        settings.jwt_signing_key.get_secret_value(),
+        algorithm=settings.jwt_algorithm,
+    )
+    return AdminAccess(admin_id, jti, now, expires, token)
