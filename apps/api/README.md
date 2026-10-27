@@ -93,7 +93,7 @@ uv run --directory apps/api --locked python -m aura_api.infra.seed
 uv run --directory apps/api --locked python -m aura_api.infra.create_admin --email admin@aura.com --name 운영자
 ```
 
-- 리비전은 `migrations/sql/`의 고정 SQL을 실행합니다(`0001` 초기 21개, `0002` Refresh Token·`users.is_active`, `0003` 관리자 토큰 `admin_sessions`, `0004` 입점 문의 제한 조회 인덱스, `0005` 회원 탈퇴 유예·로그인 실패 제한, `0006` 주문 상태·상태 이력, `0007` 결제 시도 `payments`). `db/schema.sql`은 모두 합친 최신 전체 구조입니다.
+- 리비전은 `migrations/sql/`의 고정 SQL을 실행합니다(`0001` 초기 21개, `0002` Refresh Token·`users.is_active`, `0003` 관리자 토큰 `admin_sessions`, `0004` 입점 문의 제한 조회 인덱스, `0005` 회원 탈퇴 유예·로그인 실패 제한, `0006` 주문 상태·상태 이력, `0007` 결제 시도 `payments`, `0008` 결제 시도 `CANCELED`·미결제 주문 조회 인덱스). `db/schema.sql`은 모두 합친 최신 전체 구조입니다.
 - 스키마를 바꿀 때는 새 리비전 SQL·`schema.sql`·ORM 모델(`aura_api/infra/models/<영역>.py`)을 함께 수정하고, 이미 적용된 리비전 SQL은 고치지 않습니다. `tests/db`가 마이그레이션 결과와 `schema.sql` 결과를 각각 ORM 모델과 비교합니다.
 - DB 통합 테스트는 **지워도 되는 테스트 DB**에서만 실행합니다(모든 테이블을 삭제 후 다시 만듭니다). 설정하지 않으면 건너뜁니다.
 
