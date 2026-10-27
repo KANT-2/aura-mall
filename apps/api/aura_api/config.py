@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -20,12 +21,26 @@ class Settings(BaseSettings):
     jwt_issuer: str | None = None
     jwt_audience: str | None = None
     database_url: SecretStr | None = None
+    database_url_file: Path | None = None
     jwt_access_ttl_seconds: int = Field(default=900, ge=1, le=86400)
     refresh_token_ttl_seconds: int = Field(default=604800, ge=1, le=7776000)
     # Admins get no refresh token, so their access token lives a little longer.
     admin_access_ttl_seconds: int = Field(default=3600, ge=1, le=86400)
     csrf_allowed_origins: list[str] = Field(default_factory=list)
     bff_shared_key: SecretStr | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def prefer_database_secret_file(cls, values):
+        if isinstance(values, dict) and values.get("database_url_file"):
+            if values.get("database_url") == "":
+                return {**values, "database_url": None}
+        return values
+
+    @field_validator("database_url_file", mode="before")
+    @classmethod
+    def empty_database_setting(cls, value):
+        return None if value == "" else value
 
     @field_validator("database_url")
     @classmethod
@@ -41,6 +56,20 @@ class Settings(BaseSettings):
             if parts.port is not None and not 1 <= parts.port <= 65535:
                 raise ValueError("Invalid PostgreSQL port")
         return value
+
+    @model_validator(mode="after")
+    def read_database_secret(self):
+        if self.database_url_file is not None:
+            if self.database_url is not None:
+                raise ValueError("Configure only one database URL source")
+            try:
+                value = self.database_url_file.read_text(encoding="utf-8").strip()
+                if not value:
+                    raise ValueError("Empty database secret")
+                self.database_url = self.validate_database_url(SecretStr(value))
+            except (OSError, ValueError):
+                raise ValueError("Cannot load a valid PostgreSQL database secret") from None
+        return self
 
     @model_validator(mode="after")
     def validate_jwt_configuration(self):

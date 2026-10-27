@@ -82,19 +82,27 @@ jobs:
           git pull --ff-only origin develop
 
           echo "Validating Compose configuration..."
-          docker compose config --quiet
+          compose_args=(-f compose.yaml)
+          if test -f .db-ops/client/database-url; then
+            compose_args+=(-f compose.database.yaml)
+          fi
+          docker compose "${compose_args[@]}" config --quiet
 
           echo "Building and deploying AURA API..."
-          docker compose up -d --build --no-deps api
+          if test -f .db-ops/client/database-url; then
+            python3 ops/database.py deploy-api
+          else
+            docker compose "${compose_args[@]}" up -d --build --no-deps api
+          fi
 
           echo "Checking AURA API..."
-          docker compose ps api
+          docker compose "${compose_args[@]}" ps api
 
           echo "Waiting for AURA API health check..."
 
           healthy=false
           for attempt in $(seq 1 12); do
-            if docker compose exec -T api python -c \
+            if docker compose "${compose_args[@]}" exec -T api python -c \
               "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read().decode())"; then
               healthy=true
               break
