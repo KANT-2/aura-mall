@@ -24,6 +24,7 @@ def main():
         "AURA_CADDY_NETWORK": network,
         "AURA_API_PROXY_URL": "http://caddy:8080",
         "AURA_API_REPLICAS": "2",
+        "AURA_WEB_REPLICAS": "2",
     }
     network_ids = subprocess.check_output(["docker", "network", "ls", "-q"], text=True).split()
     networks = json.loads(subprocess.check_output(["docker", "network", "inspect", *network_ids]))
@@ -52,7 +53,6 @@ def main():
     with tempfile.TemporaryDirectory(prefix=project + "-") as temporary:
         root = Path(temporary)
         shutil.copy2(SOURCE / "compose.lb.yaml", root / "compose.lb.yaml")
-        shutil.copy2(SOURCE / "compose.web2.yaml", root / "compose.web2.yaml")
         shutil.copy2(SOURCE / "compose.yaml", root / "compose.production.yaml")
         shutil.copy2(SOURCE / "ops/fixtures/proxy_backend.py", root / "server.py")
         # The public test listener uses HTTP on a random localhost port; no ACME or
@@ -112,13 +112,6 @@ networks:
       config:
         - subnet: ${AURA_TEST_PRIVATE_SUBNET}
 """)
-        (root / "fixture.web2.yaml").write_text("""services:
-  web2:
-    image: python:3.12-slim
-    command: [python, -u, /fixture/server.py]
-    environment: {ROLE: web, PORT: '3000'}
-    volumes: ['./server.py:/fixture/server.py:ro']
-""")
 
         def run(*args, check=True):
             result = subprocess.run(
@@ -139,10 +132,6 @@ networks:
             root / "fixture.yaml",
             "-f",
             root / "compose.lb.yaml",
-            "-f",
-            root / "compose.web2.yaml",
-            "-f",
-            root / "fixture.web2.yaml",
         ]
 
         def dc(*args, **kwargs):
@@ -170,19 +159,18 @@ networks:
                     root / "compose.production.yaml",
                     "-f",
                     root / "compose.lb.yaml",
-                    "-f",
-                    root / "compose.web2.yaml",
                     "config",
                     "--format",
                     "json",
                 ).stdout
             )
-            assert set(production["services"]) == {"api", "web", "web2", "db"}
-            for service in ("web", "web2"):
-                settings = production["services"][service]
-                assert not settings.get("ports")
-                assert settings["environment"]["API_URL"] == "http://caddy:8080"
-                assert settings["networks"]["caddy"]["aliases"] == ["aura-web"]
+            assert set(production["services"]) == {"api", "web", "db"}
+            for service in ("api", "web"):
+                assert production["services"][service]["deploy"]["replicas"] == 2
+            web = production["services"]["web"]
+            assert not web.get("ports")
+            assert web["environment"]["API_URL"] == "http://caddy:8080"
+            assert web["networks"]["caddy"]["aliases"] == ["aura-web"]
             assert set(production["services"]["db"]["networks"]) == {"aura-internal"}
             print(
                 "PASS: app Compose starts no proxy; Next.js has no host port; DB remains private",
@@ -221,7 +209,7 @@ networks:
                 "--adapter",
                 "caddyfile",
             )
-            dc("up", "-d", "--scale", "api=2", "api", "web", "web2", "edge")
+            dc("up", "-d", "api", "web", "edge")
             edge = dc("ps", "-q", "edge").stdout.strip()
             port = dc("port", "edge", "8081").stdout.strip().rsplit(":", 1)[1]
             address = f"http://127.0.0.1:{port}"
@@ -284,16 +272,22 @@ networks:
                 dc("up", "-d", "--scale", f"api={count}", "api")
                 eventually(lambda count=count: balanced(count))
                 assert dc("ps", "-q", "edge").stdout.strip() == edge
-            dc("stop", "web2")
+            web_containers = dc("ps", "-q", "web").stdout.split()
+            assert len(web_containers) == 2
+            run("docker", "stop", web_containers[0])
             eventually(lambda: balanced(1, web_count=1))
             assert dc("ps", "-q", "edge").stdout.strip() == edge
             print(
                 "PASS: one Next/BFF instance can stop while the other serves requests", flush=True
             )
-            dc("stop", "api", "web", "web2")
+            for count in (3, 1):
+                dc("up", "-d", "--scale", f"web={count}", "web")
+                eventually(lambda count=count: balanced(1, web_count=count))
+                assert dc("ps", "-q", "edge").stdout.strip() == edge
+            dc("stop", "api", "web")
             assert dc("ps", "--status", "running", "-q", "edge").stdout.strip() == edge
             print(
-                "PASS: scale 2 -> 3 -> 1 without restarting Caddy; "
+                "PASS: API and web scale 2 -> 3 -> 1 without restarting Caddy; "
                 "app stop leaves shared Caddy running",
                 flush=True,
             )
