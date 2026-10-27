@@ -1,4 +1,4 @@
-"""Order routes (BFF contract): GET /orders and POST /orders. Members only."""
+"""Order routes (BFF contract): GET /orders, POST /orders and cancellation. Members only."""
 
 import uuid
 from datetime import datetime
@@ -159,3 +159,14 @@ async def place_order(
     if not created:
         response.status_code = 200  # same key sent again: the original order, nothing new
     return order_out(order)
+
+
+@router.post(
+    "/{order_id}/cancel",
+    response_model=OrderOut,
+    response_model_exclude_unset=True,
+    responses={code: {"model": ErrorResponse} for code in (401, 404, 409)},
+    summary="미결제 주문 취소 (재고·쿠폰 복구)",
+)
+async def cancel_order(order_id: str, member_id: Member, session: Session) -> OrderOut:
+    return order_out(await service.cancel_order(session, member_id, order_id))

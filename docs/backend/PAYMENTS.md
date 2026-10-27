@@ -64,16 +64,12 @@ uv run --directory apps/api python -m aura_api.infra.reconcile_payments --older-
 15일간 유효하고, 결제 인증 후 10분 안에 승인하지 않으면 PG에서 만료되어 실패로 확정됩니다. 확인 중인
 건이 남으면 종료 코드 1입니다. 실행 주기(예: 5분)는 배포 환경에 등록해야 합니다.
 
-## 재고·쿠폰 (현재 구조와 필요한 변경)
+## 재고·쿠폰과 주문 취소
 
-주문 접수 시 재고 차감과 쿠폰 사용이 이미 끝납니다. 따라서 결제 실패나 장시간 미결제 주문은
-재고와 쿠폰을 계속 점유합니다. 이번 PR은 이 동작을 바꾸지 않았습니다. 다음 주문 취소 PR에서 처리합니다.
-
-- 미결제 `received` 주문을 일정 시간(예: 30분) 뒤 자동 취소하고, 주문 항목·Gift Set 구성으로 차감한
-  재고를 되돌리고 쿠폰을 `AVAILABLE`로 복구합니다. 한 트랜잭션에서 `change_status(..., "cancelled")`와 함께 처리합니다.
-- 자동 취소 전에 그 주문의 `IN_PROGRESS` 결제를 먼저 재확인합니다. 진행 중인 결제가 있는 주문은 취소하지 않습니다.
-  늦게 승인되면 `ORDER_NOT_PAYABLE` 검토 대상이 되므로 이 순서가 필요합니다.
-- 쿠폰 복구 시 회원 탈퇴 예약 삭제의 쿠폰 보존 조건(`used_order_id`, 주문 참조)과 맞춰야 합니다.
+주문 접수 시 재고 차감과 쿠폰 사용이 끝나므로, 결제하지 않은 주문은 취소될 때까지 재고와 쿠폰을
+점유합니다. 회원 취소와 미결제 만료 작업이 이를 되돌립니다(마이그레이션 0008,
+[주문 취소 문서](ORDER_CANCELLATION.md)). 취소된 주문의 `READY` 결제 시도는 `CANCELED`가 되어 이후
+승인 요청은 409 `PAYMENT_CLOSED`입니다. `IN_PROGRESS` 결제가 있는 주문은 취소하지 않습니다.
 
 ## 보안
 
@@ -91,10 +87,50 @@ uv run --directory apps/api python -m aura_api.infra.reconcile_payments --older-
 | `AURA_PAYMENT_TIMEOUT_SECONDS` | 기본 30, 최대 60                                                      |
 | 웹                             | 테스트 클라이언트 키, 결제창 SDK, successUrl·failUrl 페이지, BFF 경로 |
 
+## 토스 테스트 결제 흐름 로컬 검증
+
+실제 토스 테스트 환경(실제 청구 없음)으로 승인까지 확인하는 최소 화면이 있습니다. 개발·검증용이며
+`/payments/test`는 색인에서 제외됩니다.
+
+| 경로                | 역할                                                                        |
+| ------------------- | --------------------------------------------------------------------------- |
+| `/payments/test`    | 로그인한 회원이 테스트 주문을 만들고 결제를 발급해 토스 결제위젯으로 결제   |
+| `/payments/success` | 토스가 돌려보낸 `paymentKey`·`orderId`·`amount`를 서버 승인 API로 전달·표시 |
+| `/payments/fail`    | 토스가 돌려보낸 오류 코드·메시지 표시. 결제 완료로 기록하지 않음            |
+
+BFF는 `POST /api/payments`, `POST /api/payments/confirm`, `GET /api/payments/{id}`를 FastAPI로 전달하며
+본문은 허용한 필드만 보냅니다. 결제위젯 SDK는 `https://js.tosspayments.com/v2/standard`입니다.
+
+로컬 실행에 필요한 설정(값은 저장소·로그·커밋에 넣지 않습니다):
+
+- FastAPI: `AURA_PAYMENT_PROVIDER=toss`, `AURA_TOSS_SECRET_KEY`(테스트 시크릿 키), DB·JWT 설정,
+  `AURA_BFF_SHARED_KEY`, `AURA_CSRF_ALLOWED_ORIGINS`
+- Next: `NEXT_PUBLIC_TOSS_CLIENT_KEY`(테스트 클라이언트 키, `.env.local`), `API_URL`, `API_PREFIX=/api/v1`,
+  `API_AUTH_MODE=jwt`, `API_BFF_SHARED_KEY`(FastAPI와 같은 값), `APP_ORIGIN`
+- `API_BFF_SHARED_KEY`가 없으면 FastAPI가 BFF 요청을 403으로 거절합니다.
+- 결제위젯 테스트 환경은 결제수단 선택 후 휴대폰 번호와 테스트 비밀번호(위젯 화면에 표시)를 안내합니다.
+
+2026-10-27 일회용 DB와 로컬 서버로 실제 토스 테스트 API를 호출해 확인한 결과입니다.
+
+| 확인 항목                        | 결과                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------- |
+| 위젯 결제 → 성공 URL → 서버 승인 | 결제 `DONE`(계좌이체, 31,000원), 주문 `paid`, 상태 이력 `system` 기록     |
+| 같은 확인 요청 재전송            | 200 `DONE`, 두 번째 승인 없음                                             |
+| 금액 100원·31,001원으로 확인     | 400 `PAYMENT_AMOUNT_MISMATCH`                                             |
+| 결제 완료 주문에 다른 paymentKey | 409 `ORDER_ALREADY_PAID`                                                  |
+| 미결제 주문에 변조 금액          | 400, PG 호출 없음                                                         |
+| 위조 paymentKey + 올바른 금액    | 토스가 거절(`NOT_FOUND_PAYMENT_SESSION`) → 결제 `FAILED`, 주문 `received` |
+| 존재하지 않는 결제 조회·승인     | `NOT_FOUND_PAYMENT`·`NOT_FOUND_PAYMENT_SESSION`으로 매핑                  |
+| 잘못된 시크릿 키                 | 401 `UNAUTHORIZED_KEY`(결제 실패가 아닌 인증 오류)                        |
+| 승인된 결제의 토스 조회          | 상태·금액·주문번호·paymentKey가 우리 기록과 일치                          |
+
+이 결과는 토스 **테스트** 환경 검증입니다. 운영 키·실결제는 검증하지 않았습니다. 타임아웃·승인 후 DB
+오류 복구와 동시 승인은 PG를 흉내 낸 테스트(Fake PG)로만 검증했고, 실제 토스에서는 재현하지 않았습니다.
+
 ## 남은 결제 개발
 
-1. BFF 경로(`/api/payments*`)와 결제창·성공/실패 페이지
-2. 주문 취소와 미결제 주문 자동 취소, 재고·쿠폰 복구
+1. ~~BFF 경로와 결제창·성공/실패 페이지~~ (최소 테스트 화면 구현. 상품·주문 화면과 연결하는 정식 결제 화면은 남음)
+2. ~~주문 취소와 미결제 주문 자동 취소, 재고·쿠폰 복구~~ (0008에서 구현, 만료 시간 정책과 스케줄 등록은 남음)
 3. 결제 취소·환불 API(토스 `POST /v1/payments/{paymentKey}/cancel`, 멱등키 사용)와 `review_reason` 건 처리
 4. 재확인 작업 스케줄 등록과 관리자 화면의 결제 정보·검토 대상 표시
 5. 웹훅 수신(가상계좌 입금 등)과 라이브 키 전환 승인 절차

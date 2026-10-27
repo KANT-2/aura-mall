@@ -27,7 +27,11 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 with urllib.request.urlopen(request, timeout=15) as response:
                     result = json.load(response)
-                result.update(via_web=True, public_host=self.headers.get("Host"))
+                result.update(
+                    via_web=True,
+                    web_backend=socket.gethostname(),
+                    public_host=self.headers.get("Host"),
+                )
                 status = 200
             except urllib.error.HTTPError as error:
                 result, status = {"error": "upstream_error"}, error.code

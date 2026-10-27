@@ -3,7 +3,7 @@
 서버에서 이미 실행 중인 공용 Caddy를 재사용합니다. AURA Compose는 Next.js·FastAPI·PostgreSQL만 실행하며 프록시 컨테이너나 인증서 저장소를 추가하지 않습니다.
 
 ```text
-브라우저 ──HTTPS──▶ 기존 Caddy ──▶ Next.js :3000
+브라우저 ──HTTPS──▶ 기존 Caddy ──▶ Next.js 1 / Next.js 2 :3000
                                     │ BFF
                                     ▼
                              기존 Caddy :8080
@@ -41,24 +41,24 @@ docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adap
 docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
 ```
 
-파일을 bind mount로 사용하는 경우 기존 파일을 제자리에서 수정합니다. 호스트에서 원자 교체하면 컨테이너가 이전 파일을 계속 볼 수 있습니다. Caddy 컨테이너·80/443 매핑·인증서 볼륨은 유지합니다. 내부 API 리스너는 Docker DNS의 `aura-api` 별칭을 조회하므로 API 증감에 맞춰 설정을 다시 쓰거나 Caddy를 재시작할 필요가 없습니다. Next.js에는 `aura-web` 별칭을 사용합니다.
+파일을 bind mount로 사용하는 경우 기존 파일을 제자리에서 수정합니다. 호스트에서 원자 교체하면 컨테이너가 이전 파일을 계속 볼 수 있습니다. Caddy 컨테이너·80/443 매핑·인증서 볼륨은 유지합니다. 내부 API 리스너는 Docker DNS의 `aura-api` 별칭을 조회하므로 API 증감에 맞춰 설정을 다시 쓰거나 Caddy를 재시작할 필요가 없습니다. Next.js 두 인스턴스도 `aura-web` 별칭을 공유하여 분산합니다.
 
 ## 앱 시작과 배포
 
 ```sh
 docker network inspect caddy
-docker compose -f compose.yaml -f compose.lb.yaml config --quiet
-docker compose -f compose.yaml -f compose.lb.yaml up -d --build
+docker compose -f compose.yaml -f compose.lb.yaml -f compose.web2.yaml config --quiet
+docker compose -f compose.yaml -f compose.lb.yaml -f compose.web2.yaml up -d --build
 ```
 
-DB 보안 구성을 사용하면 `compose.database.yaml`도 함께 지정합니다.
+`compose.web2.yaml`은 첫 번째 웹에서 빌드한 `aura-web` 이미지를 재사용합니다. Next.js 한 개만 실행하려면 이 파일을 생략합니다. DB 보안 구성을 사용하면 `compose.database.yaml`도 함께 지정합니다.
 
 ```sh
-docker compose -f compose.yaml -f compose.database.yaml -f compose.lb.yaml up -d --build
+docker compose -f compose.yaml -f compose.database.yaml -f compose.lb.yaml -f compose.web2.yaml up -d --build
 python3 ops/database.py status
 ```
 
-API 수는 `.env`의 `AURA_API_REPLICAS`로 관리합니다. CD와 DB 운영 도구는 `compose.lb.yaml`이 있으면 함께 사용하여 다음 API 배포에서 공유 네트워크와 복제 수가 사라지지 않도록 합니다. CD는 웹의 네트워크·API 연결 주소·포트 변경도 반영합니다. 최초 연결 전환에는 웹 컨테이너 재생성이 필요할 수 있습니다. 정기 DB 비밀번호 회전은 앱 재시작 없이 수행합니다.
+API 수는 `.env`의 `AURA_API_REPLICAS`로 관리합니다. CD와 DB 운영 도구는 `compose.lb.yaml`이 있으면 함께 사용하여 다음 API 배포에서 공유 네트워크와 복제 수가 사라지지 않도록 합니다. CD는 DB 백업·마이그레이션 후 API와 두 Next.js를 배포하고, 설정한 API 수와 두 웹의 상태를 확인합니다. 최초 연결 전환에는 웹 컨테이너 재생성이 필요할 수 있습니다. 정기 DB 비밀번호 회전은 앱 재시작 없이 수행합니다. 초기 카탈로그 적재는 자동 실행하지 않습니다.
 
 내부 Caddy는 TCP 연결 실패 시 다른 API로 연결할 수 있습니다. 연결 후 응답이 끊긴 요청의 재시도는 GET·HEAD·OPTIONS로 제한하여 처리된 POST 쓰기를 다시 보내지 않습니다. 진행 중인 응답에 별도의 짧은 제한 시간을 추가하지 않습니다.
 
@@ -68,4 +68,4 @@ API 수는 `.env`의 `AURA_API_REPLICAS`로 관리합니다. CD와 DB 운영 도
 python3 ops/test_caddy.py
 ```
 
-검증은 별도 임시 네트워크·컨테이너에서 실행합니다. 실제 공용 Caddy와 운영 앱을 변경하지 않습니다. 운영 Compose에 추가 프록시가 없고 웹의 직접 호스트 포트와 DB의 공용 네트워크 연결이 없는지 확인합니다. 테스트용 공용 Caddy 하나를 재사용해 `브라우저 → Caddy → 웹/BFF → 같은 Caddy → API` 경로, API 2개 분산과 3개·1개 증감, Caddy 비재시작, POST 처리 후 연결이 끊겨도 쓰기가 한 번만 발생하는지를 검사합니다. CI에서도 동일하게 실행합니다.
+검증은 별도 임시 네트워크·컨테이너에서 실행합니다. 실제 공용 Caddy와 운영 앱을 변경하지 않습니다. 운영 Compose에 추가 프록시가 없고 두 웹의 직접 호스트 포트와 DB의 공용 네트워크 연결이 없는지 확인합니다. 테스트용 공용 Caddy 하나를 재사용해 `브라우저 → Caddy → 웹/BFF → 같은 Caddy → API` 경로, 두 웹과 API 2개 분산 및 API 3개·1개 증감, Caddy 비재시작, POST 처리 후 연결이 끊겨도 쓰기가 한 번만 발생하는지를 검사합니다. CI에서도 동일하게 실행합니다.

@@ -42,6 +42,21 @@ async def open_payment(session: AsyncSession, order_id: uuid.UUID) -> Payment | 
     )
 
 
+async def orders_with_payment(
+    session: AsyncSession, order_ids: list[uuid.UUID], statuses: tuple[str, ...]
+) -> set[uuid.UUID]:
+    """Which of these orders have a payment attempt in one of `statuses` (read only)."""
+    if not order_ids:
+        return set()
+    return set(
+        await session.scalars(
+            select(Payment.order_id).where(
+                Payment.order_id.in_(order_ids), Payment.status.in_(statuses)
+            )
+        )
+    )
+
+
 async def member_payment(
     session: AsyncSession,
     member_id: uuid.UUID,

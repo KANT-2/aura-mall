@@ -52,6 +52,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix=project + "-") as temporary:
         root = Path(temporary)
         shutil.copy2(SOURCE / "compose.lb.yaml", root / "compose.lb.yaml")
+        shutil.copy2(SOURCE / "compose.web2.yaml", root / "compose.web2.yaml")
         shutil.copy2(SOURCE / "compose.yaml", root / "compose.production.yaml")
         shutil.copy2(SOURCE / "ops/fixtures/proxy_backend.py", root / "server.py")
         # The public test listener uses HTTP on a random localhost port; no ACME or
@@ -111,6 +112,13 @@ networks:
       config:
         - subnet: ${AURA_TEST_PRIVATE_SUBNET}
 """)
+        (root / "fixture.web2.yaml").write_text("""services:
+  web2:
+    image: python:3.12-slim
+    command: [python, -u, /fixture/server.py]
+    environment: {ROLE: web, PORT: '3000'}
+    volumes: ['./server.py:/fixture/server.py:ro']
+""")
 
         def run(*args, check=True):
             result = subprocess.run(
@@ -131,6 +139,10 @@ networks:
             root / "fixture.yaml",
             "-f",
             root / "compose.lb.yaml",
+            "-f",
+            root / "compose.web2.yaml",
+            "-f",
+            root / "fixture.web2.yaml",
         ]
 
         def dc(*args, **kwargs):
@@ -158,14 +170,19 @@ networks:
                     root / "compose.production.yaml",
                     "-f",
                     root / "compose.lb.yaml",
+                    "-f",
+                    root / "compose.web2.yaml",
                     "config",
                     "--format",
                     "json",
                 ).stdout
             )
-            assert set(production["services"]) == {"api", "web", "db"}
-            assert not production["services"]["web"].get("ports")
-            assert production["services"]["web"]["environment"]["API_URL"] == "http://caddy:8080"
+            assert set(production["services"]) == {"api", "web", "web2", "db"}
+            for service in ("web", "web2"):
+                settings = production["services"][service]
+                assert not settings.get("ports")
+                assert settings["environment"]["API_URL"] == "http://caddy:8080"
+                assert settings["networks"]["caddy"]["aliases"] == ["aura-web"]
             assert set(production["services"]["db"]["networks"]) == {"aura-internal"}
             print(
                 "PASS: app Compose starts no proxy; Next.js has no host port; DB remains private",
@@ -204,7 +221,7 @@ networks:
                 "--adapter",
                 "caddyfile",
             )
-            dc("up", "-d", "--scale", "api=2", "api", "web", "edge")
+            dc("up", "-d", "--scale", "api=2", "api", "web", "web2", "edge")
             edge = dc("ps", "-q", "edge").stdout.strip()
             port = dc("port", "edge", "8081").stdout.strip().rsplit(":", 1)[1]
             address = f"http://127.0.0.1:{port}"
@@ -226,10 +243,12 @@ networks:
                     for reply in replies
                 )
                 assert len({reply["backend"] for reply in replies}) == count
+                assert len({reply["web_backend"] for reply in replies}) == 2
 
             eventually(lambda: balanced(2))
             print(
-                "PASS: browser -> shared Caddy -> Next/BFF -> same Caddy -> two API replicas",
+                "PASS: browser -> shared Caddy -> two Next/BFF instances -> "
+                "same Caddy -> two API replicas",
                 flush=True,
             )
 
@@ -265,7 +284,7 @@ networks:
                 dc("up", "-d", "--scale", f"api={count}", "api")
                 eventually(lambda count=count: balanced(count))
                 assert dc("ps", "-q", "edge").stdout.strip() == edge
-            dc("stop", "api", "web")
+            dc("stop", "api", "web", "web2")
             assert dc("ps", "--status", "running", "-q", "edge").stdout.strip() == edge
             print(
                 "PASS: scale 2 -> 3 -> 1 without restarting Caddy; "
