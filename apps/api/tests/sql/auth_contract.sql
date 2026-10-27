@@ -8,7 +8,8 @@ CREATE TABLE users (
     marketing boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX users_email_test_unique ON users (lower(email));
+ALTER TABLE users ADD COLUMN deactivated_at timestamptz;
+CREATE UNIQUE INDEX users_email_test_unique ON users (lower(email)) WHERE deactivated_at IS NULL;
 CREATE TABLE revoked_tokens (jti uuid PRIMARY KEY, expires_at timestamptz NOT NULL);
 CREATE INDEX revoked_expiry_test ON revoked_tokens (expires_at);
 -- Everything below is a pending extension, NOT part of merged PR #33.

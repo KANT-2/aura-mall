@@ -1,13 +1,13 @@
 import { test, expect } from "./fixtures/test";
-import { seedLocalCart } from "./fixtures/api";
+import { currentCartKey, seedLocalCart } from "./fixtures/api";
 import { randomUUID } from "node:crypto";
 import { routes } from "./fixtures/data";
 import { testIds } from "@/lib/test-ids";
-import { CART_STORAGE_KEY } from "@/features/cart/storage/cart-storage";
+import { cartStorageKey } from "@/features/cart/storage/cart-storage";
 
 const single = [{ product: { id: "fresh-hand-cream" }, quantity: 2 }];
 
-test("local cart survives authentication and reload without cart API calls", async ({
+test("guest and member carts stay separate across sign-in and sign-out, without cart API calls", async ({
   page,
   account,
   storefront,
@@ -27,27 +27,33 @@ test("local cart survives authentication and reload without cart API calls", asy
   await page.request.post("/api/auth/logout");
   await page.goto("/shop/fresh-hand-cream");
   await storefront.addToCart.click();
-  await expect(page.getByTestId(testIds.navigation.cart)).toHaveAttribute(
-    "aria-label",
-    "장바구니 1개",
-  );
   await account.openCart();
   await expect(account.cartItems).toHaveCount(1);
   await expect(account.firstProductLink).toHaveAttribute("href", "/shop/fresh-hand-cream");
+  // The guest cart is never adopted by a member who signs in.
   await account.signIn(credentials, routes.cart);
+  await expect(account.cartItems).toHaveCount(0);
+  await page.goto("/shop/fresh-hand-cream");
+  await storefront.addToCart.click();
+  await account.openCart();
   await expect(account.cartItems).toHaveCount(1);
-  await expect(account.firstProductLink).toHaveAttribute("href", "/shop/fresh-hand-cream");
+  const memberKey = await currentCartKey(page);
+  expect(memberKey).not.toBe(cartStorageKey("guest"));
   await account.signOut();
   await account.openCart();
-  await expect(account.cartItems).toHaveCount(1);
+  await expect(account.cartItems).toHaveCount(1); // the guest's own cart
   await page.reload();
   await expect(account.cartItems).toHaveCount(1);
   const stored = await page.evaluate(
     (key) => JSON.parse(localStorage.getItem(key)!),
-    CART_STORAGE_KEY,
+    cartStorageKey("guest"),
   );
   expect(stored[0].product).toEqual({ id: "fresh-hand-cream" });
   expect(stored[0]).not.toHaveProperty("unitPrice");
+  // Signing in again finds the member's own cart untouched.
+  await account.signIn(credentials, routes.cart);
+  await expect(account.cartItems).toHaveCount(1);
+  expect(await currentCartKey(page)).toBe(memberKey);
   expect(cartRequests).toEqual([]);
 });
 
@@ -105,7 +111,7 @@ test("corrupt local data is recoverable and does not overwrite valid selections 
   storefront,
 }) => {
   await seedLocalCart(page, single);
-  await page.evaluate((key) => localStorage.setItem(key, "{invalid"), CART_STORAGE_KEY);
+  await page.evaluate((key) => localStorage.setItem(key, "{invalid"), await currentCartKey(page));
   await page.goto(routes.cart);
   await expect(page.getByRole("heading", { name: "아직 담은 향이 없어요." })).toBeVisible();
   await page.goto("/shop/fresh-hand-cream");
@@ -129,7 +135,7 @@ test("blocked storage reports failure without confirming an unsaved item", async
 
       return original.call(this, name, value);
     };
-  }, CART_STORAGE_KEY);
+  }, cartStorageKey("guest"));
   await page.goto("/shop/fresh-hand-cream");
   await storefront.addToCart.click();
   await expect(

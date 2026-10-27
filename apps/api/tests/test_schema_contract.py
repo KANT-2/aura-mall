@@ -56,6 +56,7 @@ def extension_metadata():
             "table_name": "users",
             "columns": [None],
             "expression": "lower((email)::text)",
+            "predicate": "(deactivated_at IS NULL)",
             "key_count": 1,
         },
         {
@@ -121,7 +122,8 @@ def test_merged_base_is_compatible_but_required_extension_is_missing():
     assert not any(
         gap.startswith("revoked_tokens:") or gap.startswith("revoked_tokens.") for gap in gaps
     )
-    assert not any("users.email" in gap or "users.password_hash" in gap for gap in gaps)
+    assert not any("users.password_hash" in gap for gap in gaps)
+    assert "users.email: missing non-deactivated lower(email) unique index" in gaps
 
 
 def test_pending_extension_passes_structural_guard_without_assuming_approval():

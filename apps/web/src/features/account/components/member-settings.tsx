@@ -11,6 +11,7 @@ import {
 import type { AccountState, Member } from "@/features/account/model/account";
 import { useNotify } from "@/components/feedback/notification-provider";
 import styles from "@/features/account/components/account.module.css";
+import { removeMemberCart } from "@/features/cart/storage/cart-storage";
 
 export function MemberSettings({ member }: { member: Member }) {
   const client = useQueryClient();
@@ -67,6 +68,11 @@ export function MemberSettings({ member }: { member: Member }) {
           await changePassword(member.id, current, next);
         } else {
           await deactivateAccount(member.id, deactivationPassword);
+          if (!removeMemberCart(member.id)) {
+            notify(
+              "계정 사용 중지는 완료됐지만 장바구니를 정리하지 못했어요. 브라우저 저장 공간을 확인해 주세요.",
+            );
+          }
         }
 
         notify(
@@ -147,11 +153,10 @@ export function MemberSettings({ member }: { member: Member }) {
         </fieldset>
       </form>
       <h2>계정 사용 중지</h2>
-      <p>이 브라우저의 장바구니는 유지됩니다.</p>
+      <p>계정 사용 중지가 완료되면 이 회원의 장바구니만 삭제됩니다.</p>
       <p>
-        30일 안에 같은 이메일과 비밀번호로 로그인하면 계정과 저장 레시피·쿠폰이 복구됩니다. 30일이
-        지나면 복구할 수 없으며 회원 정보와 레시피·미사용 쿠폰은 삭제 대상이 됩니다. 주문 기록은
-        보존하며 이 안내는 개인정보 완전 파기를 의미하지 않습니다.
+        계정은 복구할 수 없습니다. 같은 이메일로 새로 가입할 수 있지만 이전 주문·쿠폰·레시피는
+        연결되지 않습니다. 거래 기록은 보존하며 이 안내는 개인정보 완전 파기를 의미하지 않습니다.
       </p>
       <form onSubmit={(event) => void submit(event, "deactivate")}>
         <fieldset disabled={pending}>

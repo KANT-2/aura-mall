@@ -321,18 +321,19 @@ erDiagram
 
 **users** — 회원
 
-| 컬럼                  | 타입         | 제약                         | 설명                                     |
-| --------------------- | ------------ | ---------------------------- | ---------------------------------------- |
-| id                    | UUID         | PK                           | 회원 ID (`Member.id`)                    |
-| email                 | VARCHAR(254) | NOT NULL, UK(`lower(email)`) | 소문자로 저장, 대소문자 무관 중복 금지   |
-| name                  | VARCHAR(100) | NOT NULL                     | 이름                                     |
-| password_hash         | VARCHAR(255) | NOT NULL                     | 서버 해시값(Argon2id 등). 평문 저장 금지 |
-| marketing             | BOOLEAN      | NOT NULL DEFAULT false       | 마케팅 수신 동의                         |
-| created_at            | TIMESTAMPTZ  | NOT NULL DEFAULT now()       | 가입 시각                                |
-| is_active             | BOOLEAN      | NOT NULL DEFAULT true        | false면 로그인 거절 (마이그레이션 0002)  |
-| deletion_requested_at | TIMESTAMPTZ  | NULL                         | 탈퇴 신청 시각 (0005)                    |
-| deletion_scheduled_at | TIMESTAMPTZ  | NULL, 부분 INDEX             | 신청 + 30일. 이전 로그인 시 복구 (0005)  |
-| deleted_at            | TIMESTAMPTZ  | NULL                         | 예약 삭제 완료 시각. 행은 익명화 (0005)  |
+| 컬럼                  | 타입         | 제약                         | 설명                                                           |
+| --------------------- | ------------ | ---------------------------- | -------------------------------------------------------------- |
+| id                    | UUID         | PK                           | 회원 ID (`Member.id`)                                          |
+| email                 | VARCHAR(254) | NOT NULL, UK(`lower(email)`) | 소문자로 저장, 대소문자 무관 중복 금지                         |
+| name                  | VARCHAR(100) | NOT NULL                     | 이름                                                           |
+| password_hash         | VARCHAR(255) | NOT NULL                     | 서버 해시값(Argon2id 등). 평문 저장 금지                       |
+| marketing             | BOOLEAN      | NOT NULL DEFAULT false       | 마케팅 수신 동의                                               |
+| created_at            | TIMESTAMPTZ  | NOT NULL DEFAULT now()       | 가입 시각                                                      |
+| is_active             | BOOLEAN      | NOT NULL DEFAULT true        | false면 로그인 거절 (마이그레이션 0002)                        |
+| deactivated_at        | TIMESTAMPTZ  | NULL                         | 복구 없는 탈퇴 시각. 값이 있으면 이메일 유니크에서 제외 (0010) |
+| deletion_requested_at | TIMESTAMPTZ  | NULL                         | 탈퇴 신청 시각 (0005, 이전 정책)                               |
+| deletion_scheduled_at | TIMESTAMPTZ  | NULL, 부분 INDEX             | 신청 + 30일. 이전 로그인 시 복구 (0005)                        |
+| deleted_at            | TIMESTAMPTZ  | NULL                         | 예약 삭제 완료 시각. 행은 익명화 (0005)                        |
 
 > 0005 CHECK: 신청·예정 시각은 함께 NULL이거나 함께 값이 있고, 탈퇴 신청·삭제된 회원은 `is_active=false`다.
 > 예약 삭제는 주문 보존을 위해 행을 지우지 않고 이메일·이름·비밀번호 해시를 익명 값으로 바꾼다.

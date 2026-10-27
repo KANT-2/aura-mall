@@ -111,7 +111,7 @@ test("member settings update across tabs, reject bad passwords, and end sessions
   await other.close();
 });
 
-test("member deactivation preserves administrator cookies and never claims full erasure", async ({
+test("member deactivation removes only that member's cart, ends other tabs and keeps other data", async ({
   page,
   context,
 }) => {
@@ -123,6 +123,7 @@ test("member deactivation preserves administrator cookies and never claims full 
       })
     ).status(),
   ).toBe(201);
+  const { user } = await (await context.request.get("/api/auth/me")).json();
   await context.addCookies([
     { name: "aura_admin_access", value: "header.payload.signature", url: "http://127.0.0.1:3200" },
   ]);
@@ -130,14 +131,36 @@ test("member deactivation preserves administrator cookies and never claims full 
   await page.getByRole("button", { name: "계정 관리", exact: true }).click();
   await expect(page.getByText(/개인정보 완전 파기를 의미하지 않습니다/)).toBeVisible();
   const cart = '[{"product":{"id":"warm-candle"},"quantity":1,"selection":[]}]';
-  await page.evaluate((value) => localStorage.setItem("aura_cart_v1", value), cart);
+  const keys = {
+    member: `aura_cart_v2:member:${encodeURIComponent(user.id)}`,
+    other: "aura_cart_v2:member:someone-else",
+    guest: "aura_cart_v2:guest",
+    legacy: "aura_cart_v1",
+  };
+  await page.evaluate(
+    ({ keys, cart }) => Object.values(keys).forEach((key) => localStorage.setItem(key, cart)),
+    { keys, cart },
+  );
+  // A second tab of the same member must end when the first tab withdraws.
+  const second = await context.newPage();
+  await second.goto("/mypage");
   await page.getByLabel("계정 사용 중지 확인").check();
   await page.getByLabel("확인용 현재 비밀번호").fill(credentials.password);
   await page.getByRole("button", { name: "계정 사용 중지", exact: true }).click();
   await expect(page.getByText("로그인하면 저장한 향과 쿠폰을 확인할 수 있어요.")).toBeVisible();
+  await expect(second.getByText("로그인하면 저장한 향과 쿠폰을 확인할 수 있어요.")).toBeVisible();
   expect(await cookieToken(context.request)).toBeUndefined();
   expect(await cookieToken(context.request, "aura_admin_access")).toBe("header.payload.signature");
-  expect(await page.evaluate(() => localStorage.getItem("aura_cart_v1"))).toBe(cart);
+  const stored = await page.evaluate(
+    (keys) =>
+      Object.fromEntries(
+        Object.entries(keys).map(([name, key]) => [name, localStorage.getItem(key)]),
+      ),
+    keys,
+  );
+  // Only the withdrawn member's cart is gone: guests, other members and legacy data stay.
+  expect(stored).toEqual({ member: null, other: cart, guest: cart, legacy: cart });
+  await second.close();
   expect(
     (
       await context.request.post("/api/auth/login", {
@@ -145,7 +168,17 @@ test("member deactivation preserves administrator cookies and never claims full 
       })
     ).status(),
   ).toBe(401);
+  // The same email can register again as a new member who starts with an empty cart.
+  const again = await context.request.post("/api/auth/register", {
+    data: { name: "New identity", email, password: credentials.password },
+  });
+  expect(again.status()).toBe(201);
+  const fresh = (await (await context.request.get("/api/auth/me")).json()).user;
+  expect(fresh.id).not.toBe(user.id);
+  await page.goto("/cart");
+  await expect(page.getByRole("heading", { name: "아직 담은 향이 없어요." })).toBeVisible();
 });
+
 const cookieToken = async (request: APIRequestContext, name = "aura_access") =>
   (await request.storageState()).cookies.find((cookie) => cookie.name === name)?.value;
 

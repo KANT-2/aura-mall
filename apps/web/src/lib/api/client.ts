@@ -1,9 +1,13 @@
 import { ApiError } from "@/lib/api/errors";
 import { publishMemberChange } from "@/lib/api/auth-events";
+import { removeMemberCart } from "@/features/cart/storage/cart-storage";
 
 let refreshing: Promise<boolean> | undefined;
 const localLocks = new Map<string, Promise<unknown>>();
-async function withAuthLock<T>(operation: () => Promise<T>, name = "aura-jwt-auth"): Promise<T> {
+export async function withAuthLock<T>(
+  operation: () => Promise<T>,
+  name = "aura-jwt-auth",
+): Promise<T> {
   const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
   if (!locks) {
     const pending = (localLocks.get(name) ?? Promise.resolve()).catch(() => {}).then(operation);
@@ -103,9 +107,21 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
       );
     }
 
+    if (path === "/auth/me" && method === "DELETE" && response.status !== 204) {
+      throw new ApiError(502, "계정 사용 중지 결과를 확인하지 못했어요.");
+    }
+
     const owner = headers.get("X-Account-Owner");
+    if (path === "/auth/me" && method === "DELETE" && response.status === 204 && owner) {
+      removeMemberCart(owner);
+    }
+
     if (memberMutation && owner) {
       publishMemberChange(owner, method === "PATCH" ? "profile" : "ended");
+    }
+
+    if (authMutation) {
+      publishMemberChange("session", "session");
     }
 
     return body as T;

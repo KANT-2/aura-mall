@@ -38,7 +38,13 @@ class User(Base):
             "(deletion_requested_at IS NULL AND deleted_at IS NULL) OR NOT is_active",
             name="deletion_inactive",
         ),
-        Index("users_email_lower_key", func.lower(text("email")), unique=True),
+        Index(
+            "users_email_lower_key",
+            func.lower(text("email")),
+            unique=True,
+            postgresql_where=text("deactivated_at IS NULL"),
+        ),
+        CheckConstraint("deactivated_at IS NULL OR NOT is_active", name="deactivated_inactive"),
         Index(
             "users_deletion_due_idx",
             "deletion_scheduled_at",
@@ -53,7 +59,8 @@ class User(Base):
     marketing: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
-    # 0005: restorable until deletion_scheduled_at; deleted_at is set by the purge job.
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Legacy 0005 schedules only; 0010 withdrawals have deactivated_at and no deadline.
     deletion_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deletion_scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
