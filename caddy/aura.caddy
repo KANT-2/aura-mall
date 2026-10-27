@@ -1,0 +1,30 @@
+# Append these sites to the existing server Caddyfile and replace this example host.
+# The public HTTPS site terminates TLS and forwards to Next.js, including its BFF.
+mall.example.com {
+	# Manage this host even when the shared proxy already has a wildcard site.
+	tls force_automate
+	encode zstd gzip
+	reverse_proxy aura-web:3000
+}
+
+# Internal BFF -> API listener. Do not publish port 8080 on the host.
+http://:8080 {
+	reverse_proxy {
+		dynamic a {
+			name aura-api
+			port 8000
+			refresh 2s
+			resolvers 127.0.0.11
+			versions ipv4
+		}
+		lb_policy round_robin
+		lb_try_duration 5s
+		lb_try_interval 100ms
+		lb_retry_match method GET HEAD OPTIONS
+		fail_duration 5s
+		max_fails 1
+		transport http {
+			dial_timeout 2s
+		}
+	}
+}

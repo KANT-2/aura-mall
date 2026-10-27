@@ -86,6 +86,9 @@ jobs:
           if test -f .db-ops/client/database-url; then
             compose_args+=(-f compose.database.yaml)
           fi
+          if test -f compose.lb.yaml; then
+            compose_args+=(-f compose.lb.yaml)
+          fi
           docker compose "${compose_args[@]}" config --quiet
 
           echo "Building and deploying AURA API..."
@@ -93,6 +96,11 @@ jobs:
             python3 ops/database.py deploy-api
           else
             docker compose "${compose_args[@]}" up -d --build --no-deps api
+          fi
+
+          if test -f compose.lb.yaml; then
+            echo "Connecting Next.js to the existing Caddy..."
+            docker compose "${compose_args[@]}" up -d --no-deps web
           fi
 
           echo "Checking AURA API..."
