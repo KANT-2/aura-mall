@@ -233,7 +233,7 @@ networks:
                 with urllib.request.urlopen(req, timeout=20) as response:
                     return json.load(response)
 
-            def balanced(count):
+            def balanced(count, web_count=2):
                 replies = [request("/probe?keep=yes") for _ in range(12)]
                 assert all(
                     reply["via_web"]
@@ -243,7 +243,7 @@ networks:
                     for reply in replies
                 )
                 assert len({reply["backend"] for reply in replies}) == count
-                assert len({reply["web_backend"] for reply in replies}) == 2
+                assert len({reply["web_backend"] for reply in replies}) == web_count
 
             eventually(lambda: balanced(2))
             print(
@@ -284,6 +284,12 @@ networks:
                 dc("up", "-d", "--scale", f"api={count}", "api")
                 eventually(lambda count=count: balanced(count))
                 assert dc("ps", "-q", "edge").stdout.strip() == edge
+            dc("stop", "web2")
+            eventually(lambda: balanced(1, web_count=1))
+            assert dc("ps", "-q", "edge").stdout.strip() == edge
+            print(
+                "PASS: one Next/BFF instance can stop while the other serves requests", flush=True
+            )
             dc("stop", "api", "web", "web2")
             assert dc("ps", "--status", "running", "-q", "edge").stdout.strip() == edge
             print(
