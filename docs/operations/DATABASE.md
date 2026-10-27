@@ -27,8 +27,10 @@ mkdir -m 700 -p .db-ops/backups
 docker compose exec -T db sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > .db-ops/backups/before-tls.dump
 docker compose exec -T db sh -c 'exec pg_dumpall -U "$POSTGRES_USER" --globals-only' > .db-ops/backups/before-tls.globals.sql
 
+docker compose -f compose.yaml -f compose.lb.yaml build api
 python3 ops/database.py init
-docker compose stop api
+docker compose -f compose.yaml -f compose.lb.yaml stop api
+docker compose -f compose.yaml -f compose.lb.yaml run --rm --no-deps api alembic upgrade head
 python3 ops/database.py bootstrap
 python3 ops/database.py maintain
 python3 ops/database.py install-timer
@@ -42,15 +44,16 @@ python3 ops/database.py install-timer
 
 새 설정이 잘못됐거나 검증에 실패하면 앱은 검증된 기존 연결을 유지합니다. 전환 확인이 실패하면 운영 스크립트가 이전 URL을 복원하고 워커들의 복원·연결 정리를 기다립니다. 요청을 강제로 끊지 않으므로 오래 걸리는 요청이 있으면 회전 제한 시간(기본 120초)을 조정하거나 해당 요청이 완료된 뒤 재실행합니다. 실패·중단 복구도 같은 확인 절차를 사용합니다. DB 트랜잭션이나 HTTP 요청을 회전 때문에 자동 재실행하지 않습니다.
 
-전환 후 Compose를 직접 사용할 때는 반드시 두 파일을 지정합니다.
+전환 후 Compose를 직접 사용할 때는 DB 보안 구성과 Caddy 구성을 함께 지정합니다. 기본 Compose 실행에도 적용되도록 `.env`의 `COMPOSE_FILE`을 `compose.yaml:compose.database.yaml:compose.lb.yaml`로 설정합니다.
 
 ```sh
-docker compose -f compose.yaml -f compose.database.yaml ps
+docker compose -f compose.yaml -f compose.database.yaml -f compose.lb.yaml ps
 python3 ops/database.py status
 python3 ops/database.py deploy-api
+python3 ops/database.py migrate
 ```
 
-CD는 관리 URL 파일이 존재하면 이 추가 구성을 선택하고 `deploy-api`로 배포합니다. `compose.lb.yaml`이 있으면 CD와 운영 도구 모두 함께 사용해 기존 Caddy 공유 네트워크와 API 복제 수를 유지합니다. 먼저 [Caddy 배포 준비](../backend/DEPLOYMENT.md)를 완료합니다. 배포와 정기 유지보수는 같은 파일 잠금을 사용합니다. DB를 일반 `docker compose up`으로 재생성하지 않습니다. TLS 설정이나 승격 후 fence를 빼고 기동할 수 있습니다.
+CD는 관리 URL 파일이 존재하면 이 추가 구성을 선택하고 `deploy-api`로 배포합니다. 마이그레이션은 `migrate` 명령이 기존 관리자 자격증명과 검증된 TLS를 사용하여 일회용 컨테이너에서 실행합니다. DML 전용 런타임 계정에는 DDL 권한을 추가하지 않습니다. 관리자 URL은 명령 인자·로그·관리 URL 파일에 기록하지 않습니다. `compose.lb.yaml`이 있으면 CD와 운영 도구 모두 함께 사용해 기존 Caddy 공유 네트워크와 API 복제 수를 유지합니다. 먼저 [Caddy 배포 준비](../backend/DEPLOYMENT.md)를 완료합니다. 배포와 정기 유지보수는 같은 파일 잠금을 사용합니다. DB를 일반 `docker compose up`으로 재생성하지 않습니다. TLS 설정이나 승격 후 fence를 빼고 기동할 수 있습니다.
 
 최초 전환이 실패하면 API를 멈춘 상태에서 원인을 해결하고 `bootstrap`을 재실행합니다. 전환 자체를 취소하려면 기존 `.env`를 유지한 채 기본 Compose로 DB/API를 재생성하면 됩니다. 단, **승격 후에는 이 방식으로 돌아가면 안 됩니다.** 승격 후 복구는 아래 절차를 따릅니다.
 
