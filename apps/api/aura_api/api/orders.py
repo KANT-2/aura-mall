@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from aura_api.api.catalog import CamelModel, ProductOut
@@ -13,6 +13,7 @@ from aura_api.core.errors import ErrorResponse
 from aura_api.domain.ordering import OrderStatus
 from aura_api.infra.repositories.orders import SavedOrder
 from aura_api.services import orders as service
+from aura_api.services import refunds
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 Member = Annotated[uuid.UUID, Depends(member_required("로그인이 필요해요."))]
@@ -165,8 +166,21 @@ async def place_order(
     "/{order_id}/cancel",
     response_model=OrderOut,
     response_model_exclude_unset=True,
-    responses={code: {"model": ErrorResponse} for code in (401, 404, 409)},
-    summary="미결제 주문 취소 (재고·쿠폰 복구)",
+    responses={
+        **{code: {"model": ErrorResponse} for code in (401, 404, 409, 503)},
+        202: {"model": OrderOut, "description": "환불 결과 확인 중 (주문은 아직 결제 완료)"},
+    },
+    summary="주문 취소 (미결제: 재고·쿠폰 복구, 결제 완료: 전액 환불 후 취소)",
 )
-async def cancel_order(order_id: str, member_id: Member, session: Session) -> OrderOut:
-    return order_out(await service.cancel_order(session, member_id, order_id))
+async def cancel_order(
+    order_id: str, member_id: Member, session: Session, request: Request, response: Response
+) -> OrderOut:
+    try:
+        order, settled = await refunds.cancel_order(
+            session, getattr(request.app.state, "payment_gateway", None), member_id, order_id
+        )
+    except refunds.PaymentGatewayUnavailable:
+        raise HTTPException(503) from None  # no PG configured: never pretend a refund happened
+    if not settled:
+        response.status_code = 202  # refund result unknown: send the same request again later
+    return order_out(order)

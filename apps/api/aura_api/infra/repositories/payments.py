@@ -1,4 +1,4 @@
-"""Payment attempts. Lock order: order row first, then its payment row."""
+"""Payment attempts and refunds. Lock order: order row, then its payment, then its refund."""
 
 import uuid
 from datetime import datetime
@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aura_api.domain.payments import OPEN_PAYMENT_STATUSES
-from aura_api.infra.models import Order, OrderItem, Payment
+from aura_api.infra.models import Order, OrderItem, Payment, Refund
 
 
 async def lock_order(
@@ -95,6 +95,47 @@ async def unresolved_before(session: AsyncSession, cutoff: datetime, limit: int)
             select(Payment.id)
             .where(Payment.status == "IN_PROGRESS", Payment.confirm_started_at < cutoff)
             .order_by(Payment.confirm_started_at, Payment.id)
+            .limit(limit)
+        )
+    )
+
+
+async def lock_refund(session: AsyncSession, refund_id: uuid.UUID) -> Refund | None:
+    return await session.scalar(
+        select(Refund)
+        .where(Refund.id == refund_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+
+
+async def active_refund(session: AsyncSession, payment_id: uuid.UUID) -> Refund | None:
+    """The payment's IN_PROGRESS or DONE refund; the caller holds the order lock."""
+    return await session.scalar(
+        select(Refund)
+        .where(Refund.payment_id == payment_id, Refund.status.in_(("IN_PROGRESS", "DONE")))
+        .execution_options(populate_existing=True)
+    )
+
+
+async def has_pending_refund(session: AsyncSession, order_id: uuid.UUID) -> bool:
+    return (
+        await session.scalar(
+            select(Refund.id).where(Refund.order_id == order_id, Refund.status == "IN_PROGRESS")
+        )
+        is not None
+    )
+
+
+async def unresolved_refunds_before(
+    session: AsyncSession, cutoff: datetime, limit: int
+) -> list[uuid.UUID]:
+    """IN_PROGRESS refunds requested before `cutoff`, oldest first."""
+    return list(
+        await session.scalars(
+            select(Refund.id)
+            .where(Refund.status == "IN_PROGRESS", Refund.requested_at < cutoff)
+            .order_by(Refund.requested_at, Refund.id)
             .limit(limit)
         )
     )

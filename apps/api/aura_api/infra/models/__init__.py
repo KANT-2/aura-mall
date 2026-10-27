@@ -31,7 +31,7 @@ from aura_api.infra.models.ordering import (
     OrderStatusHistory,
 )
 from aura_api.infra.models.partner import PartnerInquiry
-from aura_api.infra.models.payment import Payment
+from aura_api.infra.models.payment import Payment, Refund
 
 __all__ = [
     "Admin",
@@ -56,6 +56,7 @@ __all__ = [
     "Recipe",
     "RecipeIngredient",
     "RefreshToken",
+    "Refund",
     "RevokedToken",
     "ScentFamily",
     "ScentFamilyIngredient",

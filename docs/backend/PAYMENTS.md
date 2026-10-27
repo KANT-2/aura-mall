@@ -68,7 +68,7 @@ uv run --directory apps/api python -m aura_api.infra.reconcile_payments --older-
 
 주문 접수 시 재고 차감과 쿠폰 사용이 끝나므로, 결제하지 않은 주문은 취소될 때까지 재고와 쿠폰을
 점유합니다. 회원 취소와 미결제 만료 작업이 이를 되돌립니다(마이그레이션 0008,
-[주문 취소 문서](ORDER_CANCELLATION.md)). 취소된 주문의 `READY` 결제 시도는 `CANCELED`가 되어 이후
+[주문 취소 문서](ORDER_CANCELLATION.md)). 결제가 끝난 주문은 PG 환불 뒤에만 취소됩니다([환불 문서](REFUNDS.md)). 취소된 주문의 `READY` 결제 시도는 `CANCELED`가 되어 이후
 승인 요청은 409 `PAYMENT_CLOSED`입니다. `IN_PROGRESS` 결제가 있는 주문은 취소하지 않습니다.
 
 ## 보안
@@ -131,6 +131,6 @@ BFF는 `POST /api/payments`, `POST /api/payments/confirm`, `GET /api/payments/{i
 
 1. ~~BFF 경로와 결제창·성공/실패 페이지~~ (최소 테스트 화면 구현. 상품·주문 화면과 연결하는 정식 결제 화면은 남음)
 2. ~~주문 취소와 미결제 주문 자동 취소, 재고·쿠폰 복구~~ (0008에서 구현, 만료 시간 정책과 스케줄 등록은 남음)
-3. 결제 취소·환불 API(토스 `POST /v1/payments/{paymentKey}/cancel`, 멱등키 사용)와 `review_reason` 건 처리
+3. ~~결제 취소·환불 API~~ (0009에서 전액 환불 구현, [환불 문서](REFUNDS.md). 부분 환불·정책 확정과 `payments.review_reason` 건 처리는 남음)
 4. 재확인 작업 스케줄 등록과 관리자 화면의 결제 정보·검토 대상 표시
 5. 웹훅 수신(가상계좌 입금 등)과 라이브 키 전환 승인 절차

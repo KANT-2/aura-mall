@@ -78,7 +78,7 @@ async def start_payment(
         if order is None:
             raise NotFound("ORDER_NOT_FOUND", "주문을 찾을 수 없어요.")
         existing = await repository.open_payment(session, order.id)
-        if existing is not None and existing.status == "DONE":
+        if existing is not None and existing.status == "DONE" and order.status != "cancelled":
             raise Conflict("ORDER_ALREADY_PAID", "이미 결제된 주문이에요.")
         if existing is not None and existing.status == "IN_PROGRESS":
             raise Conflict("PAYMENT_IN_PROGRESS", "결제를 확인하고 있어요. 잠시 후 확인해 주세요.")

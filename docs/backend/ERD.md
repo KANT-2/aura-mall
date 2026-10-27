@@ -41,6 +41,7 @@ erDiagram
     orders ||--o{ order_items : "주문 항목"
     orders ||--o{ order_status_history : "상태 변경"
     orders ||--o{ payments : "결제 시도"
+    payments ||--o{ refunds : "환불 시도"
     order_items ||--o{ order_item_selections : "Gift Set 구성"
     user_coupons |o--o| orders : "사용"
 
@@ -229,6 +230,15 @@ erDiagram
         int amount
         varchar status
         timestamptz approved_at
+    }
+    refunds {
+        uuid id PK
+        uuid payment_id FK
+        uuid order_id FK
+        int amount
+        varchar status
+        varchar transaction_key
+        timestamptz refunded_at
     }
     order_status_history {
         uuid id PK
@@ -615,6 +625,27 @@ erDiagram
 |                    |              | UNIQUE(order_id) WHERE status IN READY·IN_PROGRESS·DONE | 주문당 진행·완료 결제는 1건                     |
 
 > 카드 번호 등 결제수단 정보는 저장하지 않습니다. 브라우저가 PG 결제창과 직접 통신합니다.
+
+**refunds** — 결제 완료 주문의 전액 환불 시도 (마이그레이션 0009, [환불 문서](REFUNDS.md))
+
+| 컬럼            | 타입         | 제약                                                | 설명                                    |
+| --------------- | ------------ | --------------------------------------------------- | --------------------------------------- |
+| id              | UUID         | PK                                                  | PG 취소 멱등키로 사용                   |
+| payment_id      | UUID         | FK → payments                                       |                                         |
+| order_id        | UUID         | FK → orders, INDEX                                  |                                         |
+| amount          | INTEGER      | NOT NULL, CHECK > 0                                 | 결제 금액 복사(전액 환불만)             |
+| reason          | VARCHAR(200) | NOT NULL                                            | 주문 상태 이력에 그대로 기록            |
+| actor_type      | VARCHAR(10)  | CHECK `member`·`admin`·`system`                     | 요청자. `system`일 때만 actor_id가 NULL |
+| actor_id        | UUID         | NULL                                                |                                         |
+| status          | VARCHAR(20)  | CHECK `IN_PROGRESS`·`DONE`·`FAILED`                 | 기본 `IN_PROGRESS`                      |
+| transaction_key | VARCHAR(64)  | NULL                                                | PG 취소 transactionKey                  |
+| failure_code    | VARCHAR(100) | NULL                                                | PG 확정 거절 코드                       |
+| failure_message | VARCHAR(500) | NULL                                                | PG 확정 거절 사유                       |
+| review_reason   | VARCHAR(100) | NULL                                                | 사람이 확인해야 하는 PG 결과            |
+| requested_at    | TIMESTAMPTZ  | NOT NULL DEFAULT now()                              | 재확인 기준                             |
+| refunded_at     | TIMESTAMPTZ  | `DONE`일 때만 값 (CHECK)                            | 환불 완료 시각                          |
+| updated_at      | TIMESTAMPTZ  | NOT NULL DEFAULT now()                              |                                         |
+|                 |              | UNIQUE(payment_id) WHERE status IN IN_PROGRESS·DONE | 결제당 진행·완료 환불은 1건             |
 
 **order_item_selections** — Gift Set 구성 3개 (스냅샷)
 

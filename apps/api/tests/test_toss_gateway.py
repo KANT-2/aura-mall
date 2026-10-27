@@ -199,3 +199,126 @@ def test_amount_and_names():
     assert order_name("핸드크림", 1) == "핸드크림"
     assert order_name("핸드크림", 3) == "핸드크림 외 2건"
     assert len(order_name("x" * 150, 1)) == 100
+
+
+CANCELED = DONE | {
+    "status": "CANCELED",
+    "cancels": [
+        {
+            "cancelAmount": 31000,
+            "cancelReason": "member request",
+            "canceledAt": "2026-10-27T19:00:00+09:00",
+            "transactionKey": "TXKEY0001",
+            "cancelStatus": "DONE",
+        }
+    ],
+}
+
+
+def cancel(amount=31000, **overrides):
+    values = {
+        "payment_key": DONE["paymentKey"],
+        "amount": amount,
+        "reason": "member request",
+        "idempotency_key": "7a1c0a2e-0000-4000-8000-000000000002",
+    } | overrides
+    return anyio.run(lambda: gateway().cancel(**values))
+
+
+def test_cancel_request_matches_the_toss_contract(sent):
+    requests, answers = sent
+    answers.append((200, CANCELED))
+    result = cancel()
+    [request] = requests
+    assert request.full_url == (
+        "https://api.tosspayments.com/v1/payments/" + DONE["paymentKey"] + "/cancel"
+    )
+    assert request.get_method() == "POST"
+    assert (
+        request.get_header("Authorization")
+        == "Basic " + base64.b64encode((SECRET + ":").encode()).decode()
+    )
+    assert request.get_header("Idempotency-key") == "7a1c0a2e-0000-4000-8000-000000000002"
+    # A full refund names no amount: the PG cancels the whole balance.
+    assert json.loads(request.data) == {"cancelReason": "member request"}
+    assert (result.outcome, result.amount, result.transaction_key) == (
+        "refunded",
+        31000,
+        "TXKEY0001",
+    )
+    assert result.refunded_at.isoformat() == "2026-10-27T19:00:00+09:00"
+
+
+def test_cancel_path_quotes_the_payment_key(sent):
+    sent[1].append((200, CANCELED))
+    cancel(payment_key="a/b c")
+    assert sent[0][0].full_url.endswith("/v1/payments/a%2Fb%20c/cancel")
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        CANCELED | {"status": "PARTIAL_CANCELED"},
+        CANCELED | {"cancels": [CANCELED["cancels"][0] | {"cancelAmount": 1000}]},
+        CANCELED | {"cancels": []},
+        CANCELED | {"cancels": [CANCELED["cancels"][0] | {"cancelStatus": "IN_PROGRESS"}]},
+    ],
+)
+def test_a_refund_that_is_not_exactly_the_full_amount_needs_review(sent, body):
+    sent[1].append((200, body))
+    result = cancel()
+    assert result.outcome == "pending" and result.code == "REFUND_AMOUNT_MISMATCH"
+
+
+def test_payment_still_approved_is_not_a_refund(sent):
+    sent[1].append((200, DONE))
+    assert cancel().outcome == "pending"
+
+
+def test_already_canceled_reads_the_recorded_cancellation(sent):
+    requests, answers = sent
+    answers.extend([(400, {"code": "ALREADY_CANCELED_PAYMENT", "message": "x"}), (200, CANCELED)])
+    result = cancel()
+    assert (result.outcome, result.transaction_key) == ("refunded", "TXKEY0001")
+    assert requests[1].get_method() == "GET"
+    assert requests[1].full_url.endswith("/v1/payments/" + DONE["paymentKey"])
+
+
+def test_already_canceled_with_another_amount_needs_review(sent):
+    sent[1].extend([(400, {"code": "ALREADY_CANCELED_PAYMENT"}), (200, CANCELED)])
+    assert cancel(amount=20000).code == "REFUND_AMOUNT_MISMATCH"
+
+
+@pytest.mark.parametrize(
+    "status,code",
+    [
+        (400, "NOT_CANCELABLE_PAYMENT"),
+        (404, "NOT_FOUND_PAYMENT"),
+        (400, "INVALID_REFUND_ACCOUNT_INFO"),
+        (401, "UNAUTHORIZED_KEY"),
+    ],
+)
+def test_definite_cancel_rejections_fail(sent, status, code):
+    sent[1].append((status, {"code": code, "message": "거절"}))
+    result = cancel()
+    assert (result.outcome, result.code, result.message) == ("failed", code, "거절")
+
+
+@pytest.mark.parametrize(
+    "answers",
+    [
+        [(500, {"code": "FAILED_INTERNAL_SYSTEM_PROCESSING", "message": "x"})],
+        [(409, {"code": "IDEMPOTENT_REQUEST_PROCESSING", "message": "x"})],
+        [(400, {"code": "PROVIDER_ERROR", "message": "x"})],
+        [(400, {"code": "ALREADY_PROCESSING_REQUEST", "message": "x"})],
+        [(502, {})],
+        [(TimeoutError("timed out"), None)],
+        [(urllib.error.URLError("reset"), None)],
+        [(400, {"code": "ALREADY_CANCELED_PAYMENT"}), (500, {})],
+        [(200, CANCELED | {"status": "SOMETHING_NEW"})],
+    ],
+)
+def test_unknown_cancel_results_are_never_reported_as_failed(sent, answers):
+    sent[1].extend(answers)
+    with pytest.raises(GatewayUnavailable):
+        cancel()
