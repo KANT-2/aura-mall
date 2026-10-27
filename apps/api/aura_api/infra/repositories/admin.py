@@ -5,19 +5,22 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aura_api.domain.admin import HISTORY_LIMIT, LOW_STOCK, PAGE_SIZE
 from aura_api.infra.models import (
     Admin,
     AdminAuditLog,
+    AdminSession,
     Order,
     OrderItem,
     OrderItemSelection,
     PartnerInquiry,
     Product,
     ProductType,
+    RevokedToken,
     StockAdjustment,
     User,
 )
@@ -273,4 +276,57 @@ async def overview_counts(session: AsyncSession, since: datetime) -> OverviewCou
         recent_orders=recent,
         recent_revenue=int(revenue),
         inquiries=statuses,
+    )
+
+
+async def admin_by_email(session: AsyncSession, email: str) -> Admin | None:
+    return await session.scalar(select(Admin).where(func.lower(Admin.email) == email.lower()))
+
+
+async def admin_count(session: AsyncSession) -> int:
+    return await session.scalar(select(func.count()).select_from(Admin)) or 0
+
+
+async def add_admin(
+    session: AsyncSession,
+    *,
+    email: str,
+    name: str,
+    password_hash: str,
+    created_by: uuid.UUID | None,
+) -> Admin:
+    admin = Admin(email=email, name=name, password_hash=password_hash, created_by=created_by)
+    session.add(admin)
+    await session.flush()
+    return admin
+
+
+def add_admin_session(
+    session: AsyncSession,
+    *,
+    jti: uuid.UUID,
+    admin_id: uuid.UUID,
+    issued_at: datetime,
+    expires_at: datetime,
+) -> None:
+    session.add(
+        AdminSession(jti=jti, admin_id=admin_id, issued_at=issued_at, expires_at=expires_at)
+    )
+
+
+async def admin_session(session: AsyncSession, jti: uuid.UUID) -> AdminSession | None:
+    return await session.scalar(select(AdminSession).where(AdminSession.jti == jti))
+
+
+async def revoke_admin_session(session: AsyncSession, admin_session_row: AdminSession) -> None:
+    """Logout: mark the session and add its jti to the shared blacklist until it expires."""
+    await session.execute(
+        update(AdminSession)
+        .where(AdminSession.jti == admin_session_row.jti, AdminSession.revoked_at.is_(None))
+        .values(revoked_at=func.now())
+    )
+    await session.execute(
+        insert(RevokedToken)
+        .values(jti=admin_session_row.jti, expires_at=admin_session_row.expires_at)
+        .on_conflict_do_nothing(index_elements=[RevokedToken.jti])
     )
