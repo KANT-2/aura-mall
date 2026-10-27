@@ -18,7 +18,7 @@ pytestmark = pytest.mark.skipif(not URL, reason="AURA_TEST_DATABASE_URL is not s
 @pytest.mark.parametrize("kind", ["payments", "refunds"])
 def test_pg_authentication_errors_remain_in_admin_review(client, pg, kind):
     path = f"/api/v1/admin/{kind}/review"
-    if not any(getattr(route, "path", None) == path for route in client.app.routes):
+    if path not in client.app.openapi()["paths"]:
         pytest.skip("PR #82 review endpoints are not merged into this branch")
     owner = new_customer()
     placed = order(client, owner, items=[{"productId": "fresh-hand-cream", "quantity": 1}])

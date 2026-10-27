@@ -1,10 +1,11 @@
 """Confirmed operating policies on a disposable PostgreSQL database."""
 
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import select, update
 from test_admin_api import URL, db, new_customer
 from test_admin_api import client as client
 from test_order_cancellation import cancel, order
@@ -12,7 +13,7 @@ from test_payments_api import confirm, order_status, start
 from test_payments_api import pg as pg
 
 from aura_api.config import Settings
-from aura_api.infra.models import Order
+from aura_api.infra.models import Order, Product
 from aura_api.infra.repositories import admin as admin_repository
 from aura_api.services import orders as order_service
 
@@ -75,3 +76,48 @@ def test_revenue_excludes_only_confirmed_cancel_and_preserves_order_counts(clien
     assert (after.orders, after.recent_orders) == (before.orders, before.recent_orders)
     assert cancel(client, member, placed["id"]).status_code == 200
     assert db(counts).recent_revenue == after.recent_revenue
+
+
+@pytest.mark.parametrize("round_", range(4))
+def test_ten_minute_expiry_racing_approval_never_restocks_a_paid_order(client, pg, round_):
+    member = new_customer()
+    # A distinct SKU keeps the preceding boundary test's newly expired orders from
+    # changing this race's stock observation when the batch legitimately cancels them.
+    product_id = "fresh-candle"
+    placed = order(client, member, items=[{"productId": product_id, "quantity": 1}])
+    target = uuid.UUID(placed["id"])
+    payment = start(client, member, placed["id"]).json()
+
+    async def age(maker):
+        async with maker() as session, session.begin():
+            await session.execute(
+                update(Order)
+                .where(Order.id == target)
+                .values(created_at=datetime.now(UTC) - timedelta(minutes=10, seconds=1))
+            )
+
+    async def stock(maker):
+        async with maker() as session:
+            return await session.scalar(select(Product.stock).where(Product.id == product_id))
+
+    async def expire(maker):
+        async with maker() as session:
+            return await order_service.expire_unpaid_orders(
+                session, older_than=timedelta(minutes=10), execute=True
+            )
+
+    db(age)
+    before = db(stock)
+    pg.delay = 0.1
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        expiring = pool.submit(db, expire)
+        approving = pool.submit(confirm, client, member, payment)
+        expiring.result(timeout=30)
+        response = approving.result(timeout=30)
+    final = order_status(target)
+    if final == "paid":
+        assert response.status_code == 200 and pg.approvals == 1
+        assert db(stock) == before
+    else:
+        assert final == "cancelled" and response.status_code == 409
+        assert db(stock) == before + 1 and pg.approvals == 0

@@ -142,10 +142,13 @@ def test_simultaneous_cancels_refund_once(client, pg):
     assert {call["key"] for call in pg.refund_calls} == {str(refunds_of(order_id)[0].id)}
 
 
-def test_no_database_lock_is_held_while_the_pg_is_called(client, pg):
+@pytest.mark.parametrize("state", ["paid", "preparing"])
+def test_no_database_lock_is_held_while_the_pg_is_called(client, pg, state):
     member = new_customer()
     placed, payment, _ = pay(client, member)
     order_id = uuid.UUID(placed["id"])
+    if state == "preparing":
+        change(order_id, state)
     seen = {}
 
     async def probe(sessionmaker):
@@ -171,7 +174,7 @@ def test_no_database_lock_is_held_while_the_pg_is_called(client, pg):
     assert cancel(client, member, placed["id"]).status_code == 200
     assert seen["locked"] is True
     # The claim was already committed when the PG was asked, and the order was still paid.
-    assert seen["refunds"] == ["IN_PROGRESS"] and seen["orders"] == ["paid"]
+    assert seen["refunds"] == ["IN_PROGRESS"] and seen["orders"] == [state]
 
 
 def test_pg_unreachable_leaves_the_order_paid_and_a_resend_finishes_it(client, pg):
