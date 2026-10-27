@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 from aura_api.core.errors import ErrorResponse
 
-CONTRACT_VERSION = "1.0.0"
+CONTRACT_VERSION = "1.1.0"
 ERROR_RESPONSES = {
     code: {"model": ErrorResponse} for code in (400, 401, 403, 404, 409, 422, 500, 503)
 }

@@ -2,7 +2,7 @@
 
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -12,7 +12,9 @@ from aura_api.domain import admin as rules
 from aura_api.domain.errors import NotFound
 from aura_api.infra.models import AdminAuditLog, Order, OrderItem, PartnerInquiry, User
 from aura_api.infra.repositories import admin as repository
+from aura_api.infra.repositories import orders as order_repository
 from aura_api.infra.repositories.admin import OverviewCounts
+from aura_api.infra.repositories.orders import StatusChange
 
 
 @dataclass(frozen=True)
@@ -20,6 +22,7 @@ class OrderView:
     order: Order
     customer: User | None
     lines: list[tuple[OrderItem, list[str]]]  # item, Gift Set product names
+    history: list[StatusChange] = field(default_factory=list)  # filled for the detail only
 
     @property
     def title(self) -> str:
@@ -84,7 +87,7 @@ async def order_detail(session: AsyncSession, order_id: str) -> OrderView:
     if found is None:
         raise NotFound("ORDER_NOT_FOUND", "주문을 찾을 수 없어요.")
     [view] = await _order_views(session, [found])
-    return view
+    return replace(view, history=await order_repository.status_history(session, view.order.id))
 
 
 async def list_inquiries(

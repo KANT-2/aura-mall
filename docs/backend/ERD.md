@@ -39,6 +39,7 @@ erDiagram
     recipes |o--o{ recipes : "다시 만들기(parent)"
 
     orders ||--o{ order_items : "주문 항목"
+    orders ||--o{ order_status_history : "상태 변경"
     order_items ||--o{ order_item_selections : "Gift Set 구성"
     user_coupons |o--o| orders : "사용"
 
@@ -217,6 +218,17 @@ erDiagram
         uuid coupon_id FK
         varchar idempotency_key
         timestamptz created_at
+        varchar status
+    }
+    order_status_history {
+        uuid id PK
+        uuid order_id FK
+        varchar from_status
+        varchar to_status
+        varchar actor_type
+        uuid actor_id
+        varchar reason
+        timestamptz changed_at
     }
     order_items {
         uuid id PK
@@ -536,6 +548,7 @@ erDiagram
 | coupon_id       | UUID         | FK → user_coupons, NULL                                  | 사용한 쿠폰                        |
 | idempotency_key | VARCHAR(64)  | NULL                                                     | 같은 주문 중복 생성 방지           |
 | created_at      | TIMESTAMPTZ  | NOT NULL DEFAULT now()                                   | `Order.created`                    |
+| status          | VARCHAR(20)  | NOT NULL DEFAULT `received`, CHECK 6개 상태              | `Order.status` (마이그레이션 0006) |
 |                 |              | UK(user_id, idempotency_key)                             |                                    |
 |                 |              | INDEX(user_id, created_at DESC)                          | 내 주문 최신순 조회                |
 
@@ -553,6 +566,21 @@ erDiagram
 | unit_price       | INTEGER      | NOT NULL, CHECK ≥ 0                                  | 서버가 계산한 단가 (Gift Set = 선택 3개 합)     |
 | quantity         | SMALLINT     | NOT NULL, CHECK(quantity BETWEEN 1 AND 15)           |                                                 |
 | custom           | JSONB        | NULL                                                 | 맞춤 조향 구성 (주문 허용 시)                   |
+
+**order_status_history** — 주문 상태 변경 이력 (마이그레이션 0006, 추가만 함)
+
+| 컬럼        | 타입         | 제약                                      | 설명                                |
+| ----------- | ------------ | ----------------------------------------- | ----------------------------------- |
+| id          | UUID         | PK                                        |                                     |
+| order_id    | UUID         | FK → orders ON DELETE CASCADE, INDEX      | 주문별 시간순 조회                  |
+| from_status | VARCHAR(20)  | NULL, CHECK 6개 상태                      | 첫 `received` 기록은 NULL           |
+| to_status   | VARCHAR(20)  | NOT NULL, CHECK 6개 상태                  | 바뀐 상태                           |
+| actor_type  | VARCHAR(10)  | NOT NULL, CHECK `member`·`admin`·`system` | 변경 주체                           |
+| actor_id    | UUID         | NULL, `system`일 때만 NULL (CHECK)        | 회원 또는 관리자 ID. FK 없음        |
+| reason      | VARCHAR(200) | NULL                                      | 변경 사유                           |
+| changed_at  | TIMESTAMPTZ  | NOT NULL DEFAULT now()                    | 0006 이전 주문은 주문 시각으로 기록 |
+
+> 상태: `received` 접수(결제 없음) · `paid` 결제 완료 · `preparing` 제작·출고 준비 · `shipped` 배송 중 · `delivered` 배송 완료 · `cancelled` 취소. 전이 규칙은 [주문 상태 문서](ORDER_STATUS.md).
 
 **order_item_selections** — Gift Set 구성 3개 (스냅샷)
 
