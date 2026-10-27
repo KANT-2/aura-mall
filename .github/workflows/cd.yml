@@ -43,8 +43,11 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_HOST_PUBLIC_KEY: ${{ secrets.DEPLOY_HOST_PUBLIC_KEY }}
         run: |
-          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          printf '%s %s\n' "$DEPLOY_HOST" "$DEPLOY_HOST_PUBLIC_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
           ssh -i ~/.ssh/id_ed25519 \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
