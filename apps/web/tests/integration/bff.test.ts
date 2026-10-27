@@ -8,6 +8,8 @@ import { GET as product } from "@/app/api/catalog/products/[id]/route";
 import { POST as inquiry } from "@/app/api/partner/route";
 import { POST as saveRecipe } from "@/app/api/recipes/route";
 import { GET as session } from "@/app/api/auth/me/route";
+import { PATCH as updateProfile, DELETE as deactivate } from "@/app/api/auth/me/route";
+import { POST as changePassword } from "@/app/api/auth/change-password/route";
 import { POST as login } from "@/app/api/auth/login/route";
 import { POST as refresh } from "@/app/api/auth/refresh/route";
 import { POST as logout } from "@/app/api/auth/logout/route";
@@ -117,6 +119,113 @@ beforeEach(() => {
 });
 
 describe("JWT authentication contract", () => {
+  it("rejects admin principals before changing member details", async () => {
+    respond = (res) => json(res, { ...member, role: "admin" });
+    const response = await updateProfile(
+      request("/api/auth/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "blocked" }),
+      }),
+    );
+    expect(response.status).toBe(401);
+    expect(calls).toHaveLength(1);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+  it("patches only the cookie-authenticated member and returns the public account DTO", async () => {
+    respond = (res) =>
+      json(
+        res,
+        calls.at(-1)?.method === "PATCH"
+          ? { ...member, name: "새 이름", marketing: true, password_hash: "private" }
+          : member,
+      );
+    const response = await updateProfile(
+      request("/api/auth/me", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Account-Owner": member.id,
+          Authorization: "Bearer forged",
+        },
+        body: JSON.stringify({ name: "새 이름", marketing: true }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      user: { ...member, name: "새 이름", marketing: true },
+      guestId,
+    });
+    expect(calls.map((call) => call.method)).toEqual(["GET", "PATCH"]);
+    expect(calls.every((call) => call.headers.authorization === `Bearer ${token}`)).toBe(true);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+  for (const [action, path, method] of [
+    [changePassword, "/api/auth/change-password", "POST"],
+    [deactivate, "/api/auth/me", "DELETE"],
+  ] as const) {
+    it(`clears only member cookies after confirmed 204 for ${method} ${path}`, async () => {
+      respond = (res) =>
+        calls.at(-1)?.method === "GET" ? json(res, member) : (res.writeHead(204), res.end());
+      const response = await action(
+        request(path, {
+          method,
+          headers: {
+            Cookie: `aura_guest=${guestId}; aura_access=${token}; aura_refresh=${pair.refreshToken}; aura_admin_access=private-admin`,
+            "X-Account-Owner": member.id,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            currentPassword: "private-password",
+            ...(method === "POST" ? { newPassword: "next-password" } : {}),
+          }),
+        }),
+      );
+      expect(response.status).toBe(204);
+      expect(await response.text()).toBe("");
+      const cookies = response.headers.getSetCookie();
+      expect(cookies).toHaveLength(2);
+      expect(cookies.every((cookie) => cookie.includes("Max-Age=0"))).toBe(true);
+      expect(cookies.join()).not.toContain("admin");
+      expect(cookies.join()).not.toContain(token);
+      expect(cookies.some((cookie) => cookie.includes("Path=/api/auth"))).toBe(true);
+    });
+    for (const status of [400, 401, 403, 422, 503, 200]) {
+      it(`preserves cookies on ${status} instead of 204 for ${method}`, async () => {
+        respond = (res) =>
+          calls.at(-1)?.method === "GET"
+            ? json(res, member)
+            : json(
+                res,
+                { error: { code: "CURRENT_PASSWORD_INVALID", message: "확인해 주세요." } },
+                status,
+              );
+        const response = await action(
+          request(path, {
+            method,
+            headers: { Cookie: `aura_access=${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ currentPassword: "private-password" }),
+          }),
+        );
+        expect(response.status).toBe(status >= 500 || status === 200 ? 502 : status);
+        expect(response.headers.get("set-cookie")).toBeNull();
+        expect(await response.text()).not.toContain("private-password");
+      });
+    }
+  }
+
+  it("rejects stale account owners before forwarding a member write", async () => {
+    const response = await deactivate(
+      request("/api/auth/me", {
+        method: "DELETE",
+        headers: { "X-Account-Owner": "another-member", "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: "password" }),
+      }),
+    );
+    expect(response.status).toBe(409);
+    expect(calls).toHaveLength(1);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
   it("uses only the access cookie for Bearer and preserves owner/request IDs", async () => {
     const response = await saveDraft(
       request("/api/atelier/draft", {

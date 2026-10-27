@@ -92,6 +92,9 @@ FastAPI 내부 인증 응답은 TokenPair 또는 회원 프로필이며, BFF가 
 | GET    | `/api/catalog`               | `Catalog`                                                                                         |
 | GET    | `/api/catalog/products/{id}` | `Product`, 없는 상품은 404                                                                        |
 | GET    | `/api/auth/me`               | `AccountState { user: Member \| null, guestId: string }`                                          |
+| PATCH  | `/api/auth/me`               | `{ name?, marketing? }` → `AccountState`                                                          |
+| POST   | `/api/auth/change-password`  | `{ currentPassword, newPassword }` → 204, 회원 쿠키 삭제                                          |
+| DELETE | `/api/auth/me`               | `{ currentPassword }` → 204, 계정 비활성화 후 회원 쿠키 삭제                                      |
 | POST   | `/api/auth/register`         | `{ name, email, password, marketing? }` → 201 `AccountState`                                      |
 | POST   | `/api/auth/login`            | `{ email, password }` → `AccountState`                                                            |
 | POST   | `/api/auth/logout`           | 본문 없음 → `AccountState`                                                                        |
@@ -138,9 +141,9 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
 - 미인증·무효·폐기 Token·관리자 principal·비활성/삭제 회원은 401, CSRF 거절은 403,
   저장소 실패는 503입니다. 요청 ID·공통 오류·보안 헤더는 유지합니다.
 - JWT·Refresh를 재발급하거나 폐기하지 않습니다. 쿠폰·이메일·권한 등은 수정할 수 없습니다.
-- **이번 구현은 FastAPI만 제공합니다.** BFF `/api/auth/me`의 PATCH와 마이페이지 수정 UI는
-  아직 이 작업에서 연결하지 않았습니다. 조정민님 후속 연결 시 `MemberResponse`와 공개
-  `AccountState` 변환·계정 캐시 갱신을 맞춰야 합니다.
+- CRA-36에서 BFF PATCH와 마이페이지 계정 관리 탭을 연결했습니다. BFF는 현재 JWT로
+  회원을 확인하고 `MemberResponse`를 공개 `AccountState`로 변환합니다. 계정 캐시와
+  다른 탭의 계정 조회를 갱신하며 인증 쿠키와 개인 주문·레시피는 유지합니다.
 
 ### 비밀번호 변경 — FastAPI CRA-33
 
@@ -155,10 +158,9 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
   **400 `CURRENT_PASSWORD_INVALID`**입니다. 인증 토큰 실패를 뜻하는 401과 구분해
   자동 Refresh·쓰기 재시도를 유발하지 않습니다. 미인증·폐기 토큰·관리자·비활성/삭제
   회원은 401, CSRF 차단은 403, 저장소 실패는 503입니다. 공통 오류 형식과 요청 ID를 유지합니다.
-- **BFF 경로·화면은 이번 작업에 포함하지 않습니다.** 후속 BFF 연결에서는 백엔드 204를
-  확인한 뒤 Access/Refresh 쿠키 삭제·계정 상태 초기화·재로그인 안내를 처리해야 합니다.
-  실패 응답에서 성공으로 처리하거나 새 토큰을 자동 발급해서는 안 됩니다. 인증 Web Lock을
-  사용해 Refresh 및 로그아웃과 브라우저 상태 변경을 직렬화하는 연결이 필요합니다.
+- CRA-36에서 BFF POST와 비밀번호 변경 폼을 연결했습니다. 백엔드의 정확한 204를 확인한
+  뒤 회원 쿠키만 삭제하고 현재 회원의 계정·주문·레시피 캐시를 정리해 재로그인을 안내합니다.
+  실패에서는 성공 처리를 하지 않으며 400은 Refresh나 재시도를 유발하지 않습니다.
 
 ### 회원 계정 비활성화 — FastAPI CRA-34
 
@@ -177,9 +179,10 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
 - **개인정보 완전 파기 API가 아닙니다.** 이름·이메일·비밀번호 해시와 주문 수령인·주소는
   이번에 삭제하지 않습니다. 이메일 UNIQUE는 유지하며 재가입·계정 복구·정지와 탈퇴 구분·
   개인정보 보존 범위와 기간은 미확정입니다. 개인정보 삭제 완료로 안내해서는 안 됩니다.
-- BFF DELETE 경로·쿠키·계정/주문/레시피 캐시·장바구니 초기화는 후속 작업입니다.
-  BFF는 백엔드 204 확인 후 회원 쿠키만 삭제하고, 기존 회원 인증 잠금에 DELETE를 연결해야
-  합니다. 관리자 쿠키는 유지하며 단순 401이나 응답 유실을 탈퇴 성공으로 간주하지 않습니다.
+- CRA-36에서 BFF DELETE·확인 UI·회원 쿠키·해당 회원의 주문/레시피 캐시 정리를 연결했습니다.
+  백엔드 204만 성공으로 처리하고 관리자 쿠키·다른 회원 캐시는 유지합니다. 단순 401이나
+  응답 유실을 성공으로 간주하지 않습니다. 장바구니는 공용 `aura_cart_v1`에 소유자 정보가
+  없어 다른 회원·비회원 데이터 보호를 위해 삭제하지 않습니다. 회원별 소유 정책 합의가 필요합니다.
 
 ### 토큰 보관과 전달
 
@@ -187,7 +190,9 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
 - BFF는 Access 쿠키의 JWT 형식과 3,800자 상한만 검사하고 `Authorization: Bearer <JWT>`로 전달합니다. FastAPI만 서명·issuer·audience·필수 클레임·만료·발급 기록·폐기·활성 회원을 검증합니다. 웹에는 서명 키를 주입하지 않습니다.
 - 브라우저의 `Authorization`, 임의 사용자 ID, `Cookie`, Refresh Token을 업무 API로 전달하지 않습니다. 백엔드의 `Set-Cookie`도 전달하지 않고 BFF가 검증한 TokenPair로 쿠키를 만듭니다. 공개 카탈로그와 RSC는 사용자 토큰을 전달하지 않습니다.
 - `aura_guest`는 로그인 전후 초안을 유지하기 위한 별도 방문자 UUID입니다. `guestId`는 사용자 JWT·Refresh에 포함하지 않으며 회원 API의 인증·인가 근거가 될 수 없습니다. Mock의 익명 초안은 민감한 회원 데이터를 저장하지 않습니다.
-- `X-Account-Owner`는 계정 변경 중 시작된 레시피 요청의 409 충돌 검사에만 사용합니다. 실제 소유자는 검증된 JWT의 `sub`로 결정합니다.
+- `X-Account-Owner`는 계정 변경 중 시작된 레시피 및 회원 관리 요청의 409 충돌 검사에
+  사용합니다. 회원 관리 BFF는 `/auth/me`로 검증한 현재 회원과 비교합니다. 인증 수단은
+  아니며 실제 소유자는 FastAPI가 검증한 JWT의 `sub`로 결정합니다.
 
 ### 갱신·동시성·로그아웃
 

@@ -2,6 +2,91 @@ import { createHmac, randomUUID } from "node:crypto";
 import { test, expect, type APIRequestContext } from "@playwright/test";
 
 const credentials = { email: "member-a@example.com", password: "bff-password123" };
+
+test("member settings update across tabs, reject bad passwords, and end sessions only on success", async ({
+  page,
+  context,
+}) => {
+  const email = `cra36-${randomUUID()}@example.com`;
+  const registered = await context.request.post("/api/auth/register", {
+    data: { name: "Before", email, password: credentials.password },
+  });
+  expect(registered.status()).toBe(201);
+  const initial = await cookieToken(context.request);
+  expect((await context.request.patch("/api/auth/me", { data: { name: null } })).status()).toBe(
+    422,
+  );
+  expect(await cookieToken(context.request)).toBe(initial);
+  await page.goto("/mypage");
+  await page.getByRole("button", { name: "계정 관리", exact: true }).click();
+  await page.screenshot({ path: "test-results/cra36-member-settings.png", fullPage: true });
+  const other = await context.newPage();
+  await other.goto("/mypage");
+  await expect(other.getByRole("heading", { name: /님의 취향 기록/ })).toBeVisible();
+  await page.getByLabel("이름", { exact: true }).fill("새로운 회원");
+  await page.getByLabel("마케팅 수신 동의").check();
+  await page.getByRole("button", { name: "회원 정보 저장" }).click();
+  await expect(other.getByRole("heading", { name: "새로운 회원님의 취향 기록" })).toBeVisible();
+  const before = await cookieToken(context.request);
+  await page.getByLabel("현재 비밀번호", { exact: true }).fill("wrong-password");
+  await page.getByLabel("새 비밀번호", { exact: true }).fill("changed-password123");
+  await page.getByRole("button", { name: "비밀번호 변경", exact: true }).click();
+  await expect(
+    page.getByRole("region", { name: "회원 계정 관리" }).getByRole("alert"),
+  ).toContainText("현재 비밀번호");
+  expect(await cookieToken(context.request)).toBe(before);
+  await page.getByLabel("현재 비밀번호", { exact: true }).fill(credentials.password);
+  await page.getByLabel("새 비밀번호", { exact: true }).fill("changed-password123");
+  await page.getByRole("button", { name: "비밀번호 변경", exact: true }).click();
+  await expect(page.getByText("로그인하면 저장한 향과 쿠폰을 확인할 수 있어요.")).toBeVisible();
+  await expect(other.getByText("로그인하면 저장한 향과 쿠폰을 확인할 수 있어요.")).toBeVisible();
+  expect(await cookieToken(context.request)).toBeUndefined();
+  expect(await cookieToken(context.request, "aura_refresh")).toBeUndefined();
+  expect(
+    (
+      await context.request.post("/api/auth/login", {
+        data: { email, password: "changed-password123" },
+      })
+    ).status(),
+  ).toBe(200);
+  await other.close();
+});
+
+test("member deactivation preserves administrator cookies and never claims full erasure", async ({
+  page,
+  context,
+}) => {
+  const email = `cra36-${randomUUID()}@example.com`;
+  expect(
+    (
+      await context.request.post("/api/auth/register", {
+        data: { name: "Private", email, password: credentials.password },
+      })
+    ).status(),
+  ).toBe(201);
+  await context.addCookies([
+    { name: "aura_admin_access", value: "header.payload.signature", url: "http://127.0.0.1:3200" },
+  ]);
+  await page.goto("/mypage");
+  await page.getByRole("button", { name: "계정 관리", exact: true }).click();
+  await expect(page.getByText(/개인정보 완전 파기를 의미하지 않습니다/)).toBeVisible();
+  const cart = '[{"product":{"id":"warm-candle"},"quantity":1,"selection":[]}]';
+  await page.evaluate((value) => localStorage.setItem("aura_cart_v1", value), cart);
+  await page.getByLabel("계정 사용 중지 확인").check();
+  await page.getByLabel("확인용 현재 비밀번호").fill(credentials.password);
+  await page.getByRole("button", { name: "계정 사용 중지", exact: true }).click();
+  await expect(page.getByText("로그인하면 저장한 향과 쿠폰을 확인할 수 있어요.")).toBeVisible();
+  expect(await cookieToken(context.request)).toBeUndefined();
+  expect(await cookieToken(context.request, "aura_admin_access")).toBe("header.payload.signature");
+  expect(await page.evaluate(() => localStorage.getItem("aura_cart_v1"))).toBe(cart);
+  expect(
+    (
+      await context.request.post("/api/auth/login", {
+        data: { email, password: credentials.password },
+      })
+    ).status(),
+  ).toBe(401);
+});
 const cookieToken = async (request: APIRequestContext, name = "aura_access") =>
   (await request.storageState()).cookies.find((cookie) => cookie.name === name)?.value;
 

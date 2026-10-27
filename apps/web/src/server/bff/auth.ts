@@ -13,7 +13,15 @@ import {
   visitorId,
 } from "@/server/bff/token-cookie";
 
-export type AuthAction = "login" | "register" | "me" | "refresh" | "logout";
+export type AuthAction =
+  | "login"
+  | "register"
+  | "me"
+  | "refresh"
+  | "logout"
+  | "update-profile"
+  | "change-password"
+  | "deactivate";
 const invalid = () =>
   new ApiError(502, "API 서버의 인증 응답을 확인하지 못했어요.", "INVALID_BACKEND_RESPONSE");
 
@@ -136,6 +144,44 @@ export async function handleAuth(
   }
 
   const token = requestJwt(cookie, config.accessCookie);
+  if (["update-profile", "change-password", "deactivate"].includes(action)) {
+    if (!token) {
+      throw new ApiError(401, "로그인이 필요해요.", "TOKEN_REQUIRED");
+    }
+
+    const current = publicMember((await upstream("/auth/me", "GET", token)).data);
+    if (current.role === "admin") {
+      throw new ApiError(401, "회원 로그인이 필요해요.", "LOGIN_REQUIRED");
+    }
+
+    const expected = request.headers.get("x-account-owner");
+    if (expected && expected !== current.id) {
+      throw new ApiError(409, "계정이 변경됐어요. 다시 확인해 주세요.", "OWNER_CHANGED");
+    }
+
+    const result = await upstream(
+      action === "change-password" ? "/auth/change-password" : "/auth/me",
+      action === "update-profile" ? "PATCH" : action === "deactivate" ? "DELETE" : "POST",
+      token,
+      body,
+    );
+    if (action === "update-profile") {
+      const user = publicMember(result.data);
+      if (result.status !== 200 || user.id !== current.id || user.role === "admin") {
+        throw invalid();
+      }
+
+      return Response.json({ user, guestId: visitorId(cookie, headers, secure) }, { headers });
+    }
+
+    if (result.status !== 204) {
+      throw invalid();
+    }
+
+    clearTokens(headers, secure);
+    return new Response(null, { status: 204, headers });
+  }
+
   const refresh = readCookie(cookie, config.refreshCookie);
   if (!token && refresh !== undefined) {
     throw new ApiError(401, "인증 토큰 갱신이 필요해요.", "TOKEN_REQUIRED");

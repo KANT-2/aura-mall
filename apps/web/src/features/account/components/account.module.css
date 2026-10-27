@@ -1,5 +1,52 @@
 /* account screen styles. :where keeps the original selector specificity. */
 
+.memberSettings {
+  display: grid;
+  gap: 20px;
+  max-width: 680px;
+}
+
+.memberSettings fieldset {
+  display: grid;
+  gap: 18px;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.memberSettings label {
+  display: grid;
+  gap: 8px;
+}
+
+.memberSettings input:not([type="checkbox"]) {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.memberSettings input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  flex: 0 0 18px;
+}
+
+.memberSettings label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+}
+
+.memberSettings p {
+  overflow-wrap: anywhere;
+}
+
+.memberSettings button:disabled {
+  opacity: 0.6;
+}
+
 :where(.root):global(.auth-page) {
   display: grid;
   grid-template-columns: 1fr 1fr;
