@@ -41,3 +41,15 @@ CREATE INDEX refresh_expiry_test ON refresh_tokens(expires_at);
 CREATE INDEX access_expiry_test ON refresh_tokens(access_expires_at);
 CREATE UNIQUE INDEX refresh_one_unused_per_family_test ON refresh_tokens(family_id)
     WHERE consumed_at IS NULL AND revoked_at IS NULL;
+-- Admin access tokens (migration 0003): read by is_revoked alongside member tokens.
+CREATE TABLE admins (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    status varchar(20) NOT NULL DEFAULT 'active'
+);
+CREATE TABLE admin_sessions (
+    jti uuid PRIMARY KEY,
+    admin_id uuid NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+    issued_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL,
+    revoked_at timestamptz
+);
