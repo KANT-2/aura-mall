@@ -52,6 +52,9 @@ uv run --directory apps/api python -m aura_api.infra.expire_unpaid_orders --exec
   **운영 기본값은 정하지 않았습니다.** 값이 없으면 작업이 실행을 거부합니다.
 - 토스 결제 인증 후 승인까지 10분 제한이 있으므로, 정책값은 결제창 체류 시간보다 충분히 길어야 합니다.
 - 결제 결과 재확인 작업을 먼저 실행해 `IN_PROGRESS`를 줄인 뒤 만료 작업을 실행하는 순서를 권장합니다.
+- 출력의 `due`는 이번 실행의 대상 수(`--limit` 이하)입니다. 더 많은 대상이 남아 있을 수 있습니다.
+  `cancelled`·`skipped`는 실행 결과이고, dry run에서는 그 시점의 예상치입니다(결제 확인 중·완료 주문은
+  건너뜀으로 셉니다). 실행 직전에 결제가 시작되면 실제 결과와 달라질 수 있습니다.
 - 스케줄러는 등록하지 않았습니다.
 
 ## API (계약 1.3.0)
@@ -71,7 +74,17 @@ uv run --directory apps/api python -m aura_api.infra.expire_unpaid_orders --exec
 - `payments.status`에 `CANCELED` 추가. `CANCELED`는 paymentKey 없이 허용되며 주문당 열린 결제 1건
   제약에서 빠집니다.
 - `orders (created_at) WHERE status = 'received'` 부분 인덱스.
-- 되돌리기는 `CANCELED` 결제 시도 행(PG에 보낸 적 없는 미사용 시도)을 삭제한 뒤 0007 제약으로 돌아갑니다.
+- 되돌리기는 `CANCELED` 결제 시도 행을 **삭제**한 뒤 0007 제약으로 돌아갑니다.
+
+### 0008 되돌리기의 데이터 손실
+
+0007 제약은 `READY`가 아닌 시도에 paymentKey를 요구하므로 `CANCELED` 행을 다른 상태로 바꿀 수 없어
+삭제합니다. 삭제되는 것은 취소된 주문의 미사용 결제 시도 기록(시도 ID, PG 주문번호, 금액, 발급 시각,
+`ORDER_CANCELLED`)입니다. PG에 승인 요청을 보낸 적이 없는 행이라 결제·환불 금액에는 영향이 없고,
+주문의 `cancelled` 상태와 상태 변경 이력은 남습니다. 다시 0008을 적용해도 삭제된 행은 복구되지 않습니다.
+
+운영에서 되돌려야 하면 먼저 백업을 확인하고, 필요하면
+`SELECT * FROM payments WHERE status = 'CANCELED'` 결과를 별도로 보관한 뒤 실행합니다.
 
 ## 남은 것
 

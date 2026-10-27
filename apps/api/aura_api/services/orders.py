@@ -208,14 +208,19 @@ async def expire_unpaid_orders(
 ) -> dict[str, int]:
     """Cancel `received` orders older than `older_than`, one transaction per order.
 
-    Orders with a payment in progress or approved are skipped and counted, never cancelled.
+    `due` is the number of candidates in this batch (at most `limit`). Orders with a payment in
+    progress or approved are skipped, never cancelled. A dry run changes nothing and reports
+    the same counts the run would produce now: `cancelled` and `skipped` are predictions.
     """
     cutoff = datetime.now(UTC) - older_than
     async with session.begin():
         ids = await repository.unpaid_before(session, cutoff, limit)
+        if not execute:
+            blocked = await payment_repository.orders_with_payment(
+                session, ids, ("IN_PROGRESS", "DONE")
+            )
+            return {"due": len(ids), "cancelled": len(ids) - len(blocked), "skipped": len(blocked)}
     counts = {"due": len(ids), "cancelled": 0, "skipped": 0}
-    if not execute:
-        return counts
     for order_id in ids:
         try:
             async with session.begin():

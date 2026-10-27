@@ -6,6 +6,9 @@
 The time limit comes from AURA_UNPAID_ORDER_TTL_MINUTES (or --ttl-minutes); without one the job
 refuses to run, because the operating value is a policy decision. Orders whose payment is in
 progress or approved are skipped: run aura_api.infra.reconcile_payments first.
+
+Output: due = candidates in this batch (at most --limit), cancelled/skipped = the result, or in
+a dry run the predicted result at that moment. More candidates may remain beyond --limit.
 """
 
 import argparse
