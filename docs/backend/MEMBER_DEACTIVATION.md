@@ -161,7 +161,11 @@ Ruff와 Python 116개 파일 포맷 검사가 통과했습니다. 실제 Postgre
 
 웹 lint·CSS·타입 검사와 `npm run build`가 통과했습니다. 기존 JWT·업무 E2E는 실제
 FastAPI/BFF와 저장소 대역을 사용하므로 실제 DB E2E나 새 DELETE의 브라우저 검증으로
-표시하지 않습니다. 새 BFF DELETE 경로·화면은 후속 작업입니다.
+표시하지 않습니다. 위 결과는 CRA-34 API 단계의 기록입니다. 이후 BFF DELETE 경로와
+마이페이지 계정 사용 중지 화면은 CRA-36 [PR #67](https://github.com/KANT-2/aura-mall/pull/67)에서
+구현·병합했고, [PR #68](https://github.com/KANT-2/aura-mall/pull/68)에서 비밀번호 확인 입력
+분리와 빈 확인 입력 제출 차단을 보완했습니다. 브라우저 검증은
+[CRA-36 문서](MEMBER_ACCOUNT_INTEGRATION.md)에 기록합니다.
 
 루트 `npm run check`는 기존 283개 파일의 Prettier 경고로 포맷 단계에서 중단됐습니다.
 변경 문서 2개는 별도 포맷 검사를 통과했습니다. 무관한 파일을 일괄 수정하지 않았습니다.
