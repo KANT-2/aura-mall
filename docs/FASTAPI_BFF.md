@@ -292,6 +292,7 @@ DTO는 [관리자 모델](../apps/web/src/features/admin/model/admin.ts)에 정�
 - 모든 변경 요청은 읽은 시점의 `version`을 보내고, 현재 버전과 다르면 409로 거절합니다. 웹은 409에서 최신 데이터를 다시 조회하고 사용자에게 재확인을 요청합니다. 실제 DB에서는 같은 트랜잭션 안에서 버전 비교·재고 변경·이력 기록을 수행합니다(조건부 UPDATE 또는 행 잠금).
 - `key`는 재고 조정 1건의 idempotency 키(8~64자 영숫자·하이픈)입니다. 같은 키·같은 내용의 재전송은 다시 적용하지 않고 현재 상태를 200으로 반환하며, 같은 키로 다른 내용을 보내면 409입니다.
 - 가격 변경은 기존 주문의 상품·단가 스냅샷을 바꾸지 않습니다. 주문 상태 변경·취소·재고 복구는 정책·DB 확장 합의 후 추가하며 현재는 조회만 제공합니다.
+- 계약 1.2.0(마이그레이션 0007): 회원 결제 API `POST /payments`(`{ orderId }` → 결제 대기 발급·재사용), `POST /payments/confirm`(`{ paymentKey, orderId, amount }` → 200 `DONE`·`FAILED`, 결과 확인 중이면 202 `IN_PROGRESS`), `GET /payments/{id}`를 추가했습니다. 금액은 서버의 주문 합계만 사용하며 클라이언트 금액은 비교만 합니다. PG 미설정 시 503입니다. BFF·결제창 연결은 아직 없습니다. 상세는 [결제 문서](backend/PAYMENTS.md)입니다.
 - 계약 1.1.0(마이그레이션 0006): FastAPI 회원 `OrderOut`, 관리자 `AdminOrderSummaryOut`에 `status`(`received`·`paid`·`preparing`·`shipped`·`delivered`·`cancelled`)를 추가했습니다. 관리자 `AdminOrderOut`은 `statusHistory: [{ fromStatus, status, actorType, reason, changed }]`를 시간순으로 포함합니다. 회원 응답에는 이력과 변경자 ID를 포함하지 않습니다. 지금 생성되는 모든 주문은 결제 없는 `received`입니다. 상태를 바꾸는 API는 아직 없으며 규칙은 [주문 상태 문서](backend/ORDER_STATUS.md)를 따릅니다. 현재 BFF 어댑터는 이 필드를 브라우저로 전달하지 않습니다.
 - 수정 작업마다 작업자·대상·시각·변경 전후 값·재고 조정 사유를 감사 기록에 남기고 상세 응답의 `history`로 최근 30건을 반환합니다. 내부 메모는 이력에 변경 사실만 표시합니다.
 - 관리자 응답의 고객 정보는 주문자 이름·이메일, 받는 분·배송지로 제한합니다. 비밀번호 해시·세션·토큰·소유자 키는 응답과 로그에 포함하지 않습니다.

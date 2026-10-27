@@ -31,6 +31,7 @@ from aura_api.infra.models.ordering import (
     OrderStatusHistory,
 )
 from aura_api.infra.models.partner import PartnerInquiry
+from aura_api.infra.models.payment import Payment
 
 __all__ = [
     "Admin",
@@ -48,6 +49,7 @@ __all__ = [
     "OrderItemSelection",
     "OrderStatusHistory",
     "PartnerInquiry",
+    "Payment",
     "Product",
     "ProductType",
     "Promotion",

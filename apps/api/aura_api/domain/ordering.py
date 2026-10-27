@@ -28,9 +28,9 @@ LineKind = Literal["product", "gift_set", "custom"]
 OrderStatus = Literal["received", "paid", "preparing", "shipped", "delivered", "cancelled"]
 ActorType = Literal["member", "admin", "system"]
 
-# Order lifecycle (draft rules; payment, cancellation and admin changes use them later).
-# received: accepted without payment (every order today) · paid: payment approved
+# Order lifecycle. received: accepted, not paid · paid: PG approval verified by the server
 # preparing: made/packed · shipped · delivered · cancelled. Terminal states allow nothing.
+# An unpaid order never reaches preparing, and only a verified payment makes it paid.
 ORDER_STATUSES: tuple[OrderStatus, ...] = (
     "received",
     "paid",
@@ -41,7 +41,7 @@ ORDER_STATUSES: tuple[OrderStatus, ...] = (
 )
 INITIAL_ORDER_STATUS: OrderStatus = "received"
 ORDER_TRANSITIONS: dict[str, frozenset[str]] = {
-    "received": frozenset({"paid", "preparing", "cancelled"}),
+    "received": frozenset({"paid", "cancelled"}),
     "paid": frozenset({"preparing", "cancelled"}),
     "preparing": frozenset({"shipped", "cancelled"}),
     "shipped": frozenset({"delivered"}),
@@ -287,10 +287,17 @@ def idempotency_key(value: object) -> str | None:
     return value
 
 
-def ensure_status_change(current: str, new: object, reason: object = None) -> str | None:
-    """Check one order status change and return its optional reason."""
+def ensure_status_change(
+    current: str, new: object, reason: object = None, *, payment_verified: bool = False
+) -> str | None:
+    """Check one order status change and return its optional reason.
+
+    `paid` is only reachable from the payment service after the PG approval was verified.
+    """
     if new not in ORDER_STATUSES:
         raise InvalidInput("ORDER_STATUS_INVALID", "주문 상태를 확인해 주세요.")
+    if new == "paid" and not payment_verified:
+        raise Conflict("ORDER_PAYMENT_REQUIRED", "결제 승인으로만 결제 완료가 돼요.")
     if new not in ORDER_TRANSITIONS[current]:
         raise Conflict("ORDER_STATUS_CONFLICT", "현재 주문 상태에서는 변경할 수 없어요.")
     if reason is None:
