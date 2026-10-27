@@ -53,6 +53,28 @@ class MemoryRepository:
     async def find_user(self, email):
         return self.users.get(email)
 
+    async def register(self, registration, password_hash, pair):
+        with self.lock:
+            if registration.email in self.users:
+                return False
+            self.users[registration.email] = UserRecord(pair.user_id, password_hash, True)
+            self.families[pair.family_id] = False
+            self.save(pair)
+        return True
+
+    async def profile(self, user_id):
+        for email, user in self.users.items():
+            if user.id == user_id and user.is_active:
+                return {
+                    "id": str(user_id),
+                    "email": email,
+                    "name": "Test customer",
+                    "marketing": False,
+                    "coupon": True,
+                    "role": "member",
+                }
+        return None
+
     def active(self, user_id):
         return any(user.id == user_id and user.is_active for user in self.users.values())
 
@@ -68,7 +90,7 @@ class MemoryRepository:
             "access_expires_at": pair.access_expires_at,
         }
 
-    async def create_session(self, pair):
+    async def create_token_family(self, pair):
         with self.lock:
             if not self.active(pair.user_id):
                 return False
@@ -379,7 +401,7 @@ def test_expired_or_forged_access_is_rejected(client):
 
 
 @pytest.mark.parametrize(
-    "operation", ["find_user", "create_session", "rotate", "logout", "is_revoked"]
+    "operation", ["find_user", "create_token_family", "rotate", "logout", "is_revoked"]
 )
 def test_storage_errors_never_report_success_or_leak_secrets(
     client, repository, monkeypatch, operation, caplog
@@ -399,7 +421,7 @@ def test_storage_errors_never_report_success_or_leak_secrets(
         )
 
     monkeypatch.setattr(repository, operation, broken)
-    if operation in {"find_user", "create_session"}:
+    if operation in {"find_user", "create_token_family"}:
         response = login(client)
     elif operation == "rotate":
         response = refresh(client, pair["refreshToken"])
@@ -670,3 +692,53 @@ def test_implicit_or_non_postgres_database_configuration_is_rejected(value):
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None, database_url=value)
+
+
+def test_registration_me_and_logout_share_the_production_jwt_contract(client):
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"name": "JWT customer", "email": "new@example.com", "password": PASSWORD},
+        headers={"Origin": ORIGIN},
+    )
+    assert response.status_code == 201
+    pair = response.json()
+    assert set(pair) == {
+        "accessToken",
+        "refreshToken",
+        "tokenType",
+        "expiresIn",
+        "refreshExpiresIn",
+    }
+    assert not response.cookies
+    headers = {"Authorization": "Bearer " + pair["accessToken"]}
+    me = client.get("/api/v1/auth/me", headers=headers)
+    assert me.status_code == 200
+    assert me.json()["email"] == "new@example.com"
+    assert me.json()["coupon"] is True
+    assert me.json()["role"] == "member"
+    assert "password_hash" not in me.text
+    duplicate = client.post(
+        "/api/v1/auth/register",
+        json={"name": "JWT customer", "email": "NEW@example.com", "password": PASSWORD},
+        headers={"Origin": ORIGIN},
+    )
+    assert duplicate.status_code == 409
+    rotated = refresh(client, pair["refreshToken"])
+    assert rotated.status_code == 200
+    logout = client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": "Bearer " + rotated.json()["accessToken"], "Origin": ORIGIN},
+    )
+    assert logout.status_code == 204
+    assert client.get("/api/v1/auth/me", headers=headers).status_code == 401
+    assert refresh(client, rotated.json()["refreshToken"]).status_code == 401
+
+
+def test_me_never_authenticates_from_cookies_or_user_headers(client):
+    pair = login(client).json()
+    for headers in [
+        {},
+        {"Cookie": "aura_access=" + pair["accessToken"]},
+        {"X-User-ID": str(ALICE), "X-Account-Owner": str(ALICE)},
+    ]:
+        assert client.get("/api/v1/auth/me", headers=headers).status_code == 401

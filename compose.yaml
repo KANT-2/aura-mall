@@ -29,6 +29,10 @@ services:
     environment:
       AURA_DATABASE_URL: ${AURA_DATABASE_URL:?Set AURA_DATABASE_URL in .env}
       AURA_BFF_SHARED_KEY: ${AURA_BFF_SHARED_KEY:?Set AURA_BFF_SHARED_KEY in .env}
+      AURA_JWT_ALGORITHM: HS256
+      AURA_JWT_SIGNING_KEY: ${AURA_JWT_SIGNING_KEY:?Set AURA_JWT_SIGNING_KEY in .env}
+      AURA_JWT_ISSUER: ${AURA_JWT_ISSUER:?Set AURA_JWT_ISSUER in .env}
+      AURA_JWT_AUDIENCE: ${AURA_JWT_AUDIENCE:?Set AURA_JWT_AUDIENCE in .env}
     expose:
       - "8000"
     networks:
@@ -44,8 +48,8 @@ services:
     environment:
       API_URL: http://api:8000
       API_PREFIX: /api/v1
-      API_SESSION_COOKIE: aura_session
-      API_AUTH_MODE: jwt
+      API_ACCESS_COOKIE: aura_access
+      API_REFRESH_COOKIE: aura_refresh
       API_BFF_SHARED_KEY: ${AURA_BFF_SHARED_KEY:?Set AURA_BFF_SHARED_KEY in .env}
       APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN in .env}
     ports:

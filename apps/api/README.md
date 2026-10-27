@@ -1,6 +1,6 @@
 # AURA FastAPI
 
-`apps/api`는 uv로 관리하는 독립 Python 앱입니다. 현재 헬스 체크·설정·라우터·테스트 골격을 제공하며, 상품·인증·장바구니 등 업무 API는 [BFF 계약](../../docs/FASTAPI_BFF.md)에 따라 구현합니다.
+`apps/api`는 uv로 관리하는 독립 Python 앱입니다. 카탈로그·문의·레시피·주문·관리자 업무 API와 JWT 인증을 제공하며, 웹 연결 계약은 [BFF 계약](../../docs/FASTAPI_BFF.md)에 따라 구현합니다.
 
 [저장소 안내](../../README.md) · [전체 문서](../../docs/README.md) · [웹 개발 안내](../web/README.md)
 
@@ -32,6 +32,7 @@ aura_api/
   api/                # 표현 계층: 라우터·요청/응답 모델
     router.py         # 업무 라우터 등록
     health.py         # 헬스 체크와 응답 모델
+    auth.py           # JWT 회원가입·로그인·사용자 조회·Refresh·로그아웃
     catalog.py        # GET /catalog, /catalog/products/{id}
     partner.py        # POST /partner
     recipes.py        # GET·POST /recipes, DELETE /recipes/{id}
@@ -120,7 +121,7 @@ API 접두사를 변경해도 `/health`는 유지됩니다. OpenAPI에는 접두
 
 ## 업무 API 추가와 웹 연결
 
-라우터는 `aura_api/api`에 추가하고 [router.py](aura_api/api/router.py)에 등록합니다. [main.py](aura_api/main.py)가 공통 접두사를 적용합니다. 요청·응답 모델은 BFF 계약의 camelCase JSON, 상태 코드, 세션 쿠키, 오류 규칙을 따릅니다.
+라우터는 `aura_api/api`에 추가하고 [router.py](aura_api/api/router.py)에 등록합니다. [main.py](aura_api/main.py)가 공통 접두사를 적용합니다. 요청·응답 모델은 BFF 계약의 camelCase JSON, 상태 코드, JWT 토큰, 오류 규칙을 따릅니다.
 
 가격·소유권·인증·트랜잭션은 백엔드가 검증합니다. DB·인증 방식·결제 연결은 업무 구현 시 정하고, 현재 Mock의 동작과 [제품 기획](../../docs/product/PRD.md)을 함께 확인합니다.
 
@@ -129,14 +130,14 @@ API 접두사를 변경해도 `/health`는 유지됩니다. OpenAPI에는 접두
 ```dotenv
 API_URL=http://127.0.0.1:8000
 API_PREFIX=/api/v1
-API_SESSION_COOKIE=aura_session
-API_AUTH_MODE=jwt
+API_ACCESS_COOKIE=aura_access
+API_REFRESH_COOKIE=aura_refresh
 # API_BFF_SHARED_KEY=<AURA_BFF_SHARED_KEY와 같은 무작위 서버 비밀값>
 ```
 
-이후 `npm run dev:web`으로 웹 서버를 실행합니다. 브라우저는 동일 출처 `/api`를 호출하고 Next BFF가 FastAPI에 연결합니다. 현재 FastAPI에는 헬스 체크·카탈로그·입점 문의·레시피·주문 API와 JWT 인증 생명주기 기능이 구현되어 있습니다. 다만 BFF의 실제 회원 Session·쿠키 연동은 아직 완료되지 않았습니다.
+이후 `npm run dev:web`으로 웹 서버를 실행합니다. 브라우저는 동일 출처 `/api`를 호출하고 Next BFF가 FastAPI에 연결합니다. 현재 FastAPI에는 헬스 체크·카탈로그·입점 문의·레시피·주문 API와 JWT 인증 생명주기 기능이 구현되어 있습니다. BFF는 사용자 JWT 인증 계약에 연결됩니다.
 
-JWT 모드의 BFF는 설정한 쿠키의 JWT를 Bearer로 변환해 FastAPI에 전달합니다. 백엔드 로그인·Refresh API는 TokenPair JSON을 반환하며, 로그아웃 API는 토큰 폐기 후 204를 반환합니다. 현재 BFF가 요구하는 공개 Session JSON·쿠키 발급 및 Refresh 자동 갱신은 별도 연동 작업으로 남아 있습니다. 테스트 전용 HTTP 검증은 저장소 루트에서 `npm run build`와 `npm run test:e2e:jwt`로 실행합니다. 실제 PostgreSQL 인증 저장소는 전용 테스트 DB에서 JWT 생명주기 테스트를 통과했으나 운영 BFF 연동이 완료된 것은 아닙니다.
+BFF는 HttpOnly 쿠키의 Access JWT를 Bearer로 전달합니다. FastAPI의 TokenPair는 토큰 쿠키로 보관하며 `/auth/me`로 공개 회원 정보를 조회합니다. Refresh 자동 갱신과 로그아웃 204 처리를 연결했습니다. `npm run build`와 `npm run test:e2e:jwt`로 운영 인증 라우터를 통과하는 브라우저 흐름을 확인합니다. 전용 PostgreSQL 테스트와 운영 배포 검증은 별도로 수행합니다.
 
 ## 검증과 의존성 변경
 
@@ -149,3 +150,7 @@ npm run format:api
 `check:api`는 Ruff 린트·포맷 검사와 pytest를 실행합니다. `test:api`는 pytest만, `format:api`는 Python 포맷 적용을 실행합니다.
 
 의존성을 추가할 때는 루트에서 `uv add --directory apps/api <패키지>`를 사용합니다. 개발 도구는 `--dev`를 추가합니다. `pyproject.toml`과 `uv.lock`을 함께 반영하고 `.venv`와 로컬 `.env`는 버전 관리에서 제외합니다.
+
+## 사용자 JWT 인증
+
+`/auth/register`와 `/auth/login`은 TokenPair JSON, `/auth/me`는 Bearer JWT로 확인한 회원 프로필, `/auth/refresh`는 회전한 TokenPair, `/auth/logout`은 계열 폐기 후 204를 반환합니다. 회원가입은 계정·배송비 쿠폰·토큰 계열을 한 트랜잭션으로 생성합니다. FastAPI는 브라우저 쿠키나 서버 세션을 사용자 인증에 사용하지 않습니다. Next BFF가 토큰을 HttpOnly 쿠키로 보관·전달합니다. DB URL과 네 JWT 설정, BFF 공유 키가 필요합니다. 상세 계약은 [FastAPI BFF](../../docs/FASTAPI_BFF.md#jwt-인증)를 참고합니다.

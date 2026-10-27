@@ -55,7 +55,7 @@ async def optional_member(
     if not exists:
         return None
     RequestOwner(guest_id="", user_id=str(member_id)).ensure_expected(
-        request.headers.get("x-session-owner")
+        request.headers.get("x-account-owner")
     )
     return member_id
 

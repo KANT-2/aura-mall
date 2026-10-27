@@ -2,17 +2,17 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { mixColor, restoreDraft, restoreRecipes } from "@/features/atelier/model/recipes";
 import { catalog, type MockDatabase } from "../data/store";
-import { resolveSession } from "../session";
+import { resolveIdentity } from "../auth";
 import { HttpError, requireJsonBody } from "../http";
 
 export function atelierRoutes(database: MockDatabase) {
   const router = Router();
   router.get("/recipes", (req, res) => {
-    const { owner } = resolveSession(req, res, database);
+    const { owner } = resolveIdentity(req, res, database);
     res.json(database.state.recipes[owner] ?? []);
   });
   router.post("/recipes", requireJsonBody, (req, res) => {
-    const { owner, user } = resolveSession(req, res, database);
+    const { owner, user } = resolveIdentity(req, res, database);
     if (!user) {
       throw new HttpError(401, "로그인 후 향을 저장할 수 있어요.");
     }
@@ -46,7 +46,7 @@ export function atelierRoutes(database: MockDatabase) {
     res.status(201).json(recipe);
   });
   router.delete("/recipes/:id", (req, res) => {
-    const { owner, user } = resolveSession(req, res, database);
+    const { owner, user } = resolveIdentity(req, res, database);
     if (!user) {
       throw new HttpError(401, "로그인이 필요해요.");
     }
@@ -61,23 +61,23 @@ export function atelierRoutes(database: MockDatabase) {
     res.json(database.state.recipes[owner]);
   });
   router.get("/atelier/draft", (req, res) => {
-    const { session } = resolveSession(req, res, database);
-    res.json(database.state.drafts[session.guestId] ?? null);
+    const { identity } = resolveIdentity(req, res, database);
+    res.json(database.state.drafts[identity.guestId] ?? null);
   });
   router.put("/atelier/draft", requireJsonBody, (req, res) => {
-    const { session } = resolveSession(req, res, database);
+    const { identity } = resolveIdentity(req, res, database);
     const draft = restoreDraft(req.body, catalog.ingredients);
     if (!draft) {
       throw new HttpError(400, "조향 초안을 확인해 주세요.");
     }
 
-    database.state.drafts[session.guestId] = draft;
+    database.state.drafts[identity.guestId] = draft;
     database.persist();
     res.json(draft);
   });
   router.delete("/atelier/draft", (req, res) => {
-    const { session } = resolveSession(req, res, database);
-    delete database.state.drafts[session.guestId];
+    const { identity } = resolveIdentity(req, res, database);
+    delete database.state.drafts[identity.guestId];
     database.persist();
     res.json(null);
   });

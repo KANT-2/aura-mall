@@ -4,10 +4,10 @@ import {
   login,
   logout,
   register,
-  sessionKey,
-  sessionQueryOptions,
-} from "@/features/account/api/session";
-import type { Credentials, Registration, Session } from "@/features/account/model/account";
+  accountKey,
+  accountQueryOptions,
+} from "@/features/account/api/account";
+import type { Credentials, Registration, AccountState } from "@/features/account/model/account";
 
 type AuthCommand =
   | { type: "login"; input: Credentials }
@@ -17,7 +17,7 @@ export function useAuth() {
   const client = useQueryClient();
   const mutation = useMutation({
     async mutationFn(command: AuthCommand) {
-      await client.ensureQueryData(sessionQueryOptions);
+      await client.ensureQueryData(accountQueryOptions);
       switch (command.type) {
         case "login":
           return login(command.input);
@@ -27,14 +27,14 @@ export function useAuth() {
           return logout();
       }
     },
-    async onSuccess(session: Session) {
+    async onSuccess(account: AccountState) {
       await client.cancelQueries({
-        predicate: (query) => ["session", "recipes", "orders"].includes(String(query.queryKey[0])),
+        predicate: (query) => ["account", "recipes", "orders"].includes(String(query.queryKey[0])),
       });
       client.removeQueries({
         predicate: (query) => ["recipes", "orders", "admin"].includes(String(query.queryKey[0])),
       });
-      client.setQueryData(sessionKey, session);
+      client.setQueryData(accountKey, account);
     },
   });
   return {

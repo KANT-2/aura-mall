@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { useNotify } from "@/components/feedback/notification-provider";
 import { useAuth } from "@/features/account/hooks/use-auth";
-import { useSession } from "@/features/account/hooks/use-session";
+import { useAccount } from "@/features/account/hooks/use-account";
 import styles from "@/features/admin/components/admin.module.css";
 import { testIds } from "@/lib/test-ids";
 
@@ -17,7 +17,7 @@ const menu = [
 
 /** Hiding the menu is only UX; every admin API checks the role again on the server. */
 export function AdminShell({ children }: { children: ReactNode }) {
-  const { user, ready } = useSession();
+  const { user, ready } = useAccount();
   const { signOut, pending } = useAuth();
   const path = usePathname();
   const router = useRouter();

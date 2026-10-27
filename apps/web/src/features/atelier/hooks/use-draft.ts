@@ -1,10 +1,10 @@
 "use client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNotify } from "@/components/feedback/notification-provider";
-import { useSession } from "@/features/account/hooks/use-session";
+import { useAccount } from "@/features/account/hooks/use-account";
 import { draftKey, getDraft, saveDraft } from "@/features/atelier/api/draft";
 export function useDraft() {
-  const { guestId, ready } = useSession();
+  const { guestId, ready } = useAccount();
   const client = useQueryClient();
   const notify = useNotify();
   const key = draftKey(guestId);

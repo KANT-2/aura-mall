@@ -6,6 +6,6 @@ export const getRecipes = (signal?: AbortSignal) => request<Recipe[]>("/recipes"
 export const saveRecipe = (recipe: RecipeInput, owner: string) =>
   request<Recipe>("/recipes", {
     method: "POST",
-    headers: { "X-Session-Owner": owner },
+    headers: { "X-Account-Owner": owner },
     body: JSON.stringify(recipe),
   });

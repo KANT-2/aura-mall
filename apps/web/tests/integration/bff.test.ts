@@ -7,8 +7,9 @@ import { GET as catalog } from "@/app/api/catalog/route";
 import { GET as product } from "@/app/api/catalog/products/[id]/route";
 import { POST as inquiry } from "@/app/api/partner/route";
 import { POST as saveRecipe } from "@/app/api/recipes/route";
-import { GET as session } from "@/app/api/session/route";
+import { GET as session } from "@/app/api/auth/me/route";
 import { POST as login } from "@/app/api/auth/login/route";
+import { POST as refresh } from "@/app/api/auth/refresh/route";
 import { POST as logout } from "@/app/api/auth/logout/route";
 import { POST as register } from "@/app/api/auth/register/route";
 import { PUT as saveDraft } from "@/app/api/atelier/draft/route";
@@ -44,8 +45,33 @@ const json = (res: ServerResponse, body: unknown, status = 200) => {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(body));
 };
-const request = (path: string, options?: RequestInit) =>
-  new Request(`http://mall.test${path}`, options);
+const token = "header.payload.signature";
+const guestId = "11111111-1111-4111-8111-111111111111";
+const member = {
+  id: "member-1",
+  name: "회원",
+  email: "member@example.com",
+  coupon: true,
+  role: "member",
+};
+const pair = {
+  accessToken: token,
+  refreshToken: "r1_" + "a".repeat(64),
+  tokenType: "Bearer",
+  expiresIn: 900,
+  refreshExpiresIn: 604800,
+};
+const request = (path: string, options: RequestInit = {}) => {
+  const headers = new Headers(options.headers);
+  if (!headers.has("Cookie")) {
+    headers.set(
+      "Cookie",
+      `aura_guest=${guestId}${path === "/api/auth/me" ? `; aura_access=${token}` : ""}`,
+    );
+  }
+
+  return new Request(`http://mall.test${path}`, { ...options, headers });
+};
 const credentials = JSON.stringify({ email: "member@example.com", password: "password123" });
 
 beforeAll(async () => {
@@ -61,40 +87,43 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.stubEnv("API_URL", base);
   vi.stubEnv("API_PREFIX", "/api");
-  vi.stubEnv("API_SESSION_COOKIE", "aura_session");
-  vi.stubEnv("API_AUTH_MODE", "cookie");
+  vi.stubEnv("API_ACCESS_COOKIE", "aura_access");
+  vi.stubEnv("API_REFRESH_COOKIE", "aura_refresh");
+  vi.stubEnv("API_AUTH_MODE", "jwt");
   vi.stubEnv("API_TIMEOUT_MS", "1000");
   vi.stubEnv("APP_ORIGIN", "");
   vi.stubEnv("API_BFF_SHARED_KEY", "");
   calls = [];
-  respond = (res) => json(res, calls.at(-1)?.url?.includes("/catalog") ? fixtureCatalog : []);
+  respond = (res) => {
+    const path = calls.at(-1)?.url ?? "";
+    if (path.endsWith("/auth/logout")) {
+      res.writeHead(204);
+      res.end();
+    } else {
+      json(
+        res,
+        path.includes("/catalog")
+          ? fixtureCatalog
+          : path.endsWith("/auth/me")
+            ? member
+            : /\/auth\/(login|register|refresh)$/.test(path)
+              ? pair
+              : [],
+      );
+    }
+  };
 });
 
-describe("JWT cookie to Bearer adapter", () => {
-  const token = "header.payload.signature";
-  const member = {
-    id: "member-1",
-    name: "회원",
-    email: "member@example.com",
-    coupon: true,
-    role: "member",
-  };
-  const publicData = { user: member, guestId: "guest-1" };
-  beforeEach(() => {
-    vi.stubEnv("API_AUTH_MODE", "jwt");
-    respond = (res) =>
-      json(res, calls.at(-1)?.url?.includes("/catalog") ? fixtureCatalog : publicData);
-  });
-
-  it("uses only the allow-listed cookie for Bearer and preserves owner/request IDs", async () => {
+describe("JWT authentication contract", () => {
+  it("uses only the access cookie for Bearer and preserves owner/request IDs", async () => {
     const response = await saveDraft(
       request("/api/atelier/draft", {
         method: "PUT",
         headers: {
-          Cookie: `analytics=private; aura_session=${token}`,
+          Cookie: `aura_guest=${guestId}; aura_access=${token}; analytics=private`,
           Authorization: "Bearer attacker",
           "X-User-ID": "admin",
-          "X-Session-Owner": "member-1",
+          "X-Account-Owner": "member-1",
           "X-Request-ID": "attacker",
         },
       }),
@@ -103,141 +132,179 @@ describe("JWT cookie to Bearer adapter", () => {
     expect(calls[0].headers.authorization).toBe(`Bearer ${token}`);
     expect(calls[0].headers.cookie).toBeUndefined();
     expect(calls[0].headers["x-user-id"]).toBeUndefined();
-    expect(calls[0].headers["x-session-owner"]).toBe("member-1");
+    expect(calls[0].headers["x-account-owner"]).toBe("member-1");
     expect(calls[0].headers["x-request-id"]).toBe(response.headers.get("x-request-id"));
-    expect(await response.text()).not.toContain(token);
   });
 
-  it("keeps catalog and RSC public, and never uses browser Authorization as fallback", async () => {
-    await catalog(request("/api/catalog", { headers: { Cookie: `aura_session=${token}` } }));
+  it("keeps catalog/RSC public and never authenticates from browser Authorization", async () => {
+    await catalog(request("/api/catalog", { headers: { Cookie: `aura_access=${token}` } }));
     await serverRequest("/catalog");
-    await session(request("/api/session", { headers: { Authorization: `Bearer ${token}` } }));
+    const anonymous = await session(
+      request("/api/auth/me", {
+        headers: { Cookie: `aura_guest=${guestId}`, Authorization: `Bearer ${token}` },
+      }),
+    );
+    expect(await anonymous.json()).toEqual({ user: null, guestId });
+    expect(calls).toHaveLength(2);
     for (const call of calls) {
       expect(call.headers.authorization).toBeUndefined();
       expect(call.headers.cookie).toBeUndefined();
     }
   });
 
-  it("binds issued/rotated JWTs to the public host and strips private auth fields", async () => {
+  it("converts TokenPair JSON to separate HttpOnly cookies and uses verified /auth/me", async () => {
     vi.stubEnv("APP_ORIGIN", "https://mall.test");
-    respond = (res) => {
-      res.setHeader("Set-Cookie", [
-        `aura_session=${token}; Domain=backend.internal; Path=/api/v1; Max-Age=900`,
-        "refresh=private; Path=/",
-      ]);
-      json(res, {
-        ...publicData,
-        accessToken: token,
-        refreshToken: "private",
-        user: { ...member, passwordHash: "private" },
-      });
-    };
-    for (const handler of [login, register, session, logout]) {
-      const response = await handler(
-        request("/api/auth", { method: handler === session ? "GET" : "POST" }),
-      );
-      expect(response.status).toBe(200);
-      expect(await response.json()).toEqual(publicData);
+    for (const handler of [login, register]) {
+      const response = await handler(request("/api/auth/login", { method: "POST" }));
+      expect(response.status).toBe(handler === register ? 201 : 200);
+      expect(await response.json()).toEqual({ user: member, guestId });
       expect(response.headers.getSetCookie()).toEqual([
-        `aura_session=${token}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=900`,
+        `aura_access=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=900; Secure`,
+        `aura_refresh=${pair.refreshToken}; Path=/api/auth; HttpOnly; SameSite=Lax; Max-Age=604800; Secure`,
       ]);
+      expect(calls.at(-1)?.url).toBe("/api/auth/me");
+      expect(calls.at(-1)?.headers.authorization).toBe(`Bearer ${token}`);
     }
   });
 
-  it("clears rejected credentials on backend 401 and returns a fixed Bearer challenge", async () => {
-    vi.stubEnv("APP_ORIGIN", "https://mall.test");
-    respond = (res) => {
-      res.setHeader("WWW-Authenticate", 'Bearer error_description="private"');
-      res.setHeader("Set-Cookie", `aura_session=${token}; Path=/`);
-      json(res, { detail: "인증이 필요합니다." }, 401);
-    };
-    const response = await session(
-      request("/api/session", { headers: { Cookie: `aura_session=${token}` } }),
+  it("forwards refresh exclusively from its HttpOnly cookie and never leaks the rotated tokens", async () => {
+    const response = await refresh(
+      request("/api/auth/refresh", {
+        method: "POST",
+        headers: {
+          Cookie: `aura_guest=${guestId}; aura_refresh=${pair.refreshToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refreshToken: "attacker" }),
+      }),
     );
-    expect(response.status).toBe(401);
-    expect(response.headers.get("www-authenticate")).toBe("Bearer");
-    expect(response.headers.getSetCookie()).toEqual([
-      "aura_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure",
-    ]);
-    expect(await response.text()).not.toContain("private");
+    expect(response.status).toBe(204);
+    expect(await response.text()).toBe("");
+    expect(JSON.parse(calls[0].body)).toEqual({ refreshToken: pair.refreshToken });
+    expect(calls[0].headers.authorization).toBeUndefined();
+    expect(calls[0].headers.cookie).toBeUndefined();
+    expect(response.headers.getSetCookie()).toHaveLength(2);
   });
 
-  it("rejects malformed, oversized and duplicate token cookies before HTTP", async () => {
+  it("requires refresh when the access cookie has expired and refresh remains", async () => {
+    const response = await session(
+      request("/api/auth/me", { headers: { Cookie: `aura_refresh=${pair.refreshToken}` } }),
+    );
+    expect(response.status).toBe(401);
+    expect(calls).toHaveLength(0);
+    expect(response.headers.getSetCookie()).toEqual([]);
+  });
+
+  it("keeps credentials on resource 401, but clears both after a rejected refresh", async () => {
+    respond = (res) => {
+      res.setHeader("Set-Cookie", "attacker=private");
+      json(res, { detail: "인증이 필요합니다." }, 401);
+    };
+    const rejected = await session(request("/api/auth/me"));
+    expect(rejected.status).toBe(401);
+    expect(rejected.headers.get("www-authenticate")).toBe("Bearer");
+    expect(rejected.headers.getSetCookie()).toEqual([]);
+    const ended = await refresh(
+      request("/api/auth/refresh", {
+        method: "POST",
+        headers: { Cookie: `aura_refresh=${pair.refreshToken}` },
+      }),
+    );
+    expect(ended.status).toBe(401);
+    expect(ended.headers.getSetCookie()).toEqual([
+      "aura_access=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0",
+      "aura_refresh=; Path=/api/auth; HttpOnly; SameSite=Lax; Max-Age=0",
+    ]);
+  });
+
+  it("rejects malformed/oversized/duplicate access and refresh cookies before HTTP", async () => {
     for (const cookie of [
-      "aura_session=",
-      "aura_session=opaque",
-      "aura_session=a.b.c%20",
-      `aura_session=${"a".repeat(3800)}.b.c`,
-      `aura_session=${token}; aura_session=${token}`,
+      "aura_access=",
+      "aura_access=opaque",
+      "aura_access=a.b.c%20",
+      `aura_access=${"a".repeat(3800)}.b.c`,
+      `aura_access=${token}; aura_access=${token}`,
     ]) {
-      const response = await session(request("/api/session", { headers: { Cookie: cookie } }));
-      expect(response.status).toBe(401);
-      expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
-      expect(response.headers.get("www-authenticate")).toBe("Bearer");
+      expect((await session(request("/api/auth/me", { headers: { Cookie: cookie } }))).status).toBe(
+        401,
+      );
+    }
+
+    for (const cookie of [
+      "",
+      "aura_refresh=bad",
+      `aura_refresh=${pair.refreshToken}; aura_refresh=${pair.refreshToken}`,
+    ]) {
+      expect(
+        (
+          await refresh(
+            request("/api/auth/refresh", { method: "POST", headers: { Cookie: cookie } }),
+          )
+        ).status,
+      ).toBe(401);
     }
 
     expect(calls).toHaveLength(0);
   });
 
-  it("preserves credentials on forbidden/conflict and failed logout, without accepting error cookies", async () => {
+  it("preserves credentials on forbidden/conflict/unavailable and failed logout", async () => {
     for (const status of [403, 409, 500]) {
       respond = (res) => {
-        res.setHeader("Set-Cookie", `aura_session=${token}; Max-Age=0`);
+        res.setHeader("Set-Cookie", `aura_access=${token}; Max-Age=0`);
         json(res, { detail: "Denied" }, status);
       };
       const response = await logout(
         request("/api/auth/logout", {
           method: "POST",
-          headers: { Cookie: `aura_session=${token}` },
+          headers: { Cookie: `aura_access=${token}` },
         }),
       );
       expect(response.status).toBe(status === 500 ? 502 : status);
       expect(response.headers.getSetCookie()).toEqual([]);
-      expect(calls.at(-1)?.headers.authorization).toBe(`Bearer ${token}`);
     }
   });
 
-  it("rejects invalid auth responses before setting a new cookie", async () => {
+  it("rejects invalid token pairs and private/invalid profiles before issuing cookies", async () => {
     for (const data of [
       { accessToken: token },
-      { ...publicData, user: { ...member, role: "superadmin" } },
+      { ...pair, refreshToken: "bad" },
+      { ...pair, expiresIn: -1 },
+      { ...pair, accessToken: "opaque" },
     ]) {
-      respond = (res) => {
-        res.setHeader("Set-Cookie", `aura_session=${token}`);
-        json(res, data);
-      };
+      respond = (res) => json(res, data);
       const response = await login(request("/api/auth/login", { method: "POST" }));
       expect(response.status).toBe(502);
       expect(response.headers.getSetCookie()).toEqual([]);
       expect(await response.text()).not.toContain(token);
     }
 
-    respond = (res) => {
-      res.setHeader("Set-Cookie", "aura_session=not-a-jwt");
-      json(res, publicData);
-    };
+    respond = (res) =>
+      json(res, calls.at(-1)?.url?.endsWith("/auth/me") ? { ...member, role: "superadmin" } : pair);
     expect((await login(request("/api/auth/login", { method: "POST" }))).status).toBe(502);
+    respond = (res) => json(res, { ...member, passwordHash: "private", accessToken: token });
+    const me = await session(request("/api/auth/me"));
+    expect(await me.json()).toEqual({ user: member, guestId });
   });
 
-  it("preserves backend expiry/deletion and never retries writes", async () => {
-    respond = (res) => {
-      res.setHeader(
-        "Set-Cookie",
-        "aura_session=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
-      );
-      json(res, { user: null, guestId: "guest-1" });
-    };
+  it("adapts backend logout 204 only after revocation succeeds and preserves the visitor", async () => {
     const response = await logout(
-      request("/api/auth/logout", { method: "POST", headers: { Cookie: `aura_session=${token}` } }),
+      request("/api/auth/logout", {
+        method: "POST",
+        headers: { Cookie: `aura_access=${token}; aura_guest=${guestId}` },
+      }),
     );
     expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ user: null, guestId });
     expect(calls).toHaveLength(1);
-    expect(response.headers.get("set-cookie")).toContain("Max-Age=0; Expires=Thu, 01 Jan 1970");
+    expect(calls[0].headers.authorization).toBe(`Bearer ${token}`);
+    expect(response.headers.getSetCookie().every((cookie) => cookie.includes("Max-Age=0"))).toBe(
+      true,
+    );
   });
 
-  it("rejects invalid authentication mode configuration", async () => {
-    vi.stubEnv("API_AUTH_MODE", "bearer-from-browser");
-    expect((await session(request("/api/session"))).status).toBe(500);
+  it("rejects legacy session configuration", async () => {
+    vi.stubEnv("API_AUTH_MODE", "cookie");
+    expect((await session(request("/api/auth/me"))).status).toBe(500);
     expect(calls).toHaveLength(0);
   });
 });
@@ -273,7 +340,7 @@ describe("storefront resource contract", () => {
     const response = await saveRecipe(
       request("/api/recipes", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Session-Owner": "member-1" },
+        headers: { "Content-Type": "application/json", "X-Account-Owner": "member-1" },
         body: JSON.stringify({
           ...input,
           id: "client-id",
@@ -286,7 +353,7 @@ describe("storefront resource contract", () => {
     );
     expect(response.status).toBe(201);
     expect(JSON.parse(calls[0].body)).toEqual(input);
-    expect(calls[0].headers["x-session-owner"]).toBe("member-1");
+    expect(calls[0].headers["x-account-owner"]).toBe("member-1");
     expect(await response.json()).toEqual(recipe);
   });
 
@@ -386,7 +453,7 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
     expect(response.headers.get("x-aura-bff-key")).toBeNull();
     expect(await response.text()).not.toContain(key);
     await catalog(request("/api/catalog"));
-    expect(calls[1].headers["x-aura-bff-key"]).toBeUndefined();
+    expect(calls.at(-1)?.headers["x-aura-bff-key"]).toBeUndefined();
   });
 
   it("does not forward browser-supplied server credentials when unconfigured", async () => {
@@ -435,11 +502,11 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
         "/api/admin/products?q=%20hand%20&collection=fresh&collection=warm&page=2&role=admin" +
           "&url=https://attacker.test&stock=" +
           "x".repeat(101),
-        { headers: { Cookie: "aura_session=admin-session" } },
+        { headers: { Cookie: `aura_access=${token}` } },
       ),
     );
     expect(calls[0].url).toBe("/api/admin/products?q=hand&collection=fresh&page=2");
-    expect(calls[0].headers.cookie).toBe("aura_session=admin-session");
+    expect(calls[0].headers.authorization).toBe(`Bearer ${token}`);
     respond = (res) => json(res, { detail: "관리자 권한이 필요해요." }, 403);
     const denied = await updateAdminInquiry(
       request("/api/admin/inquiries/a", {
@@ -470,10 +537,10 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
       request("/api/atelier/draft", {
         method: "PUT",
         headers: {
-          Cookie: "analytics=secret; aura_session=session-token; other=value",
+          Cookie: `aura_guest=${guestId}; analytics=secret; aura_access=${token}; other=value`,
           Authorization: "Bearer secret",
           "Content-Type": "application/json",
-          "X-Session-Owner": "member-1",
+          "X-Account-Owner": "member-1",
           "X-Request-ID": "untrusted",
           "X-User-ID": "admin",
         },
@@ -481,9 +548,9 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
       }),
     );
     expect(response.status).toBe(200);
-    expect(calls[0].headers.cookie).toBe("aura_session=session-token");
-    expect(calls[0].headers["x-session-owner"]).toBe("member-1");
-    expect(calls[0].headers.authorization).toBeUndefined();
+    expect(calls[0].headers.cookie).toBeUndefined();
+    expect(calls[0].headers["x-account-owner"]).toBe("member-1");
+    expect(calls[0].headers.authorization).toBe(`Bearer ${token}`);
     expect(calls[0].headers["x-user-id"]).toBeUndefined();
     expect(calls[0].headers["x-request-id"]).toBe(response.headers.get("x-request-id"));
     expect(calls[0].headers["x-request-id"]).not.toBe("untrusted");
@@ -501,28 +568,17 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
     expect(calls[1].url).toBe("/api/recipes/recipe%3A1%2C2");
   });
 
-  it("binds allowed response cookies to the BFF host, preserves expiry, and supports deletion", async () => {
-    vi.stubEnv("APP_ORIGIN", "https://mall.test");
+  it("ignores all upstream cookies and private profile fields", async () => {
     respond = (res) => {
       res.setHeader("Set-Cookie", [
-        "aura_session=token; Domain=fastapi.internal; Path=/api/v1; Expires=Tue, 01 Jan 2030 00:00:00 GMT",
-        "tracking=secret; Path=/",
+        "aura_access=attacker; Domain=backend.internal",
+        "tracking=private",
       ]);
-      res.setHeader("X-Backend-Secret", "private");
-      json(res, { user: null });
+      json(res, { ...member, passwordHash: "private" });
     };
-    const response = await session(request("/api/session"));
-    expect(response.headers.getSetCookie()).toEqual([
-      "aura_session=token; Path=/; HttpOnly; SameSite=Lax; Secure; Expires=Tue, 01 Jan 2030 00:00:00 GMT",
-    ]);
-    expect(response.headers.get("x-backend-secret")).toBeNull();
-    respond = (res) => {
-      res.setHeader("Set-Cookie", "aura_session=; Path=/api; Max-Age=0");
-      json(res, { detail: "Session expired" }, 401);
-    };
-    const expired = await session(request("/api/session"));
-    expect(expired.status).toBe(401);
-    expect(expired.headers.getSetCookie()[0]).toContain("Max-Age=0");
+    const response = await session(request("/api/auth/me"));
+    expect(response.headers.getSetCookie()).toEqual([]);
+    expect(await response.json()).toEqual({ user: member, guestId });
   });
 
   it("normalizes FastAPI errors without exposing Pydantic input values", async () => {
@@ -654,7 +710,7 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
     ];
     for (const reply of cases) {
       respond = reply;
-      const response = await session(request("/api/session"));
+      const response = await session(request("/api/auth/me"));
       expect(response.status).toBe(502);
       expect(response.headers.get("location")).toBeNull();
       expect(await response.text()).not.toMatch(/postgres|private|attacker/);
@@ -674,14 +730,14 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
 
         timers.add(setTimeout(() => res.end(startBody ? "}" : "{}"), 500));
       };
-      const response = await session(request("/api/session"));
+      const response = await session(request("/api/auth/me"));
       expect(response.status).toBe(504);
       expect((await response.json()).error.code).toBe("BACKEND_TIMEOUT");
     }
 
     const controller = new AbortController();
     controller.abort();
-    expect((await session(request("/api/session", { signal: controller.signal }))).status).toBe(
+    expect((await session(request("/api/auth/me", { signal: controller.signal }))).status).toBe(
       499,
     );
   });
@@ -709,7 +765,7 @@ describe("Next BFF to FastAPI HTTP boundary", () => {
       json(res, fixtureCatalog);
     };
     expect((await catalog(request("/api/catalog"))).headers.getSetCookie()).toEqual([]);
-    const result = await createBffHandler("GET", "/catalog", { session: false })(
+    const result = await createBffHandler("GET", "/catalog", { authenticated: false })(
       request("/api/catalog"),
     );
     expect(result.headers.get("cache-control")).toBe("private, no-store");
