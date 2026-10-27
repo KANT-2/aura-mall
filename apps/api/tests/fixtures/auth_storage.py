@@ -1,6 +1,7 @@
 """Test-only token-family storage. Production never imports this module."""
 
 import threading
+from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -13,9 +14,51 @@ class MemoryAuthRepository:
         self.issuer = issuer
         self.families, self.refreshes, self.revoked = {}, {}, {}
         self.lock = threading.RLock()
+        self.profiles = {}
 
     async def find_user(self, email):
         return self.users.get(email)
+
+    async def find_user_by_id(self, user_id):
+        return next((user for user in self.users.values() if user.id == user_id), None)
+
+    async def update_profile(self, user_id, *, name=None, marketing=None):
+        with self.lock:
+            if not self.active(user_id):
+                return None
+            changes = self.profiles.setdefault(user_id, {})
+            if name is not None:
+                changes["name"] = name
+            if marketing is not None:
+                changes["marketing"] = marketing
+            return await self.profile(user_id)
+
+    async def change_password(self, user_id, *, expected_password_hash, new_password_hash):
+        return await self._end_sessions(user_id, expected_password_hash, new_password_hash)
+
+    async def deactivate(self, user_id, *, expected_password_hash):
+        return await self._end_sessions(user_id, expected_password_hash, None)
+
+    async def _end_sessions(self, user_id, expected_password_hash, new_password_hash):
+        with self.lock:
+            for email, user in self.users.items():
+                if user.id != user_id:
+                    continue
+                if not user.is_active:
+                    return None
+                if user.password_hash != expected_password_hash:
+                    return False
+                self.users[email] = replace(
+                    user,
+                    password_hash=new_password_hash or user.password_hash,
+                    is_active=new_password_hash is not None,
+                )
+                for family in {
+                    r["family"] for r in self.refreshes.values() if r["user"] == user_id
+                }:
+                    self.revoke(family)
+                return True
+        return None
 
     async def register(self, registration, password_hash, pair):
         with self.lock:
@@ -36,6 +79,7 @@ class MemoryAuthRepository:
                     "marketing": False,
                     "coupon": True,
                     "role": "member",
+                    **self.profiles.get(user_id, {}),
                 }
         return None
 
