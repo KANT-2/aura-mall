@@ -41,6 +41,7 @@ BFF는 요청 사이에 사용자 상태를 메모리로 보관하지 않습니�
 | ---------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | `/catalog`, `/catalog/products/{id}`, `/partner`, `/recipes`                 | 실제 라우터·공개 DTO 연결                                     |
 | `/auth/register`, `/auth/login`, `/auth/me`, `/auth/refresh`, `/auth/logout` | JWT 인증 연결. PostgreSQL 인증 저장소 사용                    |
+| `/auth/change-password`                                                      | 회원 비밀번호 변경. 성공 시 모든 로그인 계열 폐기             |
 | `/orders`                                                                    | 회원 주문 API·중복 방지 키·공개 DTO 연결, 웹 결제 버튼 비활성 |
 | `/admin/**`                                                                  | 별도 관리자 JWT 인증·등록·업무 API·공개 DTO 연결              |
 | `/atelier/draft`                                                             | 방문자별 조회·전체 저장·삭제, FastAPI·공개 DTO 연결           |
