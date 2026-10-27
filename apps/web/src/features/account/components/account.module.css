@@ -260,7 +260,7 @@
     align-items: center;
   }
 
-  :where(.root):global(.mypage .heading-row > .text-link) {
+  :where(.root):global(.mypage .heading-row .actions > .text-link) {
     font-size: 12px;
     white-space: nowrap;
   }
