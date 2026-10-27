@@ -142,7 +142,7 @@ async def confirm_payment(
                 if payment.payment_key != key:
                     raise Conflict("ORDER_ALREADY_PAID", "이미 결제된 주문이에요.")
                 return _view(payment, name)  # the same approval sent again
-            if payment.status == "FAILED":
+            if payment.status in ("FAILED", "CANCELED"):
                 raise Conflict("PAYMENT_CLOSED", "결제가 완료되지 않았어요. 다시 결제해 주세요.")
             if payment.status == "IN_PROGRESS" and payment.payment_key != key:
                 raise Conflict(

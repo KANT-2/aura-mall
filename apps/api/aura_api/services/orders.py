@@ -1,18 +1,20 @@
-"""Order use cases: place an order (price, stock, coupon in one transaction) and list orders."""
+"""Order use cases: place, list and cancel orders; stock and coupon change with the order."""
 
 import uuid
 from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aura_api.domain.catalog import CUSTOM_PRODUCT_TYPE
-from aura_api.domain.errors import Conflict, Unauthorized
-from aura_api.domain.ordering import OrderLine, idempotency_key, price_order
-from aura_api.infra.models import Product
+from aura_api.domain.errors import Conflict, NotFound, Unauthorized
+from aura_api.domain.ordering import OrderLine, idempotency_key, price_order, restock_needs
+from aura_api.infra.models import Order, Product
 from aura_api.infra.repositories import catalog as catalog_repository
 from aura_api.infra.repositories import orders as repository
+from aura_api.infra.repositories import payments as payment_repository
 from aura_api.infra.repositories import users
 from aura_api.infra.repositories.orders import SavedOrder
 
@@ -141,3 +143,95 @@ async def _place(
         if coupon_id and not await repository.use_coupon(session, coupon_id, order.id):
             raise Conflict("COUPON_UNAVAILABLE", "사용할 수 없는 쿠폰이에요.")
         return order, True
+
+
+async def _cancel(
+    session: AsyncSession,
+    order: Order,
+    *,
+    actor_type: str,
+    actor_id: uuid.UUID | None,
+    reason: str,
+) -> None:
+    """Cancel a `received` order the caller has locked, inside the caller's transaction.
+
+    The order status, its unused payment attempt, the coupon and the stock all change together.
+    """
+    payment = await payment_repository.open_payment(session, order.id)
+    if payment is not None and payment.status == "IN_PROGRESS":
+        # The PG may be approving right now: never cancel on an unknown payment result.
+        raise Conflict("PAYMENT_IN_PROGRESS", "결제를 확인하고 있어요. 잠시 후 다시 시도해 주세요.")
+    if payment is not None and payment.status == "DONE":
+        raise Conflict("ORDER_ALREADY_PAID", "결제된 주문은 환불과 함께 취소해야 해요.")
+    if payment is not None:  # READY: issued but never sent for approval
+        payment.status = "CANCELED"
+        payment.failure_code = "ORDER_CANCELLED"
+        payment.updated_at = datetime.now(UTC)
+    await repository.change_status(
+        session, order.id, "cancelled", actor_type=actor_type, actor_id=actor_id, reason=reason
+    )
+    # Same lock order as placing an order: the coupon first, then products by ID.
+    if order.coupon_id is not None:
+        await repository.give_back_coupon(session, order.coupon_id, order.id)
+    needs = restock_needs(await repository.stored_lines(session, order.id))
+    for product_id in sorted(needs):
+        await repository.give_back_stock(session, product_id, needs[product_id])
+
+
+def _order_uuid(value: object) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(value) if isinstance(value, str) else None
+    except ValueError:
+        return None
+
+
+async def cancel_order(session: AsyncSession, member_id: uuid.UUID, order_id: object) -> SavedOrder:
+    """The member cancels their own unpaid order. Cancelling it again changes nothing."""
+    target = _order_uuid(order_id)
+    async with session.begin():
+        if not await users.lock_active_member(session, member_id):
+            raise Unauthorized("LOGIN_REQUIRED", "로그인이 필요해요.")
+        order = await payment_repository.lock_order(session, target, member_id) if target else None
+        if order is None:
+            raise NotFound("ORDER_NOT_FOUND", "주문을 찾을 수 없어요.")
+        if order.status == "received":
+            await _cancel(
+                session, order, actor_type="member", actor_id=member_id, reason="member request"
+            )
+        elif order.status != "cancelled":
+            raise Conflict("ORDER_NOT_CANCELLABLE", "결제가 끝난 주문은 아직 취소할 수 없어요.")
+        return await repository.member_order(session, member_id, order.id)
+
+
+async def expire_unpaid_orders(
+    session: AsyncSession, *, older_than: timedelta, limit: int = 100, execute: bool = False
+) -> dict[str, int]:
+    """Cancel `received` orders older than `older_than`, one transaction per order.
+
+    Orders with a payment in progress or approved are skipped and counted, never cancelled.
+    """
+    cutoff = datetime.now(UTC) - older_than
+    async with session.begin():
+        ids = await repository.unpaid_before(session, cutoff, limit)
+    counts = {"due": len(ids), "cancelled": 0, "skipped": 0}
+    if not execute:
+        return counts
+    for order_id in ids:
+        try:
+            async with session.begin():
+                order = await payment_repository.lock_order(session, order_id)
+                # Recheck under the lock: paid or cancelled meanwhile means nothing to do.
+                if order is None or order.status != "received" or order.created_at >= cutoff:
+                    counts["skipped"] += 1
+                    continue
+                await _cancel(
+                    session,
+                    order,
+                    actor_type="system",
+                    actor_id=None,
+                    reason="unpaid order expired",
+                )
+                counts["cancelled"] += 1
+        except Conflict:
+            counts["skipped"] += 1
+    return counts
