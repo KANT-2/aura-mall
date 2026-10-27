@@ -262,7 +262,7 @@ def test_orders_show_customer_snapshot_and_options(client, admin):
                 },
             )
 
-    order = db(place)
+    order, _ = db(place)
     listed = client.get("/api/v1/admin/orders", headers=admin).json()
     summary = next(item for item in listed["items"] if item["id"] == str(order.id))
     assert summary["customer"]["name"] == "김고객"
