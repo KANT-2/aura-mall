@@ -93,7 +93,13 @@ async def unresolved_before(session: AsyncSession, cutoff: datetime, limit: int)
     return list(
         await session.scalars(
             select(Payment.id)
-            .where(Payment.status == "IN_PROGRESS", Payment.confirm_started_at < cutoff)
+            .join(Order, Order.id == Payment.order_id)
+            .where(
+                Payment.status == "IN_PROGRESS",
+                Payment.confirm_started_at < cutoff,
+                Order.is_demo.is_(False),
+                Payment.provider != "demo",
+            )
             .order_by(Payment.confirm_started_at, Payment.id)
             .limit(limit)
         )
@@ -134,7 +140,14 @@ async def unresolved_refunds_before(
     return list(
         await session.scalars(
             select(Refund.id)
-            .where(Refund.status == "IN_PROGRESS", Refund.requested_at < cutoff)
+            .join(Order, Order.id == Refund.order_id)
+            .join(Payment, Payment.id == Refund.payment_id)
+            .where(
+                Refund.status == "IN_PROGRESS",
+                Refund.requested_at < cutoff,
+                Order.is_demo.is_(False),
+                Payment.provider != "demo",
+            )
             .order_by(Refund.requested_at, Refund.id)
             .limit(limit)
         )

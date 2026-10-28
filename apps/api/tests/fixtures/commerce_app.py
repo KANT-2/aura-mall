@@ -11,6 +11,7 @@ from sqlalchemy.engine import make_url
 from aura_api.config import Settings
 from aura_api.infra.create_admin import create_first_admin
 from aura_api.infra.seed import load_seed
+from aura_api.infra.seed_demo import seed
 from aura_api.main import create_app
 from tests.fixtures.fake_payment_gateway import FakePaymentGateway
 
@@ -31,6 +32,7 @@ async def bootstrap():
     await create_first_admin(
         URL, "operator@example.test", "브라우저 운영자", "browser-admin-password-42"
     )
+    await seed(URL, "browser-demo-password-42", execute=True)
 
 
 if __name__ == "__main__":

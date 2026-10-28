@@ -77,6 +77,10 @@ async def start_payment(
         order = await repository.lock_order(session, target, member_id) if target else None
         if order is None:
             raise NotFound("ORDER_NOT_FOUND", "주문을 찾을 수 없어요.")
+        if order.is_demo:
+            raise Conflict(
+                "DEMO_ORDER_READ_ONLY", "시연용 기록이에요. 새 주문을 만들어 결제해 주세요."
+            )
         existing = await repository.open_payment(session, order.id)
         if existing is not None and existing.status == "DONE" and order.status != "cancelled":
             raise Conflict("ORDER_ALREADY_PAID", "이미 결제된 주문이에요.")
@@ -135,6 +139,8 @@ async def confirm_payment(
             if found is None:
                 raise NotFound("PAYMENT_NOT_FOUND", "결제를 찾을 수 없어요.")
             order = await repository.lock_order(session, found.order_id)
+            if order.is_demo or found.provider == "demo":
+                raise Conflict("DEMO_ORDER_READ_ONLY", "시연용 결제 기록은 승인할 수 없어요.")
             payment = await repository.lock_payment(session, found.id)
             ensure_amount(payment.amount, claimed_amount)
             name = await _name(session, payment.order_id)

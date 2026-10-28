@@ -3,7 +3,7 @@
 -- contract in docs/FASTAPI_BFF.md. Run once on an empty database (PostgreSQL 13+):
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/schema.sql
 -- Then load initial catalog data with db/seed.sql. The cart is not stored (browser only).
--- This file is the latest full schema (migrations 0001 through 0012). Alembic applies the same
+-- This file is the latest full schema (migrations 0001 through 0013). Alembic applies the same
 -- DDL step by step from migrations/sql/; tests/db checks that both give the same tables.
 
 BEGIN;
@@ -532,5 +532,17 @@ ALTER TABLE orders ADD COLUMN recipient_phone varchar(30) NOT NULL DEFAULT '';
 ALTER TABLE orders ADD COLUMN delivery_note varchar(300) NOT NULL DEFAULT '';
 ALTER TABLE orders ADD COLUMN courier varchar(100) NOT NULL DEFAULT '';
 ALTER TABLE orders ADD COLUMN tracking_number varchar(100) NOT NULL DEFAULT '';
+
+ALTER TABLE orders ADD COLUMN is_demo boolean NOT NULL DEFAULT false;
+
+CREATE FUNCTION aura_demo_order_readonly() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF OLD.is_demo AND NEW IS DISTINCT FROM OLD THEN
+        RAISE EXCEPTION 'Synthetic presentation orders are read only';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+CREATE TRIGGER aura_demo_order_readonly BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION aura_demo_order_readonly();
 
 COMMIT;

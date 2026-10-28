@@ -1,7 +1,7 @@
 import "server-only";
 import type { Order } from "@/features/checkout/model/order";
 import { productResponse } from "@/server/backend/storefront";
-import { invalidResponse, integer, list, record, text } from "@/server/backend/decode";
+import { boolean, invalidResponse, integer, list, record, text } from "@/server/backend/decode";
 
 import { orderStatuses, type OrderStatus } from "@/features/checkout/model/order";
 export function orderStatusResponse(value: unknown): OrderStatus {
@@ -16,6 +16,7 @@ export function orderResponse(value: unknown): Order {
     recipient: text(item.recipient),
     address: text(item.address),
     created: text(item.created),
+    ...(item.isDemo !== undefined ? { isDemo: boolean(item.isDemo) } : {}),
     ...(item.status !== undefined ? { status: orderStatusResponse(item.status) } : {}),
     ...Object.fromEntries(
       ["recipientPhone", "deliveryNote", "courier", "trackingNumber"]

@@ -45,6 +45,22 @@ export function OrderActions({ order }: { order: Order }) {
       setPending(false);
     }
   };
+  if (order.isDemo) {
+    return (
+      <div>
+        <p>
+          시연용 기록 · {order.status ? orderStatusLabels[order.status] : "주문"} · 실제 결제/배송
+          대상이 아니에요.
+        </p>
+        {order.courier && (
+          <p>
+            시연 운송장: {order.courier} · {order.trackingNumber}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div>
       {order.status && (

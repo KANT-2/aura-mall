@@ -210,6 +210,10 @@ async def cancel_order(session: AsyncSession, member_id: uuid.UUID, order_id: ob
         order = await payment_repository.lock_order(session, target, member_id) if target else None
         if order is None:
             raise NotFound("ORDER_NOT_FOUND", "주문을 찾을 수 없어요.")
+        if order.is_demo:
+            raise Conflict(
+                "DEMO_ORDER_READ_ONLY", "시연용 기록이에요. 새 주문을 만들어 결제해 주세요."
+            )
         if order.status == "received":
             await _cancel(
                 session, order, actor_type="member", actor_id=member_id, reason="member request"

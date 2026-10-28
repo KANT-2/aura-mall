@@ -119,3 +119,35 @@ test("checkout survives a lost order response, pays once, clears its original ca
   await expect(page.getByText("취소 완료", { exact: true })).toBeVisible();
   expect((await (await page.request.get("/api/orders")).json())[0].status).toBe("cancelled");
 });
+
+test("presentation member has rich saved scents and order states while simulated payments stay read only", async ({
+  page,
+  browser,
+}) => {
+  const signed = await page.request.post("/api/auth/login", {
+    data: { email: "demo@aura.example.invalid", password: "browser-demo-password-42" },
+  });
+  expect(signed.status()).toBe(200);
+  await page.goto("/mypage");
+  await expect(page.getByRole("heading", { name: "시연 체험회원님의 취향 기록" })).toBeVisible();
+  await expect(page.locator(".saved-recipe")).toHaveCount(4);
+  await page.getByRole("button", { name: "구매한 향", exact: true }).click();
+  await expect(page.locator(".saved-recipe").first()).toBeVisible();
+  await page.getByRole("button", { name: "주문 내역", exact: true }).click();
+  await expect(page.getByText(/시연용 기록/).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "결제 이어하기" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "취소·전액 환불 요청" })).toHaveCount(0);
+  await page.getByRole("button", { name: "상품 문의", exact: true }).click();
+  await expect(page.getByRole("article").first()).toBeVisible();
+  const operator = await browser.newContext();
+  try {
+    const backoffice = await operator.newPage();
+    await admin(backoffice);
+    await backoffice.goto("/admin/payments");
+    await expect(backoffice.getByText("시연용 기록 · PG 재확인 제외").first()).toBeVisible();
+    await backoffice.getByRole("button", { name: "환불", exact: true }).click();
+    await expect(backoffice.getByText("시연용 기록 · PG 재확인 제외").first()).toBeVisible();
+  } finally {
+    await operator.close();
+  }
+});

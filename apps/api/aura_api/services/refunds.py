@@ -78,6 +78,10 @@ async def _claim(
         order = await repository.lock_order(session, order_id, member_id) if order_id else None
         if order is None:
             raise NotFound("ORDER_NOT_FOUND", "주문을 찾을 수 없어요.")
+        if order.is_demo:
+            raise Conflict(
+                "DEMO_ORDER_READ_ONLY", "시연용 기록이에요. 새 주문을 만들어 결제해 주세요."
+            )
         if order.status not in ("paid", "preparing"):
             return None
         if not can_ask_pg:

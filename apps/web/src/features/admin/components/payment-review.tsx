@@ -9,6 +9,7 @@ import { orderStatusLabels, type OrderStatus } from "@/features/checkout/model/o
 import { money } from "@/lib/format";
 import styles from "@/features/admin/components/admin.module.css";
 type Review = {
+  isDemo?: boolean;
   id: string;
   orderId: string;
   status: string;
@@ -61,6 +62,7 @@ export function PaymentReview() {
       {query.data && !query.data.items.length && <p>확인이 필요한 내역이 없어요.</p>}
       {query.data?.items.map((item) => (
         <article className={styles.panel} key={item.id}>
+          {item.isDemo && <p>시연용 기록 · PG 재확인 제외</p>}
           <h2>
             <Link href={`/admin/orders/${item.orderId}`}>주문 {item.orderId.slice(0, 8)}</Link>
           </h2>

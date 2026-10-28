@@ -10,6 +10,7 @@ export function paymentReviewResponse(value: unknown) {
       const row = record(value);
       return {
         id: text(row.id),
+        ...(row.isDemo !== undefined ? { isDemo: boolean(row.isDemo) } : {}),
         orderId: text(row.orderId),
         status: text(row.status),
         orderStatus: text(row.orderStatus),

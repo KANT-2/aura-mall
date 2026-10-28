@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -44,6 +45,7 @@ class Order(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=UUID_DEFAULT)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    is_demo: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     recipient: Mapped[str] = mapped_column(String(100))
     address: Mapped[str] = mapped_column(String(500))
     recipient_phone: Mapped[str] = mapped_column(String(30), server_default=text("''"))

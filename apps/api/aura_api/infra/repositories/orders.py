@@ -46,6 +46,7 @@ class SavedOrder:
     delivery_note: str = ""
     courier: str = ""
     tracking_number: str = ""
+    is_demo: bool = False
 
 
 @dataclass(frozen=True)
@@ -185,6 +186,7 @@ async def add_order(
         order.delivery_note,
         order.courier,
         order.tracking_number,
+        order.is_demo,
     )
 
 
@@ -270,6 +272,7 @@ async def unpaid_before(session: AsyncSession, cutoff: datetime, limit: int) -> 
             select(Order.id)
             .where(
                 Order.status == "received",
+                Order.is_demo.is_(False),
                 Order.created_at <= cutoff,
                 ~select(Payment.id)
                 .where(Payment.order_id == Order.id, Payment.status.in_(("IN_PROGRESS", "DONE")))
@@ -326,6 +329,7 @@ async def _saved(session: AsyncSession, orders: list[Order]) -> list[SavedOrder]
             order.delivery_note,
             order.courier,
             order.tracking_number,
+            order.is_demo,
         )
         for order in orders
     ]

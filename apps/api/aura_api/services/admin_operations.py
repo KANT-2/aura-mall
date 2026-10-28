@@ -162,6 +162,8 @@ async def fulfill_order(
         )
         if order is None:
             raise NotFound("ORDER_NOT_FOUND", "주문을 찾을 수 없어요.")
+        if order.is_demo:
+            raise Conflict("DEMO_ORDER_READ_ONLY", "시연용 기록은 상태를 변경할 수 없어요.")
         if order.status != raw["expected_status"]:
             raise Conflict("ORDER_CHANGED", "주문 상태가 바뀌었어요. 최신 내용을 확인해 주세요.")
         if raw["status"] == "shipped":

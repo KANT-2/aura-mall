@@ -96,6 +96,7 @@ class OrderOut(CamelModel):
     recipient: str
     address: str
     created: datetime
+    is_demo: bool = False
     status: OrderStatus
     recipient_phone: str = ""
     delivery_note: str = ""
@@ -125,6 +126,7 @@ def order_out(order: SavedOrder) -> OrderOut:
         address=order.address,
         created=order.created_at,
         status=order.status,
+        is_demo=order.is_demo,
         recipient_phone=order.recipient_phone,
         delivery_note=order.delivery_note,
         courier=order.courier,

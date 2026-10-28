@@ -24,6 +24,7 @@ export type Order = {
   address: string;
   created: string;
   status?: OrderStatus;
+  isDemo?: boolean;
   recipientPhone?: string;
   deliveryNote?: string;
   courier?: string;
