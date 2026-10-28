@@ -16,6 +16,22 @@ app = create_app()
 Session = Annotated[AsyncSession, Depends(get_session)]
 
 
+@app.post("/ha-write")
+async def ha_write(tag: str, session: Session):
+    if not re.fullmatch(r"[a-f0-9]{16}", tag):
+        raise HTTPException(400)
+    release = Path("/run/aura-db-runtime") / f"release-{tag}"
+    async with session.begin():
+        await session.execute(
+            text("SELECT set_config('application_name', :tag, true)"), {"tag": tag}
+        )
+        await session.execute(text("INSERT INTO inflight_writes(tag) VALUES (:tag)"), {"tag": tag})
+        async with asyncio.timeout(15):
+            while not release.exists():
+                await asyncio.sleep(0.05)
+    return {"committed": True}
+
+
 @app.get("/rotation-probe")
 async def probe(request: Request, session: Session):
     orm_user = await session.scalar(text("SELECT current_user"))

@@ -104,6 +104,11 @@ def main():
             )
             db.wait_replica()
             assert db.sql("db-standby", "SELECT value FROM rotation_probe;") == "preserved"
+            if os.environ.get("AURA_DB_TEST_HA_ONLY") == "1":
+                from test_failover import exercise
+
+                exercise(db, cli, module)
+                return
             db.dc(
                 "exec",
                 "-T",
@@ -428,6 +433,9 @@ asyncio.run(main())
                 "PASS: TLS, rotation recovery, replication, restore and promotion",
                 flush=True,
             )
+            from test_failover import exercise
+
+            exercise(db, cli, module)
         except BaseException as error:
             # Logs are useful in CI; mask all generated secrets before displaying them.
             logs = db.dc(
