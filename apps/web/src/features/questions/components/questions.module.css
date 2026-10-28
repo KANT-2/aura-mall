@@ -1,37 +1,462 @@
 .root {
   display: grid;
-  gap: 1.25rem;
+  gap: 24px;
+  min-width: 0;
+  font-family: var(--font-aura-ui);
+  color: var(--ink);
 }
-.form {
-  display: grid;
-  gap: 1rem;
-  margin-block: 1rem;
-}
-.form label {
-  display: grid;
-  gap: 0.5rem;
-}
-.form input:not([type="checkbox"]),
-.form textarea {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #fff;
-  color: #222;
-  font: inherit;
-}
-.form .check {
+.heading {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 24px;
+  letter-spacing: -0.7px;
+}
+.heading p {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.eyebrow {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--accent);
+  font-size: 10px;
+  letter-spacing: 2px;
+  font-weight: 600;
+}
+.count {
+  color: var(--accent);
+  font-family: var(--font-aura-en);
+  font-size: 26px;
+}
+.primary,
+.secondary {
+  display: inline-flex;
+  min-height: 44px;
+  padding: 11px 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  flex-shrink: 0;
+  border: 1px solid var(--ink);
+  transition:
+    background var(--aura-motion-ui),
+    color var(--aura-motion-ui);
+}
+.primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+.primary:hover {
+  background: var(--aura-wood);
+  border-color: var(--aura-wood);
+}
+.secondary {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink);
+}
+.secondary:hover {
+  background: var(--aura-linen);
+}
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.form {
+  padding: 28px;
+  background: #eee8dd;
+  border: 1px solid var(--line);
+}
+.formHeading {
+  margin-bottom: 24px;
+}
+.formHeading h3 {
+  font-size: 21px;
+}
+.formHeading p {
+  margin-top: 8px;
+  font-size: 13px;
+}
+.form fieldset {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.form label,
+.replyForm label {
+  display: grid;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.form input:not([type="checkbox"]),
+.form textarea,
+.replyForm textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid #d0c5b5;
+  border-radius: 0;
+  background: #faf7f1;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+  resize: vertical;
+}
+.form input:not([type="checkbox"]):focus-visible,
+.form textarea:focus-visible,
+.replyForm textarea:focus-visible {
+  outline: 2px solid var(--aura-focus);
+  outline-offset: 2px;
+}
+.form input::placeholder,
+.form textarea::placeholder,
+.replyForm textarea::placeholder {
+  color: #948879;
+}
+.form .check,
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+}
+.check input {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  margin: 0;
+  accent-color: var(--aura-wood);
+}
+.privacy {
+  display: grid;
+  gap: 5px;
+}
+.privacy p {
+  max-width: 540px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.formActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.list {
+  display: grid;
+  gap: 16px;
 }
 .card {
-  padding: 1.25rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  padding: 26px 28px;
+  border: 1px solid var(--line);
+  background: #faf7f1;
   overflow-wrap: anywhere;
+  min-width: 0;
+}
+.metadata {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.metadata time {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 3px 9px;
+  background: #eee6d8;
+  color: #7c674d;
+  font-size: 11px;
+}
+.answered {
+  background: #e8ede3;
+  color: #4b6047;
+}
+.private {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.private::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border: 1px solid currentcolor;
+  border-radius: 2px;
+}
+.mine {
+  color: var(--accent);
+}
+.card h3 {
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.6;
 }
 .body {
   white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.85;
+  color: #5d554c;
+}
+.card > .body,
+.locked {
+  margin-top: 12px;
+}
+.locked {
+  color: #8c8275;
+  font-size: 13px;
+}
+.answer {
+  margin: 22px 0 0;
+  padding: 20px 22px;
+  background: #eee8dd;
+  border-left: 2px solid #bca17f;
+}
+.answerLabel {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.answer time {
+  display: block;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.ownerActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 18px;
+  margin-top: 18px;
+}
+.ownerActions button {
+  min-height: 36px;
+  padding: 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.ownerActions button:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.adminArea {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+.productLink {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.answerEditor {
+  margin-top: 16px;
+}
+.answerEditor summary {
+  padding: 10px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.replyForm {
+  display: grid;
+  gap: 14px;
+  padding-top: 12px;
+}
+.replyForm .primary {
+  justify-self: start;
+}
+.error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid #d9bfb2;
+  background: #f5e9e1;
+  color: #844a33;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.error p {
+  color: inherit;
+}
+.error button {
+  min-height: 36px;
+  padding: 4px 0;
+  border-bottom: 1px solid currentcolor;
+  font-size: 12px;
+}
+.loading,
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 44px 24px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+.loading span {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: aura-question-spin 1s linear infinite;
+}
+.empty {
+  flex-direction: column;
+  gap: 12px;
+  padding-block: 52px;
+  background: #f0ebe2;
+}
+.empty h3 {
+  color: var(--ink);
+  font-size: 18px;
+}
+.empty p {
+  max-width: 360px;
+  line-height: 1.8;
+}
+.empty .secondary {
+  margin-top: 8px;
+}
+.emptyMark {
+  font-family: var(--font-aura-en);
+  font-size: 44px;
+  line-height: 1;
+  color: #a99173;
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  padding-top: 12px;
+  font-size: 13px;
+}
+.pagination button {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+}
+.pagination > span > span {
+  color: var(--muted);
+}
+.root[data-admin="true"] .heading h2 {
+  font-size: 29px;
+}
+@keyframes aura-question-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 600px) {
+  .heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .heading h2 {
+    font-size: 22px;
+  }
+  .heading > .primary,
+  .heading > .secondary {
+    width: 100%;
+  }
+  .form,
+  .card {
+    padding: 20px 18px;
+  }
+  .formActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .answer {
+    padding: 16px;
+  }
+  .metadata {
+    gap: 8px;
+  }
+  .body {
+    font-size: 13px;
+  }
+  .root[data-admin="true"] .heading h2 {
+    font-size: 25px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading span {
+    animation: none;
+  }
+}
+@media (max-width: 600px) {
+  .form input:not([type="checkbox"]),
+  .form textarea,
+  .replyForm textarea {
+    font-size: 16px;
+  }
+  .ownerActions button,
+  .pagination button {
+    min-height: 44px;
+  }
+}
+.root {
+  text-align: left;
+}
+.form label,
+.replyForm label {
+  margin: 0;
+}
+.form .check,
+.check {
+  flex-direction: row;
+  margin: 0;
+}
+.check input {
+  min-height: 17px;
+  padding: 0;
+  border-radius: 3px;
 }

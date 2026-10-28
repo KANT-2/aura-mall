@@ -426,6 +426,8 @@ def test_production_app_has_no_test_routes_and_exposes_lifecycle_routes():
             "/api/v1/admin/inquiries/{inquiry_id}",
             "/api/v1/admin/payments/review",
             "/api/v1/admin/refunds/review",
+            "/api/v1/admin/media",
+            "/api/v1/media/{asset_id}",
             "/api/v1/products/{product_id}/questions",
             "/api/v1/questions/mine",
             "/api/v1/questions/{question_id}",

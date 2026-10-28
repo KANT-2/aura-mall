@@ -25,12 +25,19 @@ export function ProductDetail({ product: p }: { product: Product }) {
     [selection, setSelection] = useState<string[]>([]),
     [added, setAdded] = useState(false);
   const preview = useRef<HTMLDialogElement>(null);
-  const stock = products.find((product) => product.id === p.id)?.stock ?? p.stock;
-  const soldOut = stock !== undefined && stock <= 0;
-  const maxQuantity = Math.min(MAX_QUANTITY, stock ?? MAX_QUANTITY);
   const col = collections.find((c) => c.id === p.collection)!,
     gift = p.type === "gift-set";
   const eligible = products.filter((x) => x.collection === p.collection && x.type !== "gift-set");
+  const stock = products.find((item) => item.id === p.id)?.stock ?? p.stock;
+  const soldOut = stock <= 0;
+  const limit = Math.max(
+    0,
+    Math.min(
+      MAX_QUANTITY,
+      stock,
+      ...(gift ? selection.map((id) => products.find((item) => item.id === id)?.stock ?? 0) : []),
+    ),
+  );
   function toggle(id: string) {
     if (selection.includes(id)) {
       setSelection(selection.filter((x) => x !== id));
@@ -127,18 +134,19 @@ export function ProductDetail({ product: p }: { product: Product }) {
             </div>
           )}
           <div className="purchase-row">
-            {!soldOut && <Quantity max={maxQuantity} n={n} set={setN} />}
+            {!soldOut && <Quantity max={limit} n={n} set={setN} />}
             <button
               data-testid={testIds.catalog.addToCart}
-                className={soldOut ? `button ${styles.soldOutButton}` : "button"}
-                disabled={
-                  !cartReady ||
-                  soldOut ||
-                  n > maxQuantity ||
-                  (gift && selection.length !== 3)
-                }
+              className={soldOut ? `button ${styles.soldOutButton}` : "button"}
+              disabled={
+                !cartReady ||
+                soldOut ||
+                n > limit ||
+                (!gift && p.price === null) ||
+                (gift && selection.length !== 3)
+              }
               onClick={async () => {
-                if (soldOut || n > maxQuantity) {
+                if (soldOut || n > limit) {
                   notify(soldOut ? "품절된 상품이에요." : "구매 가능한 재고를 확인해 주세요.");
                   return;
                 }
@@ -146,7 +154,8 @@ export function ProductDetail({ product: p }: { product: Product }) {
                 setAdded(await add(p, n, selection));
               }}
             >
-              {soldOut ? "품절" : "장바구니 담기"} {!soldOut && <Arrow />}
+              {soldOut ? "품절" : !gift && p.price === null ? "가격 확인 중" : "장바구니 담기"}{" "}
+              {!soldOut && <Arrow />}
             </button>
           </div>
           {added && !soldOut && (
@@ -180,11 +189,14 @@ export function ProductDetail({ product: p }: { product: Product }) {
                   type="checkbox"
                   checked={selection.includes(s.id)}
                   onChange={() => toggle(s.id)}
-                  disabled={!selection.includes(s.id) && selection.length === 3}
+                  disabled={!selection.includes(s.id) && (selection.length === 3 || s.stock < 1)}
                 />
                 <img src={s.image} alt={s.name} />
                 <span>{s.typeName}</span>
-                <small>{s.name}</small>
+                <small>
+                  {s.name}
+                  {s.stock < 1 ? " · 품절" : ""}
+                </small>
               </label>
             ))}
           </div>

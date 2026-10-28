@@ -6,13 +6,19 @@ import styles from "@/styles/commerce.module.css";
 import { ProductPhoto } from "@/features/catalog/components/product-photo";
 
 export function ProductCard({ product: p }: { product: Product }) {
-  const soldOut = p.stock !== undefined && p.stock <= 0;
+  const soldOut = p.stock <= 0;
   return (
-    <Link href={"/shop/" + p.id} data-testid={testIds.catalog.card} className={soldOut ? `product-card ${styles.soldOutCard}` : "product-card"}>
+    <Link
+      href={"/shop/" + p.id}
+      data-testid={testIds.catalog.card}
+      className={soldOut ? `product-card ${styles.soldOutCard}` : "product-card"}
+    >
       <div className="product-image">
         <ProductPhoto product={p} />
         {soldOut ? (
-          <span className={styles.soldOutBadge} aria-label="품절">SOLD OUT</span>
+          <span className={styles.soldOutBadge} aria-label="품절">
+            SOLD OUT
+          </span>
         ) : (
           <span>자세히 보기 ↗</span>
         )}

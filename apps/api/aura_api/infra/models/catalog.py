@@ -51,7 +51,6 @@ class Product(Base):
         CheckConstraint("price IS NULL OR price BETWEEN 0 AND 10000000", name="price"),
         CheckConstraint("stock BETWEEN 0 AND 99999", name="stock"),
         CheckConstraint("version >= 1", name="version"),
-        UniqueConstraint("collection_id", "type_id", name="products_collection_type_key"),
         UniqueConstraint("bestseller_rank", name="products_bestseller_rank_key"),
         Index("products_collection_idx", "collection_id"),
         Index("products_type_idx", "type_id"),
@@ -76,6 +75,8 @@ class Product(Base):
     is_new: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     bestseller_rank: Mapped[int | None] = mapped_column(SmallInteger)
     sort_order: Mapped[int] = mapped_column(SmallInteger)
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    details: Mapped[dict[str, str]] = mapped_column(JSONB, server_default=text("'{}'"))
     version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 import Link from "next/link";
 import { useState } from "react";
@@ -25,8 +26,12 @@ export function AdminProductList({ query }: { query: AdminQuery }) {
     <>
       <AdminHeading
         title="상품·재고"
-        description="기존 상품의 정보와 가격을 수정하고, 사유를 남겨 재고를 조정해요."
-      />
+        description="상품을 등록하고 판매 노출·상세 안내·이미지·재고를 관리해요."
+      >
+        <Link href="/admin/products/new" className="button">
+          상품 등록
+        </Link>
+      </AdminHeading>
       <form
         className={styles.filters}
         role="search"
@@ -98,12 +103,28 @@ export function AdminProductList({ query }: { query: AdminQuery }) {
                 {data.items.map((product) => (
                   <tr key={product.id} data-testid={testIds.admin.productRow}>
                     <th scope="row">
-                      <Link href={`/admin/products/${encodeURIComponent(product.id)}`}>
-                        {product.name}
-                      </Link>
-                      <small>
-                        {product.typeName} · {product.volume}
-                      </small>
+                      <div className={styles.productCell}>
+                        <img
+                          className={styles.productThumb}
+                          src={product.image}
+                          alt=""
+                          loading="lazy"
+                        />
+                        <div>
+                          <Link href={`/admin/products/${encodeURIComponent(product.id)}`}>
+                            {product.name}
+                          </Link>
+                          <small>
+                            {product.typeName} · {product.volume}
+                          </small>
+                          <span
+                            className={styles.productAvailability}
+                            data-active={product.isActive !== false}
+                          >
+                            {product.isActive === false ? "판매 중지" : "판매 중"}
+                          </span>
+                        </div>
+                      </div>
                     </th>
                     <td>{product.collection.toUpperCase()}</td>
                     <td>{money(product.price)}</td>

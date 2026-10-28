@@ -57,6 +57,16 @@ export function adminProductResponse(value: unknown): AdminProduct {
     description: text(item.description),
     featured: boolean(item.featured),
     isNew: boolean(item.isNew),
+    ...(item.isActive !== undefined ? { isActive: boolean(item.isActive) } : {}),
+    ...(item.details !== undefined
+      ? {
+          details: Object.fromEntries(
+            Object.entries(record(item.details)).map(([key, value]) => [key, text(value)]),
+          ),
+        }
+      : {}),
+    ...(item.notes !== undefined ? { notes: list(item.notes, text) } : {}),
+    ...(item.category !== undefined ? { category: text(item.category) } : {}),
     version: integer(item.version),
     updated: nullableText(item.updated),
   };
@@ -64,7 +74,12 @@ export function adminProductResponse(value: unknown): AdminProduct {
 function historyResponse(value: unknown): AdminHistoryEntry {
   const item = record(value);
   const action = item.action;
-  if (action !== "product.update" && action !== "product.stock" && action !== "inquiry.update") {
+  if (
+    action !== "product.create" &&
+    action !== "product.update" &&
+    action !== "product.stock" &&
+    action !== "inquiry.update"
+  ) {
     return invalidResponse();
   }
 
@@ -80,7 +95,7 @@ function historyResponse(value: unknown): AdminHistoryEntry {
 
       return { field: text(change.field), from: change.from, to: change.to };
     }),
-    ...(item.reason !== undefined ? { reason: text(item.reason) } : {}),
+    ...(item.reason != null ? { reason: text(item.reason) } : {}),
     created: text(item.created),
   };
 }

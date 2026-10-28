@@ -119,3 +119,117 @@ test("checkout survives a lost order response, pays once, clears its original ca
   await expect(page.getByText("취소 완료", { exact: true })).toBeVisible();
   expect((await (await page.request.get("/api/orders")).json())[0].status).toBe("cancelled");
 });
+
+test("administrator uploads an image, publishes a new product, edits customer guidance and stops sales while retaining history", async ({
+  page,
+}) => {
+  await admin(page);
+  const id = `browser-managed-${randomUUID().slice(0, 8)}`;
+  const name = `베르가못 리필 ${id.slice(-8)}`;
+  const usage = "손에 적당량을 덜어 부드럽게 펴 발라 주세요.";
+  const shipping = "주문 준비가 끝나면 배송을 시작하고 운송장을 안내해요.";
+  await page.goto("/admin/products/new");
+  await page.getByLabel(/^상품명/).fill(name);
+  await page.getByLabel(/^영문명/).fill("Bergamot Hand Cream Refill");
+  await page.getByLabel(/^컬렉션/).selectOption("fresh");
+  await page.getByLabel(/^제품 유형/).selectOption("hand-cream");
+  await page.getByLabel(/^용량/).fill("100mL");
+  await page.getByLabel(/^상품 분류/).fill("핸드 케어");
+  await page.getByLabel(/^상품 소개/).fill("산뜻한 시트러스 향의 리필 핸드크림이에요.");
+  await page.locator('input[name="price"]').fill("39000");
+  await page.locator('input[name="stock"]').fill("12");
+  await page.locator('input[name="notes"]').fill("베르가못, 네롤리, 화이트 머스크");
+  await page.getByRole("checkbox", { name: /판매·목록 노출/ }).check();
+  await page.getByText("상품 ID 직접 지정", { exact: true }).click();
+  await page.locator('input[name="id"]').fill(id);
+  const [uploaded] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/admin/media") && response.request().method() === "POST",
+    ),
+    page.getByLabel("이미지 업로드", { exact: true }).setInputFiles({
+      name: "bergamot-product.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFElEQVR4nGM8tKKHARtgwio6aCUAi5ECBrUHlk0AAAAASUVORK5CYII=",
+        "base64",
+      ),
+    }),
+  ]);
+  expect(uploaded.status(), await uploaded.text()).toBe(201);
+  const asset = await uploaded.json();
+  expect(asset.url).toMatch(/^\/api\/media\/[0-9a-f-]{36}$/);
+  const delivered = await page.request.get(asset.url);
+  expect(delivered.status()).toBe(200);
+  expect(delivered.headers()["content-type"]).toBe("image/webp");
+  expect(delivered.headers()["cache-control"]).toContain("immutable");
+  await expect(page.getByRole("status").filter({ hasText: "업로드 완료" })).toBeVisible();
+  await page.getByRole("button", { name: "상품 등록", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/admin/products/${id}$`));
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  await page.getByText(/상세 안내 편집/).click();
+  await page.getByLabel("사용 방법·보관", { exact: true }).fill(usage);
+  await page.getByLabel("배송 안내", { exact: true }).fill(shipping);
+  await page.getByRole("button", { name: "변경 저장", exact: true }).click();
+  await expect(page.getByText("상품 정보를 저장했어요.", { exact: true })).toBeVisible();
+  const customerProduct = await page.request.get(`/api/catalog/products/${id}`);
+  expect(customerProduct.status()).toBe(200);
+  expect((await customerProduct.json()).details).toMatchObject({ usage, shipping });
+  await page.goto(`/shop/${id}`);
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "제품 정보", exact: true }).click();
+  await page.getByText("사용 방법과 보관", { exact: true }).click();
+  await expect(page.getByText(usage, { exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "배송·교환", exact: true }).click();
+  await expect(page.getByText(shipping, { exact: true })).toBeVisible();
+  await page.goto(`/admin/products/${id}`);
+  await page.getByRole("checkbox", { name: /판매·목록 노출/ }).uncheck();
+  await page.getByRole("button", { name: "변경 저장", exact: true }).click();
+  await expect(page.getByText("상품 정보를 저장했어요.", { exact: true })).toBeVisible();
+  expect((await page.request.get(`/api/catalog/products/${id}`)).status()).toBe(404);
+  const retained = await page.request.get(`/api/admin/products/${id}`);
+  expect(retained.status()).toBe(200);
+  const record = await retained.json();
+  expect(record.isActive).toBe(false);
+  expect(
+    record.history.some((entry: { action: string }) => entry.action === "product.create"),
+  ).toBe(true);
+  expect(
+    record.history.some((entry: { action: string }) => entry.action === "product.update"),
+  ).toBe(true);
+  await expect(page.getByRole("heading", { name: "변경 이력", exact: true })).toBeVisible();
+});
+
+test("administrator password change returns to login even when logout cleanup loses its response", async ({
+  page,
+}) => {
+  await admin(page);
+  const email = `operator-${randomUUID()}@example.test`;
+  const currentPassword = "temporary-admin-password-42";
+  const newPassword = "replacement-admin-password-42";
+  expect(
+    (
+      await page.request.post("/api/admin/admins", {
+        data: { name: "새 운영자", email, password: currentPassword },
+      })
+    ).status(),
+  ).toBe(201);
+  await page.request.post("/api/admin/auth/logout");
+  await page.goto("/admin/login");
+  await page.getByLabel("이메일", { exact: true }).fill(email);
+  await page.getByLabel("비밀번호", { exact: true }).fill(currentPassword);
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page.getByTestId(testIds.admin.shell)).toBeVisible();
+  await page.goto("/admin/settings");
+  await page.locator('input[name="currentPassword"]').fill(currentPassword);
+  await page.locator('input[name="newPassword"]').fill(newPassword);
+  await page.locator('input[name="repeatPassword"]').fill(newPassword);
+  await page.route("**/api/admin/auth/logout", (route) => route.abort("failed"));
+  await page.getByRole("button", { name: /비밀번호 변경/ }).click();
+  await expect(page).toHaveURL(/\/admin\/login\?passwordChanged=1$/);
+  await page.unroute("**/api/admin/auth/logout");
+  await page.getByLabel("이메일", { exact: true }).fill(email);
+  await page.getByLabel("비밀번호", { exact: true }).fill(newPassword);
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page.getByTestId(testIds.admin.shell)).toBeVisible();
+});
