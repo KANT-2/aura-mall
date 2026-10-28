@@ -6,4 +6,7 @@ export const catalogQueryOptions = queryOptions({
   queryKey: catalogKey,
   queryFn: ({ signal }) => request<Catalog>("/catalog", { signal }),
   staleTime: 300_000,
+  // Stock can change in an admin tab while the storefront is still open.
+  refetchOnMount: "always",
+  refetchOnWindowFocus: "always",
 });

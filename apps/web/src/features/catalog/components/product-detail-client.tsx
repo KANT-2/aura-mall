@@ -25,6 +25,9 @@ export function ProductDetail({ product: p }: { product: Product }) {
     [selection, setSelection] = useState<string[]>([]),
     [added, setAdded] = useState(false);
   const preview = useRef<HTMLDialogElement>(null);
+  const stock = products.find((product) => product.id === p.id)?.stock ?? p.stock;
+  const soldOut = stock !== undefined && stock <= 0;
+  const maxQuantity = Math.min(MAX_QUANTITY, stock ?? MAX_QUANTITY);
   const col = collections.find((c) => c.id === p.collection)!,
     gift = p.type === "gift-set";
   const eligible = products.filter((x) => x.collection === p.collection && x.type !== "gift-set");
@@ -124,19 +127,29 @@ export function ProductDetail({ product: p }: { product: Product }) {
             </div>
           )}
           <div className="purchase-row">
-            <Quantity max={MAX_QUANTITY} n={n} set={setN} />
+            {!soldOut && <Quantity max={maxQuantity} n={n} set={setN} />}
             <button
               data-testid={testIds.catalog.addToCart}
-              className="button"
-              disabled={!cartReady || (gift && selection.length !== 3)}
+                className={soldOut ? `button ${styles.soldOutButton}` : "button"}
+                disabled={
+                  !cartReady ||
+                  soldOut ||
+                  n > maxQuantity ||
+                  (gift && selection.length !== 3)
+                }
               onClick={async () => {
+                if (soldOut || n > maxQuantity) {
+                  notify(soldOut ? "품절된 상품이에요." : "구매 가능한 재고를 확인해 주세요.");
+                  return;
+                }
+
                 setAdded(await add(p, n, selection));
               }}
             >
-              장바구니 담기 <Arrow />
+              {soldOut ? "품절" : "장바구니 담기"} {!soldOut && <Arrow />}
             </button>
           </div>
-          {added && (
+          {added && !soldOut && (
             <Link className="added" href="/cart">
               장바구니에서 확인하기 →
             </Link>
