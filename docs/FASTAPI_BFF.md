@@ -37,14 +37,14 @@ BFF는 요청 사이에 사용자 상태를 메모리로 보관하지 않습니�
 
 ## 현재 FastAPI 연결 범위
 
-| 경로                                                                         | 현재 상태                                                     |
-| ---------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `/catalog`, `/catalog/products/{id}`, `/partner`, `/recipes`                 | 실제 라우터·공개 DTO 연결                                     |
-| `/auth/register`, `/auth/login`, `/auth/me`, `/auth/refresh`, `/auth/logout` | JWT 인증 연결. PostgreSQL 인증 저장소 사용                    |
-| `/auth/change-password`                                                      | 회원 비밀번호 변경. 성공 시 모든 로그인 계열 폐기             |
-| `/orders`                                                                    | 회원 주문 API·중복 방지 키·공개 DTO 연결, 웹 결제 버튼 비활성 |
-| `/admin/**`                                                                  | 별도 관리자 JWT 인증·등록·업무 API·공개 DTO 연결              |
-| `/atelier/draft`                                                             | 방문자별 조회·전체 저장·삭제, FastAPI·공개 DTO 연결           |
+| 경로                                                                         | 현재 상태                                                                         |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `/catalog`, `/catalog/products/{id}`, `/partner`, `/recipes`                 | 실제 라우터·공개 DTO 연결                                                         |
+| `/auth/register`, `/auth/login`, `/auth/me`, `/auth/refresh`, `/auth/logout` | JWT 인증 연결. PostgreSQL 인증 저장소 사용                                        |
+| `/auth/change-password`                                                      | 회원 비밀번호 변경. 성공 시 모든 로그인 계열 폐기                                 |
+| `/orders`                                                                    | 회원 주문 API·중복 방지 키·공개 DTO 연결, 일반 주문 UI·토스 테스트 결제·취소 연결 |
+| `/admin/**`                                                                  | 별도 관리자 JWT 인증·등록·업무 API·공개 DTO 연결                                  |
+| `/atelier/draft`                                                             | 방문자별 조회·전체 저장·삭제, FastAPI·공개 DTO 연결                               |
 
 `API_URL`은 한 백엔드를 선택합니다. FastAPI 오류나 미구현 경로를 Mock으로 자동 우회하지 않습니다. 웹 개발의 기본값은 Mock입니다. FastAPI 사용 시 인증 DB 마이그레이션 0003까지 적용·시드를 적용하고 JWT 발급자·서명 키·DB·BFF 공유 키를 설정합니다. 미설정 저장소를 성공으로 간주하지 않습니다.
 
@@ -88,27 +88,27 @@ FastAPI 내부 인증 응답은 TokenPair 또는 회원 프로필이며, BFF가 
 
 공개 BFF 경로의 `/api` 부분이 백엔드에서는 `API_PREFIX`로 바뀝니다. 예: `/api/catalog` → FastAPI `/api/v1/catalog`. 경로 끝에 `/`를 추가하지 않습니다. FastAPI의 trailing-slash redirect를 포함한 백엔드 3xx는 따라가지 않고 502로 처리합니다.
 
-| 메서드 | BFF 경로                     | 요청 / 성공 응답                                                                                  |
-| ------ | ---------------------------- | ------------------------------------------------------------------------------------------------- |
-| GET    | `/api/catalog`               | `Catalog`                                                                                         |
-| GET    | `/api/catalog/products/{id}` | `Product`, 없는 상품은 404                                                                        |
-| GET    | `/api/auth/me`               | `AccountState { user: Member \| null, guestId: string }`                                          |
-| PATCH  | `/api/auth/me`               | `{ name?, marketing? }` → `AccountState`                                                          |
-| POST   | `/api/auth/change-password`  | `{ currentPassword, newPassword }` → 204, 회원 쿠키 삭제                                          |
-| DELETE | `/api/auth/me`               | `{ currentPassword }` → 204, 복구 없는 탈퇴 후 회원 쿠키 삭제 (0010)                              |
-| POST   | `/api/auth/register`         | `{ name, email, password, marketing? }` → 201 `AccountState`                                      |
-| POST   | `/api/auth/login`            | `{ email, password }` → `AccountState`, 탈퇴 계정은 401, 연속 실패 시 429 `LOGIN_LOCKED`          |
-| POST   | `/api/auth/logout`           | 본문 없음 → `AccountState`                                                                        |
-| POST   | `/api/auth/refresh`          | 본문 없음 → 204, 토큰 쿠키 회전                                                                   |
-| GET    | `/api/recipes`               | `Recipe[]`                                                                                        |
-| POST   | `/api/recipes`               | `{ name, label, counts, parent? }` → 201 `Recipe`                                                 |
-| DELETE | `/api/recipes/{id}`          | `Recipe[]`                                                                                        |
-| GET    | `/api/atelier/draft`         | `AtelierDraft \| null`                                                                            |
-| PUT    | `/api/atelier/draft`         | `AtelierDraft` → `AtelierDraft`                                                                   |
-| DELETE | `/api/atelier/draft`         | `null` 또는 본문 없는 204                                                                         |
-| GET    | `/api/orders`                | 회원의 `Order[]`                                                                                  |
-| POST   | `/api/orders`                | `{ recipient, address, coupon?, items: OrderItemInput[] }` → 201 `Order`; 현재 화면 결제는 비활성 |
-| POST   | `/api/partner`               | 문의 저장 → 201 `{ id }`; 이메일별 10분 3건을 넘으면 429 `INQUIRY_RATE_LIMITED`                   |
+| 메서드 | BFF 경로                     | 요청 / 성공 응답                                                                                              |
+| ------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/catalog`               | `Catalog`                                                                                                     |
+| GET    | `/api/catalog/products/{id}` | `Product`, 없는 상품은 404                                                                                    |
+| GET    | `/api/auth/me`               | `AccountState { user: Member \| null, guestId: string }`                                                      |
+| PATCH  | `/api/auth/me`               | `{ name?, marketing? }` → `AccountState`                                                                      |
+| POST   | `/api/auth/change-password`  | `{ currentPassword, newPassword }` → 204, 회원 쿠키 삭제                                                      |
+| DELETE | `/api/auth/me`               | `{ currentPassword }` → 204, 복구 없는 탈퇴 후 회원 쿠키 삭제 (0010)                                          |
+| POST   | `/api/auth/register`         | `{ name, email, password, marketing? }` → 201 `AccountState`                                                  |
+| POST   | `/api/auth/login`            | `{ email, password }` → `AccountState`, 탈퇴 계정은 401, 연속 실패 시 429 `LOGIN_LOCKED`                      |
+| POST   | `/api/auth/logout`           | 본문 없음 → `AccountState`                                                                                    |
+| POST   | `/api/auth/refresh`          | 본문 없음 → 204, 토큰 쿠키 회전                                                                               |
+| GET    | `/api/recipes`               | `Recipe[]`                                                                                                    |
+| POST   | `/api/recipes`               | `{ name, label, counts, parent? }` → 201 `Recipe`                                                             |
+| DELETE | `/api/recipes/{id}`          | `Recipe[]`                                                                                                    |
+| GET    | `/api/atelier/draft`         | `AtelierDraft \| null`                                                                                        |
+| PUT    | `/api/atelier/draft`         | `AtelierDraft` → `AtelierDraft`                                                                               |
+| DELETE | `/api/atelier/draft`         | `null` 또는 본문 없는 204                                                                                     |
+| GET    | `/api/orders`                | 회원의 `Order[]`                                                                                              |
+| POST   | `/api/orders`                | `{ recipient, address, coupon?, items: OrderItemInput[] }` → 201 `Order`; 서버 확정 금액으로 테스트 결제 진행 |
+| POST   | `/api/partner`               | 문의 저장 → 201 `{ id }`; 이메일별 10분 3건을 넘으면 429 `INQUIRY_RATE_LIMITED`                               |
 
 JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내부 이름은 snake_case를 사용할 수 있으나 요청과 응답의 JSON 별칭을 계약에 맞춰야 합니다. 정의 위치:
 
@@ -237,7 +237,7 @@ JSON 필드는 현재 공개 DTO의 camelCase를 유지합니다. Pydantic 내�
 
 같은 회원·같은 키의 재요청은 기존 주문을 200으로 반환합니다. 새 주문은 201입니다. 서버는 기존 주문이 있으면 달라진 본문도 다시 처리하지 않으므로, 클라이언트는 하나의 주문 시도에 키 하나를 만들고 재시도에만 같은 키를 사용해야 합니다. 헤더를 생략하면 중복 방지를 보장하지 않습니다. 회원 간 같은 키는 격리합니다.
 
-주문 BFF는 `recipient`, `address`, `coupon`, `items`만 전달하고 서버 계산 가격·스냅샷의 공개 DTO를 반환합니다. 관리자 응답도 경로별 DTO로 검증하며 잘못된 중첩 타입은 502입니다. 토큰·소유자 키·DB 내부 필드를 추가로 노출하지 않습니다. 결제·주문 접수 UI 버튼은 계속 비활성 상태입니다.
+주문 BFF는 `recipient`, `recipientPhone`, `address`, `deliveryNote`, `coupon`, `items`만 전달하고 서버 계산 가격·스냅샷의 공개 DTO를 반환합니다. 관리자 응답도 경로별 DTO로 검증하며 잘못된 중첩 타입은 502입니다. 토큰·소유자 키·DB 내부 필드를 추가로 노출하지 않습니다. 주문 접수와 토스 테스트 결제 UI가 연결되어 있습니다.
 
 ## 입점 문의 요청 제한
 
@@ -296,9 +296,9 @@ DTO는 [관리자 모델](../apps/web/src/features/admin/model/admin.ts)에 정�
 - 모든 변경 요청은 읽은 시점의 `version`을 보내고, 현재 버전과 다르면 409로 거절합니다. 웹은 409에서 최신 데이터를 다시 조회하고 사용자에게 재확인을 요청합니다. 실제 DB에서는 같은 트랜잭션 안에서 버전 비교·재고 변경·이력 기록을 수행합니다(조건부 UPDATE 또는 행 잠금).
 - `key`는 재고 조정 1건의 idempotency 키(8~64자 영숫자·하이픈)입니다. 같은 키·같은 내용의 재전송은 다시 적용하지 않고 현재 상태를 200으로 반환하며, 같은 키로 다른 내용을 보내면 409입니다.
 - 가격 변경은 기존 주문의 상품·단가 스냅샷을 바꾸지 않습니다. 주문 상태 변경·취소·재고 복구는 정책·DB 확장 합의 후 추가하며 현재는 조회만 제공합니다.
-- 계약 1.5.0(DB 변경 없음): 관리자 읽기 전용 `GET /admin/payments/review`·`GET /admin/refunds/review`를 추가했습니다. 응답에 PG `paymentKey`·`transactionKey`는 없습니다. BFF 경로는 아직 없습니다. 상세는 [결제·환불 검토 문서](backend/ADMIN_PAYMENT_REVIEW.md)입니다.
-- 계약 1.4.0(마이그레이션 0009): `POST /orders/{orderId}/cancel`이 결제 완료(`paid`) 주문도 처리합니다. 토스에 전액 취소를 요청하고 PG가 환불을 확인한 뒤에만 `cancelled`(200)로 바꾸며 재고·쿠폰을 되돌립니다. 결과가 불명확하면 202 `OrderOut`(`status: "paid"`)이고 같은 요청을 다시 보냅니다. PG 거절은 409 `REFUND_FAILED`, 준비 중 이후는 409 `ORDER_NOT_CANCELLABLE`, PG 미설정은 503입니다. 응답 필드와 결제 `status` 값은 바뀌지 않았습니다. BFF 경로는 아직 없습니다. 상세는 [환불 문서](backend/REFUNDS.md)입니다.
-- 계약 1.3.0(마이그레이션 0008): 회원 `POST /orders/{orderId}/cancel` → 200 `OrderOut`(`status: "cancelled"`)을 추가했습니다. `received` 주문만 취소하며 재고·쿠폰을 같은 트랜잭션에서 되돌립니다. 이미 취소된 주문은 그대로 200, 결제 확인 중이면 409 `PAYMENT_IN_PROGRESS`, 결제가 끝난 주문은 409 `ORDER_NOT_CANCELLABLE`, 다른 회원 주문은 404입니다. 결제 응답 `status`에 `CANCELED`가 추가됐습니다. BFF 경로는 아직 없습니다. 상세는 [주문 취소 문서](backend/ORDER_CANCELLATION.md)입니다.
+- 계약 1.5.0(DB 변경 없음): 관리자 읽기 전용 `GET /admin/payments/review`·`GET /admin/refunds/review`를 추가했습니다. 응답에 PG `paymentKey`·`transactionKey`는 없습니다. 1.6.0에서 BFF와 화면 연결을 추가했습니다. 상세는 [결제·환불 검토 문서](backend/ADMIN_PAYMENT_REVIEW.md)입니다.
+- 계약 1.4.0(마이그레이션 0009): `POST /orders/{orderId}/cancel`이 결제 완료(`paid`) 주문도 처리합니다. 토스에 전액 취소를 요청하고 PG가 환불을 확인한 뒤에만 `cancelled`(200)로 바꾸며 재고·쿠폰을 되돌립니다. 결과가 불명확하면 202 `OrderOut`(`status: "paid"`)이고 같은 요청을 다시 보냅니다. PG 거절은 409 `REFUND_FAILED`, 배송 중 이후는 409 `ORDER_NOT_CANCELLABLE`, PG 미설정은 503입니다. 응답 필드와 결제 `status` 값은 바뀌지 않았습니다. 1.6.0에서 BFF와 화면 연결을 추가했습니다. 상세는 [환불 문서](backend/REFUNDS.md)입니다.
+- 계약 1.3.0(마이그레이션 0008): 회원 `POST /orders/{orderId}/cancel` → 200 `OrderOut`(`status: "cancelled"`)을 추가했습니다. `received` 주문만 취소하며 재고·쿠폰을 같은 트랜잭션에서 되돌립니다. 이미 취소된 주문은 그대로 200, 결제 확인 중이면 409 `PAYMENT_IN_PROGRESS`, 결제가 끝난 주문은 409 `ORDER_NOT_CANCELLABLE`, 다른 회원 주문은 404입니다. 결제 응답 `status`에 `CANCELED`가 추가됐습니다. 1.6.0에서 BFF와 화면 연결을 추가했습니다. 상세는 [주문 취소 문서](backend/ORDER_CANCELLATION.md)입니다.
 - 계약 1.2.0(마이그레이션 0007): 회원 결제 API `POST /payments`(`{ orderId }` → 결제 대기 발급·재사용), `POST /payments/confirm`(`{ paymentKey, orderId, amount }` → 200 `DONE`·`FAILED`, 결과 확인 중이면 202 `IN_PROGRESS`), `GET /payments/{id}`를 추가했습니다. 금액은 서버의 주문 합계만 사용하며 클라이언트 금액은 비교만 합니다. PG 미설정 시 503입니다. BFF 경로 `POST /api/payments`·`POST /api/payments/confirm`·`GET /api/payments/{id}`와 개발용 테스트 결제 화면(`/payments/test`)은 연결했고, 정식 결제 화면은 아직 없습니다. 상세는 [결제 문서](backend/PAYMENTS.md)입니다.
 - 계약 1.1.0(마이그레이션 0006): FastAPI 회원 `OrderOut`, 관리자 `AdminOrderSummaryOut`에 `status`(`received`·`paid`·`preparing`·`shipped`·`delivered`·`cancelled`)를 추가했습니다. 관리자 `AdminOrderOut`은 `statusHistory: [{ fromStatus, status, actorType, reason, changed }]`를 시간순으로 포함합니다. 회원 응답에는 이력과 변경자 ID를 포함하지 않습니다. 지금 생성되는 모든 주문은 결제 없는 `received`입니다. 상태를 바꾸는 API는 아직 없으며 규칙은 [주문 상태 문서](backend/ORDER_STATUS.md)를 따릅니다. 현재 BFF 어댑터는 이 필드를 브라우저로 전달하지 않습니다.
 - 수정 작업마다 작업자·대상·시각·변경 전후 값·재고 조정 사유를 감사 기록에 남기고 상세 응답의 `history`로 최근 30건을 반환합니다. 내부 메모는 이력에 변경 사실만 표시합니다.
@@ -355,7 +355,7 @@ BFF는 성공 시 기존 DTO를 유지하고 오류를 다음 형태로 반환�
 
 Mock API는 본문이 필요한 경로에서 JSON 객체를 검사하고, 누락·잘못된 JSON·배열은 400, 비 JSON 본문은 415, 32KiB 초과는 413을 반환합니다. 오류 메시지에 파서가 읽은 입력값을 노출하지 않습니다. 로그아웃과 삭제는 본문 없이 호출할 수 있습니다.
 
-로컬 장바구니는 상품 ID와 맞춤 조향 중 하나만 허용하고, 향료 구성으로 표시 색을 계산합니다. 항목 추가와 수량 변경 시 누적 수량 15개 상한, 단품과 Gift Set 구성품의 합산 재고를 검사합니다. 이는 화면의 사전 검증이며 주문 API는 `items`의 모든 항목을 서버 카탈로그로 다시 구성하고 가격·구성·수량·재고를 검증합니다. 거절된 주문은 주문 목록과 쿠폰을 변경하지 않습니다. 주문 응답에는 서버가 계산한 `unitPrice`를 포함합니다. 향후 주문 UI 연결 시 성공 응답을 확인한 뒤 로컬 장바구니를 비웁니다. 현재 결제 버튼은 비활성 상태입니다.
+로컬 장바구니는 상품 ID와 맞춤 조향 중 하나만 허용하고, 향료 구성으로 표시 색을 계산합니다. 항목 추가와 수량 변경 시 누적 수량 15개 상한, 단품과 Gift Set 구성품의 합산 재고를 검사합니다. 이는 화면의 사전 검증이며 주문 API는 `items`의 모든 항목을 서버 카탈로그로 다시 구성하고 가격·구성·수량·재고를 검증합니다. 거절된 주문은 주문 목록과 쿠폰을 변경하지 않습니다. 주문 응답에는 서버가 계산한 `unitPrice`를 포함합니다. PG 결제 완료를 확인한 뒤 원래 회원의 주문 당시 항목을 로컬 장바구니에서 정리하며, 결제 창을 여는 동안 변경한 항목은 보존합니다.
 
 Mock 주문의 재고 검사는 전달된 전체 주문 항목과 고정 fixture를 기준으로 합니다. 사용자 간 재고 예약·차감과 운영 트랜잭션은 FastAPI·DB 구현에서 검증해야 합니다. 계정 변경으로 회원가입이 거절된 경우에도 계정이 생성되지 않는지 HTTP 테스트로 확인합니다.
 
