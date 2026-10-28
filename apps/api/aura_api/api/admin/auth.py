@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from aura_api.api.admin.deps import CurrentAdmin
-from aura_api.api.auth import LoginInput
+from aura_api.api.auth import ChangePasswordInput, LoginInput
 from aura_api.api.catalog import CamelModel
 from aura_api.api.deps import Session
 from aura_api.core.errors import ErrorResponse
@@ -91,3 +91,16 @@ async def create_admin(
 ) -> AdminAccountOut:
     created = await service.register(session, admin.id, body.model_dump())
     return AdminAccountOut(id=created.id, email=created.email, name=created.name)
+
+
+@router.post("/auth/change-password", status_code=204, responses=ERRORS)
+async def change_password(
+    body: ChangePasswordInput, admin: CurrentAdmin, session: Session
+) -> Response:
+    await service.change_password(
+        session,
+        admin.id,
+        body.current_password.get_secret_value(),
+        body.new_password.get_secret_value(),
+    )
+    return Response(status_code=204)

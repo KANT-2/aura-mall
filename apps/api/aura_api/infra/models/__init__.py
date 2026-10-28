@@ -32,6 +32,7 @@ from aura_api.infra.models.ordering import (
 )
 from aura_api.infra.models.partner import PartnerInquiry
 from aura_api.infra.models.payment import Payment, Refund
+from aura_api.infra.models.questions import ProductQuestion
 
 __all__ = [
     "Admin",
@@ -52,6 +53,7 @@ __all__ = [
     "Payment",
     "Product",
     "ProductType",
+    "ProductQuestion",
     "Promotion",
     "Recipe",
     "RecipeIngredient",

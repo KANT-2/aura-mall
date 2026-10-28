@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aura_api.domain import admin as rules
-from aura_api.domain.errors import NotFound
+from aura_api.domain.errors import Conflict, NotFound
 from aura_api.infra.models import AdminAuditLog, Order, OrderItem, PartnerInquiry, User
 from aura_api.infra.repositories import admin as repository
 from aura_api.infra.repositories import orders as order_repository
@@ -146,3 +146,36 @@ async def overview(session: AsyncSession) -> Overview:
     orders, _ = await repository.list_orders(session, since=None, until=None, page=1)
     inquiries, _ = await repository.list_inquiries(session, status="", page=1)
     return Overview(counts, await _order_views(session, orders[:5]), inquiries[:5])
+
+
+async def fulfill_order(
+    session: AsyncSession, admin_id: uuid.UUID, order_id: str, raw: dict
+) -> OrderView:
+    from sqlalchemy import select
+
+    target = _uuid(order_id)
+    async with session.begin():
+        order = (
+            await session.scalar(select(Order).where(Order.id == target).with_for_update())
+            if target
+            else None
+        )
+        if order is None:
+            raise NotFound("ORDER_NOT_FOUND", "주문을 찾을 수 없어요.")
+        if order.status != raw["expected_status"]:
+            raise Conflict("ORDER_CHANGED", "주문 상태가 바뀌었어요. 최신 내용을 확인해 주세요.")
+        if raw["status"] == "shipped":
+            order.courier = raw["courier"].strip()
+            order.tracking_number = raw["tracking_number"].strip()
+            if not order.courier or not order.tracking_number:
+                raise Conflict("TRACKING_REQUIRED", "택배사와 운송장 번호를 입력해 주세요.")
+        await order_repository.change_status(
+            session,
+            order.id,
+            raw["status"],
+            actor_type="admin",
+            actor_id=admin_id,
+            reason=raw["reason"],
+        )
+        await session.flush()
+        return await order_detail(session, str(order.id))

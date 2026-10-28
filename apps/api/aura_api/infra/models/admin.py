@@ -52,10 +52,13 @@ class AdminAuditLog(Base):
     __tablename__ = "admin_audit_logs"
     __table_args__ = (
         CheckConstraint(
-            "action IN ('product.update', 'product.stock', 'inquiry.update', 'admin.create')",
+            "action IN ('product.update', 'product.stock', 'inquiry.update', "
+            "'admin.create', 'question.answer')",
             name="action",
         ),
-        CheckConstraint("target_type IN ('product', 'inquiry', 'admin')", name="target"),
+        CheckConstraint(
+            "target_type IN ('product', 'inquiry', 'admin', 'question')", name="target"
+        ),
         Index("admin_audit_logs_target_idx", "target_type", "target_id", text("created_at DESC")),
     )
 

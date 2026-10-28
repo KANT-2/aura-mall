@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCatalog } from "@/features/catalog/hooks/use-catalog";
+import { completeCheckout } from "@/features/checkout/storage/checkout-attempt";
 import { useEffect, useRef, useState } from "react";
 import { confirmPayment } from "@/features/payments/api/payments";
 import type { Payment, PaymentConfirmation } from "@/features/payments/model/payment";
@@ -15,6 +18,8 @@ const LABEL: Record<Payment["status"], string> = {
 
 /** Sends the PG success redirect to the server, which compares the amount and approves. */
 export function PaymentResult({ confirmation }: { confirmation: PaymentConfirmation | null }) {
+  const catalog = useCatalog();
+  const client = useQueryClient();
   const [payment, setPayment] = useState<Payment | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -29,7 +34,14 @@ export function PaymentResult({ confirmation }: { confirmation: PaymentConfirmat
     setError("");
     try {
       // Sending the same values again is safe: the server and PG approve only once.
-      setPayment(await confirmPayment(confirmation));
+      const result = await confirmPayment(confirmation);
+      if (result.status === "DONE") {
+        await completeCheckout(result.orderId, catalog).catch(() => {});
+        void client.invalidateQueries({ queryKey: ["orders"] });
+        void client.invalidateQueries({ queryKey: ["account"] });
+      }
+
+      setPayment(result);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "결제를 확인하지 못했어요.");
     } finally {
