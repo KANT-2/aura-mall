@@ -260,9 +260,24 @@ class Failover:
                 self.transition()
             return
         self.failures = 0
-        if not self.db.running(self.db.standby):
-            # A stopped replica is recovered in its current role, never promoted.
-            self.db.dc("up", "-d", "--no-deps", self.db.standby)
+        self.recover_replica()
+        if self.db.journal.exists():
+            # No operation owns the lock now: finish an interrupted rotation even
+            # if the primary stayed healthy. Otherwise reconnect credentials can drift.
+            self.db.recover_rotation()
+
+    def recover_replica(self):
+        if self.journal.exists() or not self.db.read("ha.json", {}).get("enabled"):
+            return
+        node = self.db.standby
+        role = self.db.state / f"node-{node}"
+        if not role.exists() or not role.read_text().startswith("standby|"):
+            return
+        if not self.db.running(node) and not self.journal.exists():
+            # Restarting the existing fenced follower is safe while an operation
+            # owns the lock; synchronous commits may be waiting for exactly this node.
+            self.db.dc("unpause", node, check=False, timeout=3)
+            self.db.dc("up", "-d", "--no-deps", node, timeout=15)
 
     def watch(self):
         with (self.db.home / "ha-watch.lock").open("a") as watcher:
@@ -273,6 +288,10 @@ class Failover:
                         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     except BlockingIOError:
                         self.failures = 0
+                        try:
+                            self.recover_replica()
+                        except (OperationError, subprocess.TimeoutExpired, OSError):
+                            print("Replica recovery incomplete; retrying", flush=True)
                     else:
                         try:
                             self.tick()
