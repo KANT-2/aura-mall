@@ -4,6 +4,7 @@ Only persistence and revocation lookups are test doubles. No database is opened.
 Existing DB cross-account tests use different UUIDs; these deliberately share one.
 """
 
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -64,7 +65,11 @@ def boundary(monkeypatch):
     async def test_session():
         yield session
 
-    admin_session = AsyncMock(return_value=SimpleNamespace(admin_id=shared_id))
+    admin_session = AsyncMock(
+        return_value=SimpleNamespace(
+            admin_id=shared_id, revoked_at=None, expires_at=operator.expires_at
+        )
+    )
     active_admin = AsyncMock(
         return_value=SimpleNamespace(
             id=shared_id,
@@ -240,3 +245,16 @@ def test_admin_cannot_deactivate_member_with_shared_uuid(boundary, missing_marke
     assert response.status_code == 401
     boundary.repository.find_user_by_id.assert_not_awaited()
     boundary.repository.deactivate.assert_not_awaited()
+
+
+@pytest.mark.parametrize("revoked", [True, False])
+def test_admin_dependency_rechecks_revoked_and_expired_session(boundary, revoked):
+    row = boundary.admin_session.return_value
+    if revoked:
+        row.revoked_at = datetime.now(UTC)
+    else:
+        row.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+    response = boundary.client.get(
+        "/api/v1/admin/session", headers=bearer(boundary.operator.access_token)
+    )
+    assert response.status_code == 401

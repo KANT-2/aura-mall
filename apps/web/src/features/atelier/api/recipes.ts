@@ -9,3 +9,9 @@ export const saveRecipe = (recipe: RecipeInput, owner: string) =>
     headers: { "X-Account-Owner": owner },
     body: JSON.stringify(recipe),
   });
+
+export const deleteRecipe = (id: string, owner: string) =>
+  request<null>(`/recipes/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { "X-Account-Owner": owner },
+  });

@@ -1,8 +1,12 @@
 import "server-only";
 import type { Order } from "@/features/checkout/model/order";
 import { productResponse } from "@/server/backend/storefront";
-import { integer, list, record, text } from "@/server/backend/decode";
+import { invalidResponse, integer, list, record, text } from "@/server/backend/decode";
 
+import { orderStatuses, type OrderStatus } from "@/features/checkout/model/order";
+export function orderStatusResponse(value: unknown): OrderStatus {
+  return orderStatuses.includes(value as OrderStatus) ? (value as OrderStatus) : invalidResponse();
+}
 /** Keep the server-calculated prices and snapshots, excluding persistence/auth fields. */
 export function orderResponse(value: unknown): Order {
   const item = record(value);
@@ -12,6 +16,12 @@ export function orderResponse(value: unknown): Order {
     recipient: text(item.recipient),
     address: text(item.address),
     created: text(item.created),
+    ...(item.status !== undefined ? { status: orderStatusResponse(item.status) } : {}),
+    ...Object.fromEntries(
+      ["recipientPhone", "deliveryNote", "courier", "trackingNumber"]
+        .filter((key) => item[key] !== undefined)
+        .map((key) => [key, text(item[key])]),
+    ),
     items: list(item.items, (value) => {
       const line = record(value);
       const custom = line.custom == null ? undefined : record(line.custom);

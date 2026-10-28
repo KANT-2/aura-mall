@@ -145,6 +145,10 @@ class AdminOrderOut(AdminOrderSummaryOut):
     address: str
     items: list[AdminOrderItemOut]
     status_history: list[AdminOrderStatusChangeOut]
+    recipient_phone: str = ""
+    delivery_note: str = ""
+    courier: str = ""
+    tracking_number: str = ""
 
 
 class AdminInquirySummaryOut(CamelModel):
@@ -248,6 +252,10 @@ def order_out(view: OrderView) -> AdminOrderOut:
     return AdminOrderOut(
         **order_summary_out(view).model_dump(),
         address=view.order.address,
+        recipient_phone=view.order.recipient_phone,
+        delivery_note=view.order.delivery_note,
+        courier=view.order.courier,
+        tracking_number=view.order.tracking_number,
         items=items,
         status_history=history,
     )

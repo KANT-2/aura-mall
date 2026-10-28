@@ -61,11 +61,17 @@ class DeploymentShellTests(unittest.TestCase):
                 program.chmod(0o700)
             for name in ("compose.yaml", "compose.lb.yaml", ".env"):
                 (root / name).touch()
+            (root / "ops").mkdir(exist_ok=True)
+            (root / "ops/commerce.py").write_text(
+                "import os\n"
+                "with open(os.environ['AURA_CD_TEST_LOG'],'a') as log:\n"
+                " log.write('operation:commerce-install\\n')\n"
+            )
             if managed:
                 secret = root / ".db-ops/client/database-url"
                 secret.parent.mkdir(parents=True)
                 secret.touch()
-                (root / "ops").mkdir()
+                (root / "ops").mkdir(exist_ok=True)
                 (root / "ops/database.py").write_text(
                     "import os,sys\n"
                     "with open(os.environ['AURA_CD_TEST_LOG'],'a') as log:\n"

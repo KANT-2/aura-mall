@@ -1,6 +1,6 @@
 """Admin routes for orders, partner inquiries and the overview (#32 contract)."""
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -107,3 +107,17 @@ async def update_inquiry(
 ) -> AdminInquiryOut:
     raw = body.model_dump(exclude_unset=True)
     return inquiry_out(await service.update_inquiry(session, admin.id, inquiry_id, raw))
+
+
+class FulfillIn(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    expected_status: Literal["paid", "preparing", "shipped"] = Field(alias="expectedStatus")
+    status: Literal["preparing", "shipped", "delivered"]
+    reason: str = Field(min_length=1, max_length=200)
+    courier: str = Field(default="", max_length=100)
+    tracking_number: str = Field(default="", max_length=100, alias="trackingNumber")
+
+
+@router.patch("/orders/{order_id}/fulfillment", response_model=AdminOrderOut, responses=ERRORS)
+async def fulfill_order(order_id: str, body: FulfillIn, admin: CurrentAdmin, session: Session):
+    return order_out(await service.fulfill_order(session, admin.id, order_id, body.model_dump()))

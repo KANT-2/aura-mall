@@ -19,7 +19,7 @@ import { ProductCard } from "@/features/catalog/components/product-card";
 
 export function ProductDetail({ product: p }: { product: Product }) {
   const { products, collections } = useCatalog();
-  const { add } = useCart(),
+  const { add, ready: cartReady } = useCart(),
     notify = useNotify(),
     [n, setN] = useState(1),
     [selection, setSelection] = useState<string[]>([]),
@@ -128,7 +128,7 @@ export function ProductDetail({ product: p }: { product: Product }) {
             <button
               data-testid={testIds.catalog.addToCart}
               className="button"
-              disabled={gift && selection.length !== 3}
+              disabled={!cartReady || (gift && selection.length !== 3)}
               onClick={async () => {
                 setAdded(await add(p, n, selection));
               }}

@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import { useState, useId, type CSSProperties } from "react";
+import { Questions } from "@/features/questions/components/questions";
 import type { Product } from "@/features/catalog/model/catalog";
 
 /**
@@ -171,7 +172,7 @@ export function ProductDetailContentDock({
           )}
           {tab === "qa" && (
             <div className="a85-detail-dock__qa">
-              <p>등록된 상품 문의가 없습니다.</p>
+              <Questions productId={product.id} />
             </div>
           )}
         </div>

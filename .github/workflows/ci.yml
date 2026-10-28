@@ -93,3 +93,48 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify shared proxy and API replicas
         run: python3 ops/test_caddy.py
+
+  commerce:
+    name: PostgreSQL commerce and browser journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: aura_test
+          POSTGRES_PASSWORD: commerce-ci-test-only-password
+          POSTGRES_DB: aura_commerce_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U aura_test -d aura_commerce_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      AURA_TEST_DATABASE_URL: postgresql://aura_test:commerce-ci-test-only-password@127.0.0.1:5432/aura_commerce_test
+      AURA_COMMERCE_TEST_DATABASE_URL: postgresql://aura_test:commerce-ci-test-only-password@127.0.0.1:5432/aura_commerce_test
+      AURA_ALLOW_DATABASE_TESTS: "1"
+      NEXT_PUBLIC_TOSS_CLIENT_KEY: test_gck_aura_browser_contract
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: uv sync --directory apps/api --locked
+      - run: uv run --directory apps/api --locked pytest
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: npm run build
+      - run: uv run --directory apps/api --locked python -m tests.fixtures.commerce_app
+      - run: npx playwright test --config playwright.commerce.config.ts
+        working-directory: apps/web
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: commerce-browser-failures
+          path: apps/web/test-results
+          retention-days: 3
