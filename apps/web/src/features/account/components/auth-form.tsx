@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useAuth } from "@/features/account/hooks/use-auth";
 import { Arrow } from "@/components/ui/arrow";
 import { useNotify } from "@/components/feedback/notification-provider";
+import { ApiError } from "@/lib/api/errors";
 export function Auth({ mode, returnTo }: { mode: "login" | "register"; returnTo: string }) {
   const { signIn, signUp } = useAuth(),
     notify = useNotify(),
@@ -74,7 +75,13 @@ export function Auth({ mode, returnTo }: { mode: "login" | "register"; returnTo:
       notify(signup ? "회원가입을 환영해요." : "로그인했어요.");
       router.push(returnTo);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "다시 시도해 주세요.");
+      setError(
+        !signup && e instanceof ApiError && e.status === 401
+          ? "이메일 또는 비밀번호가 올바르지 않아요."
+          : e instanceof Error
+            ? e.message
+            : "다시 시도해 주세요.",
+      );
     } finally {
       setBusy(false);
     }

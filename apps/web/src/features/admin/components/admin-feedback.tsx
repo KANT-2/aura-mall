@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ApiError } from "@/lib/api/errors";
 import { money } from "@/lib/format";
-import type { AdminHistoryEntry } from "@/features/admin/model/admin";
+import { inquiryStatusLabels, type AdminHistoryEntry } from "@/features/admin/model/admin";
 import styles from "@/features/admin/components/admin.module.css";
 
 export const adminDate = (value: string | null) =>
@@ -146,6 +146,10 @@ function value(field: string, input: unknown) {
 
   if (typeof input === "boolean") {
     return input ? "사용" : "사용 안 함";
+  }
+
+  if (field === "status" && typeof input === "string" && input in inquiryStatusLabels) {
+    return inquiryStatusLabels[input as keyof typeof inquiryStatusLabels];
   }
 
   if (field === "price" && typeof input === "number") {
