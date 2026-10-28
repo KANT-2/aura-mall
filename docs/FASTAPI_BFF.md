@@ -374,3 +374,17 @@ BFF HTTP 통합 테스트는 실제 서버 응답으로 FastAPI 형태의 오류
 참고: [Next.js BFF](https://nextjs.org/docs/app/guides/backend-for-frontend), [FastAPI 오류 처리](https://fastapi.tiangolo.com/tutorial/handling-errors/), [응답 쿠키](https://fastapi.tiangolo.com/advanced/response-cookies/), [프록시 뒤의 FastAPI](https://fastapi.tiangolo.com/advanced/behind-a-proxy/).
 
 `npm run test:e2e:jwt`는 운영 회원가입·로그인·조회·갱신·로그아웃 라우터와 서비스를 사용하고 인증 저장소만 테스트 대역으로 바꿉니다. TokenPair·204 계약, 만료·위조·재사용·계열 폐기, 브라우저 탭 간 갱신을 검증합니다. 실제 PostgreSQL 검증은 `AURA_TEST_DATABASE_URL` 및 명시적 DDL 동의가 필요한 API 테스트에서 수행합니다.
+
+## 1.6 상품 문의·주문 운영 연결
+
+이 절은 이전의 체크아웃 비활성/주문 조회 전용 설명을 대체합니다. 현재 운영 범위와 외부 연동 경계는 [기능 점검 기록](FEATURE_PARITY.md), 자동 처리는 [주문·결제 운영](operations/COMMERCE.md)을 따릅니다.
+
+- `GET/POST /products/{product_id}/questions`: 공개/선택적 회원 조회, 회원 작성. 입력 `title`(1~120), `content`(1~3000), `private`(기본 true). 목록은 `page` 1~10000, 20건씩 `{items,total,page,pageSize}`.
+- `GET /questions/mine`: 회원 본인 목록. `PATCH /questions/{question_id}`는 본문 전체와 정수 `version` 필수, 답변 등록 전만 가능. `DELETE /questions/{question_id}?version=n`은 본인만 가능하고 204 반환.
+- `GET /admin/questions?unanswered=true&page=1`: 관리자 전체/미답변 목록. `PATCH /admin/questions/{question_id}/answer` 입력 `{answer,version}`. 답변 1~3000자, 버전 충돌 409, 감사 기록에 본문을 중복 기록하지 않음.
+- 문의 응답: `id,productId,title,content,private,mine,answer,answered,answeredAt,version,created`. 비공개 타인 조회 시 제목은 고정 안내, 내용/답변은 null. 회원 ID·이메일은 응답에 포함하지 않음. 회원별 10분에 신규 문의 5건 초과 시 429.
+- `POST /orders`에 선택적 `recipientPhone`(최대30), `deliveryNote`(최대300) 추가. 기존 필수 항목·서버 가격 산정·회원/Idempotency-Key 재사용 규칙 유지. BFF 주문 응답에 `status,recipientPhone,deliveryNote,courier,trackingNumber` 전달.
+- `POST /orders/{order_id}/cancel` BFF/화면 연결. 결과 미확정 202를 취소 완료로 간주하지 않음.
+- `PATCH /admin/orders/{order_id}/fulfillment`: `expectedStatus`와 다음 `status`(`preparing/shipped/delivered`), `reason`(1~200) 필수. 출고 시 `courier,trackingNumber`(각 최대100) 필수. 결제·환불과 같은 주문 행 잠금, 이전 상태 불일치 409, 상태 이력 제공.
+- `POST /admin/auth/change-password`: 기존 회원과 같은 `currentPassword,newPassword` 입력 검증, 성공 204 및 모든 관리자 세션 폐기. 관리자 로그인과 비밀번호 변경은 관리자 행 잠금으로 직렬화.
+- 관리자 결제·환불 검토 BFF는 `page,status,reason`만 전달하고 PG 비밀 키·거래 키는 브라우저에 제공하지 않음.

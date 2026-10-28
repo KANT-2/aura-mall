@@ -185,6 +185,9 @@ jobs:
               python3 ops/database.py ha-install
             fi
 
+            echo "Updating commerce maintenance timer..."
+            python3 ops/commerce.py install
+
             echo "Checking all API containers..."
             healthy=false
             for attempt in $(seq 1 12); do

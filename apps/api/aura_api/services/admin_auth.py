@@ -94,3 +94,26 @@ async def register(session: AsyncSession, actor_id: uuid.UUID, raw: Mapping[str,
 
 def _email_taken() -> Conflict:
     return Conflict("ADMIN_EMAIL_TAKEN", "이미 등록된 관리자 이메일이에요.")
+
+
+async def change_password(session: AsyncSession, actor: uuid.UUID, current: str, new: str) -> None:
+    from sqlalchemy import select
+
+    from aura_api.infra.models import AdminSession
+
+    async with session.begin():
+        admin = await session.scalar(
+            select(Admin).where(Admin.id == actor, Admin.status == "active").with_for_update()
+        )
+        if admin is None or not await run_sync(check_password, admin.password_hash, current):
+            raise Unauthorized("PASSWORD_MISMATCH", "현재 비밀번호를 확인해 주세요.")
+        admin.password_hash = await run_sync(PASSWORD_HASHER.hash, new)
+        sessions = list(
+            await session.scalars(
+                select(AdminSession).where(
+                    AdminSession.admin_id == actor, AdminSession.revoked_at.is_(None)
+                )
+            )
+        )
+        for row in sessions:
+            await repository.revoke_admin_session(session, row)

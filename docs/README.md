@@ -18,7 +18,9 @@
 | [DB 운영 안내](operations/DATABASE.md)     | TLS 자동 갱신·접속 비밀번호 회전·복제·복구   |
 | [Caddy 배포 안내](backend/DEPLOYMENT.md)   | 기존 Caddy 재사용·Next.js 공개 경로·API 분산 |
 
-제품 기획은 목표 정책과 경험을 정의합니다. 실제 구현 범위는 앱별 README와 소스, API 구현 시 준수할 통신 규칙은 BFF 계약을 기준으로 확인합니다. 현재 웹의 업무 데이터는 Mock에서 제공하고 FastAPI에는 헬스 체크 골격이 있습니다.
+제품 기획은 목표 정책과 경험을 정의합니다. 실제 구현 범위는 앱별 README와 소스, API 구현 시 준수할 통신 규칙은 BFF 계약을 기준으로 확인합니다. 운영 웹은 Next.js BFF를 통해 FastAPI와 PostgreSQL을 사용합니다. 로컬 웹 개발의 기본값은 Mock이며, 실제 DB 기반 브라우저 검증은 별도 commerce suite를 사용합니다.
+
+[기능 연결 점검·보완 기록](FEATURE_PARITY.md)과 [주문·결제 운영 안내](operations/COMMERCE.md)에서 현재 연결 범위와 자동 처리 작업을 확인합니다.
 
 ## 과거 기록
 

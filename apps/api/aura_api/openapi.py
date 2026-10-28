@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 from aura_api.core.errors import ErrorResponse
 
-CONTRACT_VERSION = "1.5.0"
+CONTRACT_VERSION = "1.6.0"
 ERROR_RESPONSES = {
     code: {"model": ErrorResponse} for code in (400, 401, 403, 404, 409, 422, 500, 503)
 }
@@ -74,11 +74,14 @@ def configure_openapi(app: FastAPI, prefix: str) -> None:
                     operation["security"] = [{"AdminJWT": []}]
                 elif (
                     relative in {"/auth/me", "/auth/logout", "/orders"}
-                    or relative.startswith(("/payments", "/orders/"))
+                    or relative.startswith(("/payments", "/orders/", "/questions"))
+                    or (relative.startswith("/products/") and method != "get")
                     or (relative.startswith("/recipes") and method != "get")
                 ):
                     operation["security"] = [{"MemberJWT": []}]
-                elif relative in {"/recipes", "/atelier/draft"}:
+                elif relative in {"/recipes", "/atelier/draft"} or (
+                    relative.startswith("/products/") and method == "get"
+                ):
                     operation["security"] = [{}, {"MemberJWT": []}]
                 if relative == "/atelier/draft":
                     for parameter in operation.get("parameters", []):

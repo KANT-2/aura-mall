@@ -34,6 +34,8 @@ class OrderIn(BaseModel):
     # Items, recipient and address are domain rules (OR-01~15); raw values go to the domain.
     recipient: Any = Field(default=None, json_schema_extra={"type": "string", "maxLength": 100})
     address: Any = Field(default=None, json_schema_extra={"type": "string", "maxLength": 500})
+    recipient_phone: str = Field(default="", alias="recipientPhone", max_length=30)
+    delivery_note: str = Field(default="", alias="deliveryNote", max_length=300)
     coupon: bool | None = None
     items: Any = Field(
         default=None,
@@ -95,6 +97,10 @@ class OrderOut(CamelModel):
     address: str
     created: datetime
     status: OrderStatus
+    recipient_phone: str = ""
+    delivery_note: str = ""
+    courier: str = ""
+    tracking_number: str = ""
 
 
 def order_out(order: SavedOrder) -> OrderOut:
@@ -119,6 +125,10 @@ def order_out(order: SavedOrder) -> OrderOut:
         address=order.address,
         created=order.created_at,
         status=order.status,
+        recipient_phone=order.recipient_phone,
+        delivery_note=order.delivery_note,
+        courier=order.courier,
+        tracking_number=order.tracking_number,
     )
 
 

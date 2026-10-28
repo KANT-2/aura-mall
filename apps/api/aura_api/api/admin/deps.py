@@ -2,6 +2,7 @@
 
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Depends, Request
@@ -57,7 +58,13 @@ async def current_admin(
     if is_admin_token(claims) and jti is not None:
         row = await repository.admin_session(session, jti)
         admin = await repository.active_admin(session, subject)
-        if row is not None and row.admin_id == subject and admin is not None:
+        if (
+            row is not None
+            and row.admin_id == subject
+            and admin is not None
+            and row.revoked_at is None
+            and row.expires_at > datetime.now(UTC)
+        ):
             actor = AdminActor(admin.id, admin.name, admin.email, jti)
     else:
         customer = await repository.is_customer(session, subject)

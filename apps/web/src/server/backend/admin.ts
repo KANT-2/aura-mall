@@ -1,4 +1,5 @@
 import "server-only";
+import { orderStatusResponse } from "@/server/backend/orders";
 import type {
   AdminAccount,
   AdminHistoryEntry,
@@ -99,6 +100,7 @@ export function adminOrderSummaryResponse(value: unknown): AdminOrderSummary {
     customer: item.customer === null ? null : adminAccountResponse(item.customer),
     recipient: text(item.recipient),
     title: text(item.title),
+    ...(item.status !== undefined ? { status: orderStatusResponse(item.status) } : {}),
     itemCount: integer(item.itemCount),
     total: integer(item.total),
   };
@@ -107,6 +109,25 @@ export function adminOrderResponse(value: unknown): AdminOrder {
   const item = record(value);
   return {
     ...adminOrderSummaryResponse(item),
+    ...Object.fromEntries(
+      ["recipientPhone", "deliveryNote", "courier", "trackingNumber"]
+        .filter((key) => item[key] !== undefined)
+        .map((key) => [key, text(item[key])]),
+    ),
+    ...(item.statusHistory !== undefined
+      ? {
+          statusHistory: list(item.statusHistory, (value) => {
+            const row = record(value);
+            return {
+              fromStatus: nullableText(row.fromStatus),
+              status: orderStatusResponse(row.status),
+              actorType: text(row.actorType),
+              reason: nullableText(row.reason),
+              changed: text(row.changed),
+            };
+          }),
+        }
+      : {}),
     address: text(item.address),
     items: list(item.items, (value) => {
       const line = record(value);

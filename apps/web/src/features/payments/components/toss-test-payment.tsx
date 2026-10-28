@@ -44,6 +44,7 @@ function message(error: unknown) {
 export function TossTestPayment({ orderId }: { orderId?: string }) {
   const { user, ready } = useAccount();
   const [sdkReady, setSdkReady] = useState(false);
+  const [widgetReady, setWidgetReady] = useState(false);
   const [payment, setPayment] = useState<Payment | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -65,6 +66,7 @@ export function TossTestPayment({ orderId }: { orderId?: string }) {
           current.renderPaymentMethods({ selector: "#payment-method", variantKey: "DEFAULT" }),
           current.renderAgreement({ selector: "#payment-agreement", variantKey: "AGREEMENT" }),
         ]);
+        setWidgetReady(true);
       } catch (cause) {
         setError(message(cause));
       }
@@ -117,6 +119,7 @@ export function TossTestPayment({ orderId }: { orderId?: string }) {
     }
 
     setError("");
+    setPending(true);
     try {
       await widgets.current.requestPayment({
         orderId: payment.pgOrderId,
@@ -126,6 +129,8 @@ export function TossTestPayment({ orderId }: { orderId?: string }) {
       });
     } catch (cause) {
       setError(message(cause));
+    } finally {
+      setPending(false);
     }
   };
 
@@ -139,14 +144,19 @@ export function TossTestPayment({ orderId }: { orderId?: string }) {
           {payment.orderName} · {payment.amount.toLocaleString("ko-KR")}원 ({payment.status})
         </p>
       ) : (
-        <button className="button" type="button" disabled={pending || !ready} onClick={begin}>
+        <button
+          className="button"
+          type="button"
+          disabled={pending || !ready || !user}
+          onClick={begin}
+        >
           {orderId ? "이 주문 결제 준비" : "테스트 주문 만들고 결제 준비"}
         </button>
       )}
       <div id="payment-method" />
       <div id="payment-agreement" />
       {payment?.status === "READY" && (
-        <button className="button" type="button" disabled={!sdkReady} onClick={pay}>
+        <button className="button" type="button" disabled={!widgetReady || pending} onClick={pay}>
           테스트 결제하기
         </button>
       )}
