@@ -5,7 +5,7 @@ import type { AccountState } from "@/features/account/model/account";
 import { withAuthLock } from "@/lib/api/client";
 import { useNotify } from "@/components/feedback/notification-provider";
 import type { Product } from "@/features/catalog/model/catalog";
-import type { CustomRecipeItem } from "@/features/cart/model/cart";
+import type { CartItem, CustomRecipeItem } from "@/features/cart/model/cart";
 import { useCatalog } from "@/features/catalog/hooks/use-catalog";
 import { applyCartCommand, type CartCommand } from "@/features/cart/model/cart-commands";
 import {
@@ -71,6 +71,18 @@ export function useCart() {
     pending: false,
     add: (product: Product, quantity: number, selection: string[] = []) =>
       execute({ type: "add", productId: product.id, quantity, selection }, "장바구니에 담았어요."),
+    addOrderItems: (items: CartItem[]) =>
+      execute(
+        {
+          type: "addMany",
+          items: items.map((item) => ({
+            quantity: item.quantity,
+            selection: item.selection,
+            ...(item.custom ? { custom: item.custom } : { productId: item.product.id }),
+          })),
+        },
+        "주문 상품을 장바구니에 담았어요.",
+      ),
     addCustom: (custom: CustomRecipeItem) =>
       execute({ type: "add", custom, quantity: 1 }, "나만의 향을 장바구니에 담았어요."),
     quantity: (key: string, quantity: number) => execute({ type: "quantity", key, quantity }),

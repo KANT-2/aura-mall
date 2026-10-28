@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import styles from "@/features/payments/components/payment.module.css";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCatalog } from "@/features/catalog/hooks/use-catalog";
 import { completeCheckout } from "@/features/checkout/storage/checkout-attempt";
@@ -57,45 +58,90 @@ export function PaymentResult({ confirmation }: { confirmation: PaymentConfirmat
     // Confirm once per page load; the retry button handles unknown results.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  if (!confirmation) {
-    return <p role="alert">결제 정보를 확인할 수 없어요.</p>;
-  }
-
+  const done = payment?.status === "DONE";
+  const checking = pending || payment?.status === "IN_PROGRESS";
+  const title = done
+    ? "주문이 완료되었어요"
+    : checking
+      ? "결제를 확인하고 있어요"
+      : payment
+        ? LABEL[payment.status]
+        : "결제 결과 확인";
   return (
-    <section>
-      <h1>결제 결과</h1>
-      {pending && <p role="status">결제를 확인하고 있어요.</p>}
-      {payment && (
-        <dl>
-          <dt>상태</dt>
-          <dd data-payment-status={payment.status}>{LABEL[payment.status]}</dd>
-          <dt>주문</dt>
-          <dd>{payment.orderName}</dd>
-          <dt>금액</dt>
-          <dd>{payment.amount.toLocaleString("ko-KR")}원</dd>
-          {payment.method && (
-            <>
-              <dt>결제수단</dt>
-              <dd>{payment.method}</dd>
-            </>
-          )}
-          {payment.failureMessage && (
-            <>
-              <dt>사유</dt>
-              <dd>{payment.failureMessage}</dd>
-            </>
-          )}
-        </dl>
-      )}
-      {payment?.status === "IN_PROGRESS" && (
-        <button className="button" type="button" disabled={pending} onClick={() => void confirm()}>
-          결과 다시 확인
-        </button>
-      )}
-      {error && <p role="alert">{error}</p>}
-      <p>
-        <Link href="/mypage">주문 내역으로</Link>
-      </p>
+    <section className={styles.statePage}>
+      <div className={styles.stateCard} aria-busy={pending}>
+        <div
+          className={`${styles.stateIcon} ${checking ? styles.pendingIcon : !done ? styles.failedIcon : ""}`}
+          aria-hidden="true"
+        >
+          {checking ? <span className={styles.spinner} /> : done ? "✓" : "—"}
+        </div>
+        <span className={styles.eyebrow}>{done ? "THANK YOU FOR YOUR ORDER" : "AURA PAYMENT"}</span>
+        <h1>{confirmation ? title : "결제 정보를 확인할 수 없어요"}</h1>
+        <p>
+          {done
+            ? "선택하신 향을 주문 내역에 담아 두었어요. 주문과 배송 상태는 마이페이지에서 확인해 주세요."
+            : checking
+              ? "결제 결과를 안전하게 확인하고 있어요. 잠시 후 다시 확인해 주세요."
+              : "주문 내역에서 현재 상태를 확인하고 결제를 이어갈 수 있어요."}
+        </p>
+        {payment && (
+          <dl className={styles.resultDetails}>
+            <div>
+              <dt>상태</dt>
+              <dd>
+                <span className={styles.status} data-payment-status={payment.status}>
+                  {LABEL[payment.status]}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt>주문 상품</dt>
+              <dd>{payment.orderName}</dd>
+            </div>
+            {payment.method && (
+              <div>
+                <dt>결제수단</dt>
+                <dd>{payment.method}</dd>
+              </div>
+            )}
+            <div className={styles.resultAmount}>
+              <dt>결제금액</dt>
+              <dd>{payment.amount.toLocaleString("ko-KR")}원</dd>
+            </div>
+          </dl>
+        )}
+        {payment?.failureMessage && (
+          <div className={styles.error} role="alert">
+            {payment.failureMessage}
+          </div>
+        )}
+        {error && (
+          <div className={styles.error} role="alert">
+            {error}
+          </div>
+        )}
+        {(payment?.status === "IN_PROGRESS" || error) && confirmation && (
+          <div className={styles.resultActions}>
+            <button
+              className={styles.secondary}
+              type="button"
+              disabled={pending}
+              onClick={() => void confirm()}
+            >
+              {pending ? "확인 중…" : "결과 다시 확인"}
+            </button>
+          </div>
+        )}
+        <div className={styles.resultActions}>
+          <Link className={styles.primary} href="/mypage?tab=orders">
+            주문 내역으로 <span aria-hidden="true">↗</span>
+          </Link>
+          <Link className={styles.secondary} href="/shop">
+            쇼핑 계속하기
+          </Link>
+        </div>
+      </div>
     </section>
   );
 }

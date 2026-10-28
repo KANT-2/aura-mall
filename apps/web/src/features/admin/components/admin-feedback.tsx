@@ -121,6 +121,12 @@ export function AdminPagination({
 }
 
 const fieldLabels: Record<string, string> = {
+  product: "상품 등록",
+  isActive: "판매 노출",
+  details: "상세 안내",
+  notes: "향 노트",
+  volume: "용량",
+  category: "상품 분류",
   name: "상품명",
   englishName: "영문명",
   description: "설명",
@@ -146,6 +152,26 @@ function value(field: string, input: unknown) {
     return money(input);
   }
 
+  if (Array.isArray(input)) {
+    return input.length ? input.join(" · ") : "없음";
+  }
+
+  if (typeof input === "object") {
+    const object = input as Record<string, unknown>;
+    if (field === "product") {
+      return typeof object.name === "string" ? object.name : "등록 완료";
+    }
+
+    if (field === "details") {
+      const count = Object.values(object).filter(
+        (text) => typeof text === "string" && text.trim(),
+      ).length;
+      return count ? `${count}개 항목` : "미등록";
+    }
+
+    return "변경됨";
+  }
+
   return String(input);
 }
 
@@ -160,6 +186,15 @@ export function AdminHistory({ entries }: { entries: AdminHistoryEntry[] }) {
               <span>
                 {adminDate(entry.created)} · {entry.actor}
               </span>
+              <strong className={styles.historyAction}>
+                {entry.action === "product.create"
+                  ? "상품 등록"
+                  : entry.action === "product.stock"
+                    ? "재고 조정"
+                    : entry.action === "product.update"
+                      ? "상품 정보 수정"
+                      : "입점 문의 처리"}
+              </strong>
               {entry.changes.map((change) => (
                 <p key={change.field}>
                   <strong>{fieldLabels[change.field] ?? change.field}</strong>{" "}

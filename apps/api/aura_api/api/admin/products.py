@@ -36,6 +36,11 @@ class ProductUpdateIn(BaseModel):
         default=None,
         json_schema_extra={"type": "string", "description": "상세 응답 imageOptions 중 선택"},
     )
+    isActive: Any = Field(default=None, json_schema_extra={"type": "boolean"})  # noqa: N815
+    details: Any = None
+    notes: Any = None
+    category: Any = None
+    volume: Any = None
     featured: Any = Field(default=None, json_schema_extra={"type": "boolean"})
     isNew: Any = Field(default=None, json_schema_extra={"type": "boolean"})  # noqa: N815
 

@@ -25,10 +25,17 @@ export type AdminProduct = Pick<
   | "description"
   | "featured"
   | "isNew"
-> & { version: number; updated: string | null };
+> & {
+  version: number;
+  updated: string | null;
+  isActive?: boolean;
+  details?: Product["details"];
+  notes?: string[];
+  category?: string;
+};
 export type AdminHistoryEntry = {
   id: string;
-  action: "product.update" | "product.stock" | "inquiry.update";
+  action: "product.create" | "product.update" | "product.stock" | "inquiry.update";
   actor: string;
   changes: { field: string; from: unknown; to: unknown }[];
   reason?: string;
@@ -41,7 +48,18 @@ export type AdminProductDetail = AdminProduct & {
 export type ProductUpdate = Partial<
   Pick<
     AdminProduct,
-    "name" | "englishName" | "description" | "price" | "image" | "featured" | "isNew"
+    | "name"
+    | "englishName"
+    | "description"
+    | "price"
+    | "image"
+    | "featured"
+    | "isNew"
+    | "isActive"
+    | "details"
+    | "notes"
+    | "category"
+    | "volume"
   >
 > & { version: number };
 /** `key` lets the server ignore a resent adjustment instead of applying it twice. */

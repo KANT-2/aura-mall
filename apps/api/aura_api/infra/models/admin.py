@@ -52,7 +52,7 @@ class AdminAuditLog(Base):
     __tablename__ = "admin_audit_logs"
     __table_args__ = (
         CheckConstraint(
-            "action IN ('product.update', 'product.stock', 'inquiry.update', "
+            "action IN ('product.create', 'product.update', 'product.stock', 'inquiry.update', "
             "'admin.create', 'question.answer')",
             name="action",
         ),

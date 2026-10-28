@@ -75,7 +75,43 @@ def product_changes(raw: Mapping[str, Any], image_options: Collection[str]) -> d
         if raw["image"] not in image_options:
             raise InvalidInput("IMAGE_INVALID", "등록된 상품 이미지 중에서 선택해 주세요.")
         changes["image"] = raw["image"]
-    for field, key in (("featured", "featured"), ("is_new", "isNew")):
+    for key, maximum in (("volume", 30), ("category", 50)):
+        if key in raw:
+            value = raw[key]
+            if not isinstance(value, str) or not value.strip() or len(value.strip()) > maximum:
+                raise InvalidInput("PRODUCT_INVALID", "용량과 상품 분류를 확인해 주세요.")
+            changes[key] = value.strip()
+    if "notes" in raw:
+        notes = raw["notes"]
+        if (
+            not isinstance(notes, list)
+            or len(notes) > 12
+            or any(
+                not isinstance(note, str) or not note.strip() or len(note.strip()) > 100
+                for note in notes
+            )
+        ):
+            raise InvalidInput("PRODUCT_INVALID", "향 노트를 확인해 주세요.")
+        changes["notes"] = [note.strip() for note in notes]
+    if "details" in raw:
+        details = raw["details"]
+        keys = {
+            "usage",
+            "ingredients",
+            "precautions",
+            "manufacturer",
+            "origin",
+            "shipping",
+            "returns",
+        }
+        if (
+            not isinstance(details, dict)
+            or set(details) - keys
+            or any(not isinstance(value, str) or len(value) > 5000 for value in details.values())
+        ):
+            raise InvalidInput("PRODUCT_INVALID", "상품 상세 안내를 확인해 주세요.")
+        changes["details"] = {key: value.strip() for key, value in details.items()}
+    for field, key in (("featured", "featured"), ("is_new", "isNew"), ("is_active", "isActive")):
         if key in raw and raw[key] is not None:
             if not isinstance(raw[key], bool):
                 raise InvalidInput("DISPLAY_INVALID", "상품 노출 설정을 확인해 주세요.")

@@ -54,6 +54,7 @@ export function productResponse(value: unknown): Product {
     imageUrl: text(item.imageUrl),
     category: text(item.category),
     isNew: boolean(item.isNew),
+    ...(item.details !== undefined ? { details: dictionary(item.details, text) } : {}),
     ...(item.noteImages !== undefined ? { noteImages: dictionary(item.noteImages, text) } : {}),
     ...(item.giftImages !== undefined ? { giftImages: list(item.giftImages, text) } : {}),
   };

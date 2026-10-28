@@ -8,7 +8,13 @@ export const GET = createBffHandler("GET", resource, {
 });
 export const PATCH = createBffHandler("PATCH", resource, {
   authScope: "admin",
+  maxBodyBytes: 192 * 1024,
   bodyFields: [
+    "isActive",
+    "details",
+    "notes",
+    "category",
+    "volume",
     "version",
     "name",
     "englishName",
