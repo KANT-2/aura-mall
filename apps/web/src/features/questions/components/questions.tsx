@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useId, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAccount } from "@/features/account/hooks/use-account";
+import { catalogQueryOptions } from "@/features/catalog/api/catalog";
 import { useNotify } from "@/components/feedback/notification-provider";
 import type { ProductQuestion, QuestionPage } from "@/features/questions/model/question";
 import { request } from "@/lib/api/client";
@@ -124,14 +125,19 @@ function QuestionForm({
 function QuestionCard({
   question: q,
   admin,
+  mine,
   owner,
   refresh,
 }: {
   question: ProductQuestion;
   admin: boolean;
+  mine: boolean;
   owner?: string;
   refresh: () => void;
 }) {
+  const catalog = useQuery({ ...catalogQueryOptions, enabled: admin || mine });
+  const productName =
+    catalog.data?.products.find((product) => product.id === q.productId)?.name ?? q.productId;
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -184,6 +190,11 @@ function QuestionCard({
         {q.mine && <span className={styles.mine}>내 문의</span>}
         <time dateTime={q.created}>{new Date(q.created).toLocaleDateString("ko-KR")}</time>
       </div>
+      {mine && (
+        <Link href={`/shop/${encodeURIComponent(q.productId)}`} className={styles.productLink}>
+          {productName} <span aria-hidden="true">↗</span>
+        </Link>
+      )}
       <h3>{q.title}</h3>
       {q.content ? (
         <p className={styles.body}>{q.content}</p>
@@ -230,7 +241,7 @@ function QuestionCard({
             href={`/admin/products/${encodeURIComponent(q.productId)}`}
             className={styles.productLink}
           >
-            상품 {q.productId} <span aria-hidden="true">↗</span>
+            상품 {productName} <span aria-hidden="true">↗</span>
           </Link>
           <details className={styles.answerEditor} open={!q.answered}>
             <summary>{q.answered ? "답변 수정" : "답변 작성"}</summary>
@@ -419,6 +430,7 @@ export function Questions({
             key={`${q.id}:${q.version}`}
             question={q}
             admin={admin}
+            mine={mine}
             owner={owner}
             refresh={refresh}
           />

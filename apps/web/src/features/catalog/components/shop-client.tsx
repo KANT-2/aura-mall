@@ -34,7 +34,7 @@ export function Shop({
       (p) =>
         (!c || p.collection === c) &&
         (!type || p.type === type) &&
-        [p.name, p.englishName, p.typeName, p.description]
+        [p.name, p.englishName, p.typeName, p.description, ...p.notes]
           .join(" ")
           .toLowerCase()
           .includes(keyword),
