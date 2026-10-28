@@ -28,7 +28,7 @@ test("signup welcome steps fit the viewport and can be dismissed", async ({ page
   await expect(page.getByTestId(testIds.navigation.account)).toHaveAttribute("href", routes.mypage);
 });
 
-test("partner form clears corrected field errors and saves a valid mock inquiry", async ({
+test("partner form clears corrected field errors and shows the saved inquiry in view", async ({
   page,
 }) => {
   await page.goto(routes.partner);
@@ -49,5 +49,7 @@ test("partner form clears corrected field errors and saves a valid mock inquiry"
   await page.getByLabel("문의 내용", { exact: true }).fill("화면 검수용 문의");
   await page.getByRole("checkbox", { name: /필수/ }).check();
   await submit.click();
-  await expect(page.getByRole("heading", { name: "모의 문의가 저장되었어요." })).toBeVisible();
+  const complete = page.getByRole("heading", { name: "입점 문의가 접수되었어요." });
+  await expect(complete).toBeInViewport();
+  await expect(complete).toBeFocused();
 });
