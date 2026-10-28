@@ -23,6 +23,9 @@ services:
       context: ./apps/api
       dockerfile: Dockerfile
     restart: unless-stopped
+    env_file:
+      - path: .env.payments
+        required: false
     depends_on:
       db:
         condition: service_healthy
@@ -42,6 +45,8 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_TOSS_CLIENT_KEY: ${NEXT_PUBLIC_TOSS_CLIENT_KEY:-}
     restart: unless-stopped
     depends_on:
       - api

@@ -127,6 +127,14 @@ BFF는 `POST /api/payments`, `POST /api/payments/confirm`, `GET /api/payments/{i
 이 결과는 토스 **테스트** 환경 검증입니다. 운영 키·실결제는 검증하지 않았습니다. 타임아웃·승인 후 DB
 오류 복구와 동시 승인은 PG를 흉내 낸 테스트(Fake PG)로만 검증했고, 실제 토스에서는 재현하지 않았습니다.
 
+## Docker·CD의 테스트 키 설정
+
+GitHub `development` 환경의 Secret에 `AURA_TOSS_SECRET_KEY`와 `NEXT_PUBLIC_TOSS_CLIENT_KEY`를 함께 등록합니다. CD는 키 형식을 검사한 후 SSH로 비공개 JSON 파일을 전달하고, 배포할 커밋을 확인한 뒤 `ops/configure_payments.py`로 반영합니다. 실제 키는 저장소에 기록하지 않습니다.
+
+서버 비밀 키와 `AURA_PAYMENT_PROVIDER=toss`는 소유자만 읽는 `.env.payments`에서 API에만 주입됩니다. 공개 클라이언트 키는 서버 `.env`에서 Compose 빌드 인자로 Next.js에 전달합니다. `NEXT_PUBLIC_*` 값은 빌드 시 브라우저 번들에 들어가므로 클라이언트 키 변경 후에는 웹 이미지를 다시 빌드해야 합니다. 비밀 키는 웹 빌드 인자나 웹 컨테이너 환경에 전달하지 않습니다.
+
+키를 제공하지 않는 CI·로컬 Compose는 기존처럼 결제 기능이 비활성화됩니다. 배포 Secret이 하나만 있거나 테스트 키 형식이 아니면 설정을 변경하기 전에 배포를 중단합니다. 비공개 서버 설정을 수동으로 반영할 때도 표준 입력으로 두 키가 담긴 JSON을 전달하고 키를 명령 인자나 로그에 넣지 않습니다.
+
 ## 남은 결제 개발
 
 1. ~~BFF 경로와 결제창·성공/실패 페이지~~ (최소 테스트 화면 구현. 상품·주문 화면과 연결하는 정식 결제 화면은 남음)
