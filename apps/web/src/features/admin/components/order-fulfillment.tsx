@@ -15,7 +15,7 @@ export function OrderFulfillment({ order }: { order: AdminOrder }) {
     preparing: "shipped",
     shipped: "delivered",
   };
-  const target = order.status ? next[order.status] : undefined;
+  const target = !order.isDemo && order.status ? next[order.status] : undefined;
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -42,6 +42,7 @@ export function OrderFulfillment({ order }: { order: AdminOrder }) {
   return (
     <section className={styles.panel}>
       <h2>주문 처리</h2>
+      {order.isDemo && <p>시연용 기록 · 실제 결제·배송·재고와 분리된 조회용 데이터예요.</p>}
       <p>현재 상태: {order.status ? orderStatusLabels[order.status] : "확인 필요"}</p>
       {order.courier && (
         <p>

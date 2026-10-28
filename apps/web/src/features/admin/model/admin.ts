@@ -50,6 +50,7 @@ export type StockAdjustmentInput = { version: number; delta: number; reason: str
 export type AdminCustomer = { id: string; name: string; email: string };
 export type AdminOrderSummary = {
   status?: OrderStatus;
+  isDemo?: boolean;
   id: string;
   created: string;
   customer: AdminCustomer | null;

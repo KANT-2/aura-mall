@@ -121,6 +121,7 @@ class AdminOrderSummaryOut(CamelModel):
     item_count: int
     total: int
     status: OrderStatus
+    is_demo: bool = False
 
 
 class AdminOrderStatusChangeOut(CamelModel):
@@ -213,10 +214,11 @@ def order_summary_out(view: OrderView) -> AdminOrderSummaryOut:
         if user and user.deactivated_at is None
         else None,
         recipient=order.recipient,
-        title=view.title,
+        title=("[시연] " if order.is_demo else "") + view.title,
         item_count=view.item_count,
         total=order.total,
         status=order.status,
+        is_demo=bool(order.is_demo),
     )
 
 

@@ -16,6 +16,7 @@ export function AdminOverviewScreen() {
   const { data, error, refetch } = useAdminOverview();
   return (
     <>
+      <p>시연용으로 표시된 주문·결제 내역은 실제 매출이 아닌 가상 데이터예요.</p>
       <AdminHeading
         title="운영 요약"
         description="저장된 주문·입점 문의·재고 데이터를 기준으로 집계해요."

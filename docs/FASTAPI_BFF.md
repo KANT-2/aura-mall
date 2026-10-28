@@ -388,3 +388,7 @@ BFF HTTP 통합 테스트는 실제 서버 응답으로 FastAPI 형태의 오류
 - `PATCH /admin/orders/{order_id}/fulfillment`: `expectedStatus`와 다음 `status`(`preparing/shipped/delivered`), `reason`(1~200) 필수. 출고 시 `courier,trackingNumber`(각 최대100) 필수. 결제·환불과 같은 주문 행 잠금, 이전 상태 불일치 409, 상태 이력 제공.
 - `POST /admin/auth/change-password`: 기존 회원과 같은 `currentPassword,newPassword` 입력 검증, 성공 204 및 모든 관리자 세션 폐기. 관리자 로그인과 비밀번호 변경은 관리자 행 잠금으로 직렬화.
 - 관리자 결제·환불 검토 BFF는 `page,status,reason`만 전달하고 PG 비밀 키·거래 키는 브라우저에 제공하지 않음.
+
+## 1.7 시연 주문 구분
+
+0013은 `orders.is_demo`(기본 false)를 추가합니다. 회원 주문·관리자 주문·관리자 결제/환불 검토 응답에 `isDemo`가 추가됩니다. 요청 본문으로 이 값을 지정할 수 없습니다. 시연 주문의 결제·취소·환불·배송 변경은 409 `DEMO_ORDER_READ_ONLY`이고, 만료·PG 재확인 배치에도 포함하지 않습니다. 자세한 적재 범위는 [시연 데이터 안내](operations/DEMO_DATA.md)를 따릅니다.

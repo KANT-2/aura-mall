@@ -97,6 +97,7 @@ export function adminOrderSummaryResponse(value: unknown): AdminOrderSummary {
   return {
     id: text(item.id),
     created: text(item.created),
+    ...(item.isDemo !== undefined ? { isDemo: boolean(item.isDemo) } : {}),
     customer: item.customer === null ? null : adminAccountResponse(item.customer),
     recipient: text(item.recipient),
     title: text(item.title),

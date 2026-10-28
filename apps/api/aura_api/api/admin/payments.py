@@ -27,6 +27,7 @@ class AdminPaymentReviewOut(CamelModel):
     order_id: uuid.UUID
     pg_order_id: str
     order_status: OrderStatus
+    is_demo: bool = False
     customer: AdminCustomerOut | None
     status: PaymentStatus
     amount: int
@@ -47,6 +48,7 @@ class AdminRefundReviewOut(CamelModel):
     payment_id: uuid.UUID
     order_id: uuid.UUID
     order_status: OrderStatus
+    is_demo: bool = False
     customer: AdminCustomerOut | None
     status: str
     amount: int
@@ -83,6 +85,7 @@ def payment_review_out(payment: Payment, order: Order, user: User | None) -> Adm
         order_id=order.id,
         pg_order_id=payment.pg_order_id,
         order_status=order.status,
+        is_demo=bool(order.is_demo),
         customer=_customer(user),
         status=payment.status,
         amount=payment.amount,
@@ -103,6 +106,7 @@ def refund_review_out(refund: Refund, order: Order, user: User | None) -> AdminR
         payment_id=refund.payment_id,
         order_id=order.id,
         order_status=order.status,
+        is_demo=bool(order.is_demo),
         customer=_customer(user),
         status=refund.status,
         amount=refund.amount,
