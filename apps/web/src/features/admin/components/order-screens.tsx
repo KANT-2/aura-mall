@@ -28,7 +28,7 @@ export function AdminOrderList({ query }: { query: AdminQuery }) {
     <>
       <AdminHeading
         title="주문 조회"
-        description="주문 당시 상품명·가격 스냅샷 기준으로 조회해요. 결제 확인 후 준비·배송·완료 상태를 처리할 수 있어요."
+        description="접수된 주문을 확인하고 상품 준비부터 배송 완료까지 관리해요."
       />
       <form
         className={styles.filters}
@@ -100,7 +100,7 @@ export function AdminOrderList({ query }: { query: AdminQuery }) {
                   <th scope="col">주문일시</th>
                   <th scope="col">주문자</th>
                   <th scope="col">수량</th>
-                  <th scope="col">결제 금액</th>
+                  <th scope="col">주문 금액</th>
                 </tr>
               </thead>
               <tbody>
@@ -116,7 +116,7 @@ export function AdminOrderList({ query }: { query: AdminQuery }) {
                       </small>
                     </th>
                     <td>{adminDate(order.created)}</td>
-                    <td>{order.customer?.name ?? "비회원"}</td>
+                    <td>{order.customer?.name ?? "회원 정보 없음"}</td>
                     <td>{order.itemCount}개</td>
                     <td>{money(order.total)}</td>
                   </tr>
@@ -135,7 +135,7 @@ export function AdminOrderList({ query }: { query: AdminQuery }) {
         <AdminEmpty
           title={filtered ? "선택한 기간의 주문이 없어요." : "아직 접수된 주문이 없어요."}
         >
-          {filtered ? null : "결제 연결 전에는 실제 주문이 생성되지 않을 수 있어요."}
+          {filtered ? null : "새로운 주문이 접수되면 이곳에서 확인할 수 있어요."}
         </AdminEmpty>
       )}
     </>
@@ -157,7 +157,23 @@ export function AdminOrderDetail({ id }: { id: string }) {
   return (
     <>
       <AdminHeading title="주문 상세" description={`주문번호 ${data.id}`} back={orderBack} />
-      <div className={styles.columns}>
+      <div className={styles.orderSummary}>
+        <div>
+          <span>현재 상태</span>
+          <strong className={styles.badge} data-status={data.status}>
+            {data.status ? orderStatusLabels[data.status] : "확인 필요"}
+          </strong>
+        </div>
+        <div>
+          <span>주문일시</span>
+          <strong>{adminDate(data.created)}</strong>
+        </div>
+        <div>
+          <span>주문 합계</span>
+          <strong>{money(data.total)}</strong>
+        </div>
+      </div>
+      <div className={styles.orderDetailGrid}>
         <section className={styles.panel} aria-labelledby="order-items">
           <h2 id="order-items">주문 상품</h2>
           <p className="micro">
@@ -192,7 +208,7 @@ export function AdminOrderDetail({ id }: { id: string }) {
             </table>
           </div>
           <p className={styles.total}>
-            결제 금액 <strong>{money(data.total)}</strong>
+            주문 금액 <strong>{money(data.total)}</strong>
           </p>
         </section>
         <section className={styles.panel} aria-labelledby="order-info">
@@ -201,7 +217,9 @@ export function AdminOrderDetail({ id }: { id: string }) {
             <dt>주문일시</dt>
             <dd>{adminDate(data.created)}</dd>
             <dt>주문자</dt>
-            <dd>{data.customer ? `${data.customer.name} (${data.customer.email})` : "비회원"}</dd>
+            <dd>
+              {data.customer ? `${data.customer.name} (${data.customer.email})` : "회원 정보 없음"}
+            </dd>
             <dt>받는 분</dt>
             <dd>{data.recipient}</dd>
             <dt>배송지</dt>

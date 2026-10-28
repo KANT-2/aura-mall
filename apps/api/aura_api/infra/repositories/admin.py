@@ -14,6 +14,7 @@ from aura_api.infra.models import (
     Admin,
     AdminAuditLog,
     AdminSession,
+    MediaAsset,
     Order,
     OrderItem,
     OrderItemSelection,
@@ -36,7 +37,11 @@ async def is_customer(session: AsyncSession, user_id: uuid.UUID) -> bool:
 
 
 async def image_options(session: AsyncSession) -> list[str]:
-    return list(await session.scalars(select(Product.image).distinct().order_by(Product.image)))
+    images = list(await session.scalars(select(Product.image).distinct().order_by(Product.image)))
+    uploaded = list(
+        await session.scalars(select(MediaAsset.id).order_by(MediaAsset.created_at.desc()))
+    )
+    return images + [f"/api/media/{asset}" for asset in uploaded]
 
 
 def _product_query():

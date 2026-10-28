@@ -28,6 +28,15 @@ export function ProductDetail({ product: p }: { product: Product }) {
   const col = collections.find((c) => c.id === p.collection)!,
     gift = p.type === "gift-set";
   const eligible = products.filter((x) => x.collection === p.collection && x.type !== "gift-set");
+  const stock = products.find((item) => item.id === p.id)?.stock ?? p.stock;
+  const limit = Math.max(
+    0,
+    Math.min(
+      MAX_QUANTITY,
+      stock,
+      ...(gift ? selection.map((id) => products.find((item) => item.id === id)?.stock ?? 0) : []),
+    ),
+  );
   function toggle(id: string) {
     if (selection.includes(id)) {
       setSelection(selection.filter((x) => x !== id));
@@ -124,16 +133,23 @@ export function ProductDetail({ product: p }: { product: Product }) {
             </div>
           )}
           <div className="purchase-row">
-            <Quantity max={MAX_QUANTITY} n={n} set={setN} />
+            <Quantity max={limit} n={n} set={setN} disabled={stock < 1} />
             <button
               data-testid={testIds.catalog.addToCart}
               className="button"
-              disabled={!cartReady || (gift && selection.length !== 3)}
+              disabled={
+                !cartReady ||
+                stock < 1 ||
+                n > limit ||
+                (!gift && p.price === null) ||
+                (gift && selection.length !== 3)
+              }
               onClick={async () => {
                 setAdded(await add(p, n, selection));
               }}
             >
-              장바구니 담기 <Arrow />
+              {stock < 1 ? "품절" : !gift && p.price === null ? "가격 확인 중" : "장바구니 담기"}{" "}
+              <Arrow />
             </button>
           </div>
           {added && (
@@ -167,11 +183,14 @@ export function ProductDetail({ product: p }: { product: Product }) {
                   type="checkbox"
                   checked={selection.includes(s.id)}
                   onChange={() => toggle(s.id)}
-                  disabled={!selection.includes(s.id) && selection.length === 3}
+                  disabled={!selection.includes(s.id) && (selection.length === 3 || s.stock < 1)}
                 />
                 <img src={s.image} alt={s.name} />
                 <span>{s.typeName}</span>
-                <small>{s.name}</small>
+                <small>
+                  {s.name}
+                  {s.stock < 1 ? " · 품절" : ""}
+                </small>
               </label>
             ))}
           </div>

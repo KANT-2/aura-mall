@@ -16,6 +16,7 @@ type BackendPath = string | ((params: Params) => string);
 type RouteContext = { params: Promise<Params> };
 type HandlerOptions = {
   authenticated?: boolean;
+  maxBodyBytes?: number;
   query?: readonly string[];
   authAction?: AuthAction;
   adminAuthAction?: AdminAuthAction;
@@ -55,6 +56,7 @@ export function createBffHandler(
   path: BackendPath,
   {
     authenticated = true,
+    maxBodyBytes,
     query,
     authAction,
     adminAuthAction,
@@ -91,7 +93,7 @@ export function createBffHandler(
         throw new ApiError(403, "허용되지 않은 출처의 요청이에요.", "INVALID_ORIGIN");
       }
 
-      let body = mutation ? await jsonRequestBody(request) : undefined;
+      let body = mutation ? await jsonRequestBody(request, maxBodyBytes) : undefined;
       if (body !== undefined && bodyFields) {
         const input = JSON.parse(body) as Record<string, unknown>;
         body = JSON.stringify(

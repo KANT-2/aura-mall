@@ -12,7 +12,9 @@ export type CartInput = { quantity: number; selection?: string[] } & (
   { productId: string; custom?: never } | { custom: CustomRecipeItem; productId?: never }
 );
 export type CartCommand =
-  ({ type: "add" } & CartInput) | { type: "quantity"; key: string; quantity: number };
+  | ({ type: "add" } & CartInput)
+  | { type: "addMany"; items: CartInput[] }
+  | { type: "quantity"; key: string; quantity: number };
 
 export class CartError extends Error {}
 
@@ -106,6 +108,15 @@ export function applyCartCommand(
   command: CartCommand,
   catalog: Catalog,
 ): CartItem[] {
+  if (command.type === "addMany") {
+    if (!command.items.length || command.items.length > 100) {
+      throw new CartError("다시 담을 상품을 확인해 주세요.");
+    }
+
+    // Build and validate the entire next cart before committing a single storage write.
+    return command.items.reduce((next, input) => addCartItem(next, input, catalog), items);
+  }
+
   if (command.type === "add") {
     return addCartItem(items, command, catalog);
   }

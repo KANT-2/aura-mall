@@ -58,6 +58,8 @@ def test_openapi_exposes_versioned_routes(client):
         "/api/v1/admin/inquiries/{inquiry_id}",
         "/api/v1/admin/payments/review",
         "/api/v1/admin/refunds/review",
+        "/api/v1/admin/media",
+        "/api/v1/media/{asset_id}",
         "/api/v1/products/{product_id}/questions",
         "/api/v1/questions/mine",
         "/api/v1/questions/{question_id}",

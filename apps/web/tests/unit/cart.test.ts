@@ -81,3 +81,43 @@ describe("local cart commands", () => {
     expect(item.quantity).toBe(2);
   });
 });
+
+describe("reordering multiple lines", () => {
+  it("keeps the previous cart intact when any reordered line is unavailable", () => {
+    const previous = addCartItem([], { productId: "fresh-hand-cream", quantity: 1 }, catalog);
+    expect(() =>
+      applyCartCommand(
+        previous,
+        {
+          type: "addMany",
+          items: [
+            { productId: "fresh-hand-wash", quantity: 2 },
+            { productId: "missing", quantity: 1 },
+          ],
+        },
+        catalog,
+      ),
+    ).toThrow(CartError);
+    expect(previous).toHaveLength(1);
+    expect(previous[0].quantity).toBe(1);
+  });
+  it("rebuilds all reordered products and compositions at current catalog prices", () => {
+    const cart = applyCartCommand(
+      [],
+      {
+        type: "addMany",
+        items: [
+          { productId: "fresh-hand-wash", quantity: 2 },
+          { custom, quantity: 1 },
+        ],
+      },
+      catalog,
+    );
+    expect(cart).toHaveLength(2);
+    expect(cart[0].quantity).toBe(2);
+    expect(cart[0].product.price).toBe(
+      catalog.products.find((p) => p.id === "fresh-hand-wash")?.price,
+    );
+    expect(cart[1].custom?.color).not.toBe("#000000");
+  });
+});

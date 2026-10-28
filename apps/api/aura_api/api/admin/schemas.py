@@ -31,7 +31,7 @@ class HistoryChangeOut(BaseModel):
 
 class HistoryEntryOut(CamelModel):
     id: uuid.UUID
-    action: Literal["product.update", "product.stock", "inquiry.update"]
+    action: Literal["product.create", "product.update", "product.stock", "inquiry.update"]
     actor: str
     changes: list[HistoryChangeOut]
     reason: str | None = None  # left out when the action had no reason
@@ -52,6 +52,10 @@ class AdminProductOut(CamelModel):
     description: str
     featured: bool
     is_new: bool
+    is_active: bool = True
+    details: dict[str, str] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+    category: str = ""
     version: int
     updated: datetime | None
 
@@ -93,6 +97,10 @@ def admin_product_out(product: Product, type_name: str) -> AdminProductOut:
         description=product.description,
         featured=product.featured,
         is_new=product.is_new,
+        is_active=product.is_active is not False,
+        details=product.details or {},
+        notes=product.notes,
+        category=product.category,
         version=product.version,
         updated=product.updated_at,
     )

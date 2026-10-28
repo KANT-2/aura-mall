@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import flow from "@/features/checkout/components/commerce-flow.module.css";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { request } from "@/lib/api/client";
@@ -11,6 +12,7 @@ export function OrderActions({ order }: { order: Order }) {
   const client = useQueryClient();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
   const cancel = async () => {
     if (
       !window.confirm(
@@ -24,6 +26,7 @@ export function OrderActions({ order }: { order: Order }) {
 
     setPending(true);
     setMessage("");
+    setFailed(false);
     try {
       const result = await request<Order>(`/orders/${encodeURIComponent(order.id)}/cancel`, {
         method: "POST",
@@ -40,34 +43,64 @@ export function OrderActions({ order }: { order: Order }) {
         client.invalidateQueries({ queryKey: ["catalog"] }),
       ]);
     } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "주문을 취소하지 못했어요.");
+      setFailed(true);
+      void client.invalidateQueries({ queryKey: ["orders"] });
+      setMessage(
+        cause instanceof TypeError
+          ? "처리 결과를 확인하지 못했어요. 잠시 후 주문 상태를 다시 확인해 주세요."
+          : cause instanceof Error
+            ? cause.message
+            : "주문을 취소하지 못했어요.",
+      );
     } finally {
       setPending(false);
     }
   };
   return (
-    <div>
-      {order.status && (
-        <p>
-          <strong>{orderStatusLabels[order.status]}</strong>
-        </p>
-      )}
+    <div className={flow.orderActions}>
+      <div className={flow.orderActionRow}>
+        {order.status && (
+          <span className={flow.status} data-status={order.status}>
+            {orderStatusLabels[order.status]}
+          </span>
+        )}
+        <div className={flow.orderButtons}>
+          {order.status === "received" && (
+            <Link
+              className={flow.compactPrimary}
+              href={`/payments/${encodeURIComponent(order.id)}`}
+            >
+              결제 이어하기
+            </Link>
+          )}
+          {order.status && ["received", "paid", "preparing"].includes(order.status) && (
+            <button
+              className={flow.compactSecondary}
+              type="button"
+              disabled={pending}
+              onClick={() => void cancel()}
+            >
+              {pending
+                ? "처리 중…"
+                : order.status === "received"
+                  ? "주문 취소"
+                  : "취소·전액 환불 요청"}
+            </button>
+          )}
+        </div>
+      </div>
       {order.courier && (
-        <p>
-          배송: {order.courier} · {order.trackingNumber}
+        <p className={flow.tracking}>
+          <span>배송 정보</span>
+          <strong>{order.courier}</strong>
+          <span>{order.trackingNumber}</span>
         </p>
       )}
-      {order.status === "received" && (
-        <Link className="button" href={`/payments/${encodeURIComponent(order.id)}`}>
-          결제 이어하기
-        </Link>
+      {message && (
+        <p className={failed ? flow.error : flow.notice} role={failed ? "alert" : "status"}>
+          {message}
+        </p>
       )}
-      {order.status && ["received", "paid", "preparing"].includes(order.status) && (
-        <button type="button" disabled={pending} onClick={() => void cancel()}>
-          {order.status === "received" ? "주문 취소" : "취소·전액 환불 요청"}
-        </button>
-      )}
-      {message && <p role="status">{message}</p>}
     </div>
   );
 }

@@ -41,6 +41,7 @@ class ProductOut(CamelModel):
     image_url: str
     category: str
     is_new: bool
+    details: dict[str, str] = Field(default_factory=dict)
 
 
 class CollectionOut(CamelModel):
@@ -115,6 +116,8 @@ def product_out(product: Product, type_name: str) -> ProductOut:
         optional["note_images"] = product.note_images
     if product.gift_images is not None:
         optional["gift_images"] = product.gift_images
+    if product.details:
+        optional["details"] = product.details
     return ProductOut(
         id=product.id,
         collection=product.collection_id,

@@ -13,6 +13,7 @@ export function ProductCard({ product: p }: { product: Product }) {
       </div>
       <span className="eyebrow">{p.collection.toUpperCase()} COLLECTION</span>
       <h3>{p.name}</h3>
+      {p.stock < 1 && <span className="micro">품절</span>}
       <p>
         {p.typeName} · {p.volume}
       </p>
