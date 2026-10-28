@@ -4,7 +4,7 @@ import styles from "@/features/partner/components/partner-form.module.css";
 
 import Link from "next/link";
 import { StyledSelect } from "@/components/ui/select";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Arrow } from "@/components/ui/arrow";
 import { Asset } from "@/components/ui/asset";
 
@@ -13,6 +13,14 @@ export function Partner() {
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [complete, setComplete] = useState(false);
+  const completeHeading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    // The form is taller than the viewport; bring the confirmation into view after submit.
+    if (complete) {
+      completeHeading.current?.scrollIntoView({ block: "center" });
+      completeHeading.current?.focus({ preventScroll: true });
+    }
+  }, [complete]);
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -80,8 +88,10 @@ export function Partner() {
       </div>
       {complete ? (
         <div className="empty">
-          <h2>모의 문의가 저장되었어요.</h2>
-          <p>Mock 서버에 저장한 내용이며 실제 담당자에게 전송되지 않습니다.</p>
+          <h2 ref={completeHeading} tabIndex={-1}>
+            입점 문의가 접수되었어요.
+          </h2>
+          <p>보내주신 내용을 검토한 후 입력하신 이메일로 연락드릴게요.</p>
           <Link className="button" href="/">
             홈으로
           </Link>
