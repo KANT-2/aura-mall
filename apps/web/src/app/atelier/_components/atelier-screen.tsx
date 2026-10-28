@@ -1,5 +1,6 @@
 "use client";
-import { useSession } from "@/features/account/hooks/use-session";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { useAccount } from "@/features/account/hooks/use-account";
 import { useCart } from "@/features/cart/hooks/use-cart";
 import { useRecipes } from "@/features/atelier/hooks/use-recipes";
 import { useDraft } from "@/features/atelier/hooks/use-draft";
@@ -12,11 +13,11 @@ export function AtelierScreen({
   recipeId?: string;
   resume?: boolean;
 }) {
-  const session = useSession();
+  const account = useAccount();
   const cart = useCart();
   const recipes = useRecipes();
   const draft = useDraft();
-  const error = session.error ?? recipes.error ?? draft.error;
+  const error = account.error ?? recipes.error ?? draft.error;
   if (error) {
     throw error;
   }
@@ -24,18 +25,18 @@ export function AtelierScreen({
   if (!recipes.ready || !draft.ready) {
     return (
       <main className="page-width" aria-busy="true">
-        <p role="status">조향 정보를 불러오고 있어요.</p>
+        <LoadingSkeleton variant="atelier" label="조향 정보를 불러오고 있어요." />
       </main>
     );
   }
 
   return (
     <AtelierEditor
-      key={`${session.owner}:${recipeId ?? ""}:${resume}`}
+      key={`${account.owner}:${recipeId ?? ""}:${resume}`}
       initialRecipe={recipes.recipes.find((recipe) => recipe.id === recipeId)}
       initialDraft={draft.draft}
       resume={resume}
-      authenticated={!!session.user}
+      authenticated={!!account.user}
       onSave={recipes.save}
       onAddToCart={cart.addCustom}
       persistDraft={draft.persist}

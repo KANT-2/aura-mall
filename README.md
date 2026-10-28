@@ -16,7 +16,7 @@ docs/
   archive/             # 과거 구현·QA 기록
 ```
 
-웹은 상품·장바구니·회원·조향·주문·문의 흐름을 Mock API로 제공합니다. FastAPI에는 헬스 체크·환경 설정·라우터·테스트 골격이 준비되어 있습니다. 업무 API 구현은 [BFF 계약](docs/FASTAPI_BFF.md)에 따라 진행합니다.
+웹은 장바구니를 브라우저 로컬 스토리지에 저장하고, 상품·회원·조향·주문·문의 흐름은 Mock API로 제공합니다. FastAPI에는 JWT 인증과 카탈로그·문의·레시피·주문·관리자 업무 API가 구현되어 있습니다. 웹과 API의 연결은 [BFF 계약](docs/FASTAPI_BFF.md)에 따라 진행합니다.
 
 Node 의존성은 npm workspaces와 루트 `package-lock.json`, Python 의존성은 `apps/api/pyproject.toml`과 `apps/api/uv.lock`으로 관리합니다. 공통 포맷 설정은 루트, 앱 전용 설정과 생성 파일은 각 앱 디렉터리에 둡니다.
 
@@ -45,17 +45,22 @@ FastAPI는 `http://127.0.0.1:8000`에서 실행되며 `/health`, `/api/v1/health
 
 ## 검증과 빌드
 
-| 명령                 | 범위                                |
-| -------------------- | ----------------------------------- |
-| `npm run check:web`  | 웹 ESLint·CSS·TypeScript·Vitest     |
-| `npm run check:api`  | Python Ruff 린트·포맷·pytest        |
-| `npm run check`      | 공통 문서·코드 포맷과 두 앱 검사    |
-| `npm run build`      | Next.js 프로덕션 빌드               |
-| `npm run start:mock` | 프로덕션 웹과 Mock 동시 실행        |
-| `npm run format`     | 공통 Prettier·Python Ruff 포맷 적용 |
+| 명령                     | 범위                                           |
+| ------------------------ | ---------------------------------------------- |
+| `npm run check:web`      | 웹 ESLint·CSS·TypeScript·Vitest                |
+| `npm run check:api`      | Python Ruff 린트·포맷·pytest                   |
+| `npm run check:contract` | OpenAPI 타입 생성·공개 DTO·경로·버전 계약 검사 |
+| `npm run check`          | 공통 포맷·두 앱 검사·OpenAPI 계약 검사         |
+| `npm run build`          | Next.js 프로덕션 빌드                          |
+| `npm run start:mock`     | 프로덕션 웹과 Mock 동시 실행                   |
+| `npm run format`         | 공통 Prettier·Python Ruff 포맷 적용            |
 
 전체 검증과 공통 포맷 적용에는 Node·Python·uv가 모두 필요합니다. 웹 빌드는 Google Fonts에 접근할 수 있어야 합니다. 브라우저 검증 명령은 [웹 검증 안내](apps/web/README.md#검증)를 참고하세요.
 
 ## 문서
+
+Next.js와 API의 배포는 [기존 Caddy를 사용하는 배포 안내](docs/backend/DEPLOYMENT.md)를 참고하세요. `compose.lb.yaml`은 기존 공용 Caddy의 네트워크를 연결하며 AURA에서 프록시를 추가로 실행하지 않습니다.
+
+PostgreSQL TLS, self-signed CA 기반 인증서 자동 갱신, 접속 비밀번호 회전, 로컬 복제본과 복구 절차는 [DB 운영 안내](docs/operations/DATABASE.md)를 참고하세요. 기존 Compose에 별도 설정을 추가하는 방식이며 최초 전환은 운영자가 수행합니다.
 
 [문서 목록](docs/README.md)에서 제품 기획, 앱별 개발 안내, API 계약, 에셋과 과거 검수 기록을 찾을 수 있습니다. 작업 지침은 [AGENTS.md](AGENTS.md)와 [웹 전용 지침](apps/web/AGENTS.md)에 있습니다.

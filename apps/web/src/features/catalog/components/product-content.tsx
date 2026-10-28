@@ -1,6 +1,8 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import { useState, useId, type CSSProperties } from "react";
+import { Questions } from "@/features/questions/components/questions";
+import { productDetailLabels } from "@/features/catalog/model/catalog";
 import type { Product } from "@/features/catalog/model/catalog";
 
 /**
@@ -137,41 +139,49 @@ export function ProductDetailContentDock({
               </details>
               <details>
                 <summary>사용 방법과 보관</summary>
-                <p>
-                  사용 후 용기를 단단히 닫아 주시고, 직사광선과 고온을 피해 보관해 주세요. 제품
-                  유형별 사용법은 확인된 제품 안내에 따릅니다.
+                <p style={{ whiteSpace: "pre-wrap" }}>
+                  {product.details?.usage ||
+                    "제품에 표시된 사용 방법을 확인하고, 직사광선과 고온을 피해 보관해 주세요."}
                 </p>
               </details>
               <details>
                 <summary>전성분 및 제품 고시</summary>
-                <p>
-                  제품별로 확인된 성분과 고시 자료를 이 영역에 연결합니다. 확정되지 않은 성분이나
-                  효능을 임의로 안내하지 않습니다.
+                <p style={{ whiteSpace: "pre-wrap" }}>
+                  {product.details?.ingredients ||
+                    "전성분은 제품 패키지의 표시사항을 확인해 주세요."}
                 </p>
               </details>
+              {(["precautions", "manufacturer", "origin"] as const)
+                .filter((key) => product.details?.[key])
+                .map((key) => (
+                  <details key={key}>
+                    <summary>{productDetailLabels[key]}</summary>
+                    <p style={{ whiteSpace: "pre-wrap" }}>{product.details?.[key]}</p>
+                  </details>
+                ))}
             </div>
           )}
           {tab === "shipping" && (
             <div className="a85-detail-dock__accordion">
               <details open>
                 <summary>배송 안내</summary>
-                <p>
-                  상품금액 합계가 50,000원 이상이면 무료배송이며, 미만일 때 기본 배송비는
-                  3,000원입니다. 최종 배송비는 장바구니 및 주문 화면에서 확인해 주세요.
+                <p style={{ whiteSpace: "pre-wrap" }}>
+                  {product.details?.shipping ||
+                    "상품금액 합계 50,000원 이상 무료배송, 미만 기본 배송비 3,000원입니다. 최종 배송비는 주문 화면에서 확인해 주세요."}
                 </p>
               </details>
               <details>
                 <summary>교환·반품 안내</summary>
-                <p>
-                  교환·반품 가능 여부와 처리 방법은 제품 상태 및 적용되는 소비자 보호 규정에 따라
-                  안내합니다. 상세 운영 정책이 확정되면 이 영역에 연동합니다.
+                <p style={{ whiteSpace: "pre-wrap" }}>
+                  {product.details?.returns ||
+                    "교환·반품 문의는 상품 Q&A에 남겨 주세요. 비공개 문의로 접수하면 운영자가 확인 후 답변드립니다."}
                 </p>
               </details>
             </div>
           )}
           {tab === "qa" && (
             <div className="a85-detail-dock__qa">
-              <p>등록된 상품 문의가 없습니다.</p>
+              <Questions productId={product.id} />
             </div>
           )}
         </div>

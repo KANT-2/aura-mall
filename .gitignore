@@ -26,6 +26,7 @@ build/
 # misc
 .DS_Store
 *.pem
+.db-ops/
 
 # debug
 npm-debug.log*
@@ -41,6 +42,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+apps/web/contracts/generated/
 next-env.d.ts
 
 # Local mock database

@@ -836,6 +836,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  text-align: center;
+}
+
+:where(.root):global(.home .collection-card > .eyebrow) {
+  align-self: center;
 }
 
 :where(.root):global(.home .collection-circle) {
@@ -892,6 +897,7 @@
 
 :where(.root):global(.home .collection-card p) {
   max-width: 245px;
+  align-self: center;
 }
 
 :where(.root):global(.home .collection-card:hover) {
@@ -1703,7 +1709,6 @@
 
   :where(.root):global(.home .hero-copy .button),
   :where(.root):global(.home .a86-atelier-intro .button) {
-    transform: translate3d(var(--aura-mx, 0px), var(--aura-my, 0px), 0) !important;
     transition:
       transform 0.24s var(--aura-motion-ease),
       background-color 0.22s ease,

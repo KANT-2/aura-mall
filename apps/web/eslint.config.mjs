@@ -150,5 +150,6 @@ export default defineConfig([
     "test-results/**",
     "playwright-report/**",
     "mock-server/.data/**",
+    "contracts/generated/**",
   ]),
 ]);

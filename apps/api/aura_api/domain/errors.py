@@ -1,0 +1,47 @@
+"""Errors raised by domain rules.
+
+Domain code never imports FastAPI. The presentation layer maps `kind` to an HTTP status
+(invalid → 400, unauthorized → 401, forbidden → 403, not_found → 404, conflict → 409,
+rate_limited → 429).
+"""
+
+from typing import Literal
+
+ErrorKind = Literal["invalid", "unauthorized", "forbidden", "not_found", "conflict", "rate_limited"]
+
+
+class DomainError(Exception):
+    kind: ErrorKind = "invalid"
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+class InvalidInput(DomainError):
+    kind: ErrorKind = "invalid"
+
+
+class Unauthorized(DomainError):
+    kind: ErrorKind = "unauthorized"
+
+
+class Forbidden(DomainError):
+    kind: ErrorKind = "forbidden"
+
+
+class NotFound(DomainError):
+    kind: ErrorKind = "not_found"
+
+
+class Conflict(DomainError):
+    kind: ErrorKind = "conflict"
+
+
+class RateLimited(DomainError):
+    kind: ErrorKind = "rate_limited"
+
+    def __init__(self, code: str, message: str, retry_after: int) -> None:
+        super().__init__(code, message)
+        self.retry_after = retry_after

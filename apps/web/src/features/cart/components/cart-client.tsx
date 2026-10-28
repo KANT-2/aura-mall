@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { MAX_QUANTITY } from "@/features/cart/model/cart";
 import { useCatalog } from "@/features/catalog/hooks/use-catalog";
 import { testIds } from "@/lib/test-ids";
@@ -12,12 +13,12 @@ import { Asset } from "@/components/ui/asset";
 import { ProductPhoto } from "@/features/catalog/components/product-photo";
 import { Quantity } from "@/components/ui/quantity-input";
 import { useCart } from "@/features/cart/hooks/use-cart";
-import { useSession } from "@/features/account/hooks/use-session";
+import { useAccount } from "@/features/account/hooks/use-account";
 
 export function Cart() {
   const { products } = useCatalog();
   const { cart, quantity, ready, pending } = useCart();
-  const { user } = useSession();
+  const { user } = useAccount();
   const known = cart.every((item) => itemPrice(item, products) !== null);
   const subtotal = cart.reduce(
     (sum, item) => sum + (itemPrice(item, products) ?? 0) * item.quantity,
@@ -28,7 +29,7 @@ export function Cart() {
   if (!ready) {
     return (
       <main className={styles.root + " page-width cart-page"} aria-busy="true">
-        <p role="status">장바구니를 불러오고 있어요.</p>
+        <LoadingSkeleton variant="cart" label="장바구니를 불러오고 있어요." />
       </main>
     );
   }

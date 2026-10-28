@@ -36,6 +36,7 @@ export const testIds = {
     card: "product-card",
     sort: "catalog-sort",
     giftOption: "gift-option",
+    addToCart: "product-add-to-cart",
   },
   account: {
     submit: "auth-submit",
@@ -46,5 +47,16 @@ export const testIds = {
   },
   cart: { item: "cart-item" },
   checkout: { summary: "checkout-summary" },
+  admin: {
+    gate: "admin-gate",
+    shell: "admin-shell",
+    logout: "admin-logout",
+    productRow: "admin-product-row",
+    productForm: "admin-product-form",
+    stockForm: "admin-stock-form",
+    orderRow: "admin-order-row",
+    inquiryRow: "admin-inquiry-row",
+    inquiryForm: "admin-inquiry-form",
+  },
   option: (selectId: string, value: string) => `${selectId}-option-${value}`,
 } as const;

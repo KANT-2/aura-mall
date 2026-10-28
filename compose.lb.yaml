@@ -1,0 +1,27 @@
+# Reuse the server's existing Caddy; this file starts no proxy container.
+services:
+  api:
+    deploy:
+      replicas: ${AURA_API_REPLICAS:-2}
+    networks:
+      caddy:
+        aliases:
+          - aura-api
+
+  web:
+    deploy:
+      replicas: ${AURA_WEB_REPLICAS:-2}
+    environment:
+      API_URL: ${AURA_API_PROXY_URL:-http://caddy:8080}
+    ports: !reset []
+    expose:
+      - "3000"
+    networks:
+      caddy:
+        aliases:
+          - aura-web
+
+networks:
+  caddy:
+    external: true
+    name: ${AURA_CADDY_NETWORK:-caddy}

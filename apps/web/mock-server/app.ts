@@ -1,13 +1,14 @@
 import express, { type ErrorRequestHandler } from "express";
 import { randomBytes, randomUUID, scryptSync } from "node:crypto";
-import { createDatabase, catalog, type MockDatabase } from "./data/store";
+import { createDatabase, catalog, catalogOf, type MockDatabase } from "./data/store";
+import { adminAuthRoutes } from "./routes/admin-auth";
 import { accountRoutes } from "./routes/account";
-import { cartRoutes } from "./routes/cart";
 import { atelierRoutes } from "./routes/atelier";
 import { checkoutRoutes } from "./routes/checkout";
-import { resolveSession, ownerOf } from "./session";
-import { HttpError } from "./http";
-import { restoreCart } from "@/features/cart/model/cart";
+import { adminRoutes } from "./routes/admin";
+import { resolveIdentity, ownerOf, issueTokens } from "./auth";
+import { HttpError, requireJsonBody } from "./http";
+import { isRecord } from "@/lib/validation";
 import { restoreDraft, restoreRecipes } from "@/features/atelier/model/recipes";
 
 export function createMockApp({
@@ -18,7 +19,7 @@ export function createMockApp({
   app.disable("x-powered-by");
   app.use(express.json({ limit: "32kb" }));
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
-  app.get("/api/catalog", (_req, res) => res.json(catalog));
+  app.get("/api/catalog", (_req, res) => res.json(catalogOf(database)));
   const aliases = new Map([
     ["bergamot-veil", "fresh-eau-de-parfum"],
     ["petal-haze", "soft-eau-de-parfum"],
@@ -29,7 +30,7 @@ export function createMockApp({
   ]);
   app.get("/api/catalog/products/:id", (req, res) => {
     const id = aliases.get(String(req.params.id)) ?? req.params.id;
-    const product = catalog.products.find((product) => product.id === id);
+    const product = database.state.products.find((product) => product.id === id);
     if (!product) {
       throw new HttpError(404, "상품을 찾을 수 없어요.");
     }
@@ -39,13 +40,14 @@ export function createMockApp({
   app.use(
     "/api",
     accountRoutes(database),
-    cartRoutes(database),
+    adminAuthRoutes(database),
     atelierRoutes(database),
     checkoutRoutes(database),
+    adminRoutes(database),
   );
   if (testMode) {
-    app.post("/__test__/seed", (req, res) => {
-      const { session } = resolveSession(req, res, database);
+    app.post("/__test__/seed", requireJsonBody, (req, res) => {
+      const { identity } = resolveIdentity(req, res, database);
       if (req.body.member) {
         const salt = randomBytes(16).toString("hex");
         const member = { ...req.body.member, id: req.body.member.id ?? randomUUID() };
@@ -54,14 +56,10 @@ export function createMockApp({
           salt,
           passwordHash: scryptSync(req.body.password ?? "test-password", salt, 32).toString("hex"),
         };
-        session.userId = member.id;
+        identity.userId = member.id;
       }
 
-      const owner = ownerOf(session);
-      if (req.body.cart) {
-        database.state.carts[owner] = restoreCart(req.body.cart, catalog);
-      }
-
+      const owner = ownerOf(identity);
       if (req.body.recipes) {
         database.state.recipes[owner] = restoreRecipes(req.body.recipes, catalog.ingredients);
       }
@@ -72,11 +70,14 @@ export function createMockApp({
           throw new HttpError(400, "Invalid test draft");
         }
 
-        database.state.drafts[session.guestId] = draft;
+        database.state.drafts[identity.guestId] = draft;
       }
 
       database.persist();
-      res.json({ guestId: session.guestId });
+      res.json({
+        guestId: identity.guestId,
+        ...(identity.userId ? issueTokens(database, identity.userId) : {}),
+      });
     });
   }
 
@@ -84,15 +85,23 @@ export function createMockApp({
     res.status(404).json({ error: { message: "API 경로를 찾을 수 없어요." } }),
   );
   const handleError: ErrorRequestHandler = (error, _req, res, _next) => {
-    const status =
-      error instanceof HttpError ? error.status : error instanceof SyntaxError ? 400 : 500;
+    const parserError = isRecord(error) ? error.type : undefined;
+    const failure =
+      error instanceof HttpError
+        ? error
+        : parserError === "entity.too.large"
+          ? new HttpError(413, "입력 내용이 너무 길어요.")
+          : parserError === "entity.parse.failed" || parserError === "request.size.invalid"
+            ? new HttpError(400, "입력 형식을 확인해 주세요.")
+            : parserError === "charset.unsupported" || parserError === "encoding.unsupported"
+              ? new HttpError(415, "JSON 형식으로 요청해 주세요.")
+              : new HttpError(500, "서버 요청을 처리하지 못했어요.");
+    const { status, message } = failure;
     if (status === 500) {
       console.error(error);
     }
 
-    res.status(status).json({
-      error: { message: status === 500 ? "서버 요청을 처리하지 못했어요." : error.message },
-    });
+    res.status(status).json({ error: { message } });
   };
   app.use(handleError);
   return app;

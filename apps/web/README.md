@@ -13,7 +13,7 @@ npm run dev
 
 `dev`는 Next.js(`http://localhost:3000`)와 Mock API(`http://127.0.0.1:4000`)를 함께 실행합니다. `npm run dev:web`과 `npm run mock:dev`로 따로 실행할 수도 있습니다.
 
-설정이 필요하면 [환경 변수 예제](.env.example)를 `apps/web/.env.local`로 복사합니다. Next는 환경 파일을 `apps/web`에서 읽습니다. API 주소·접두사·세션 쿠키·제한시간은 [BFF 계약](../../docs/FASTAPI_BFF.md#실행-환경)에 정리되어 있으며, 설정 변경 후 웹 서버를 재시작합니다.
+설정이 필요하면 [환경 변수 예제](.env.example)를 `apps/web/.env.local`로 복사합니다. Next는 환경 파일을 `apps/web`에서 읽습니다. API 주소·접두사·토큰 쿠키·제한시간은 [BFF 계약](../../docs/FASTAPI_BFF.md#실행-환경)에 정리되어 있으며, 설정 변경 후 웹 서버를 재시작합니다.
 
 ```sh
 npm run build
@@ -38,6 +38,7 @@ src/
     atelier/_components/       # 계정·장바구니·레시피·초안을 조향 편집기에 연결
     shop/, cart/, checkout/    # 얇은 서버 라우트 진입점
     mypage/, partner/
+    admin/                     # 관리자 화면 진입점(운영 요약·상품·주문·문의)
     api/                       # 명시적인 BFF Route Handlers
     loading.tsx, error.tsx, global-error.tsx
   features/
@@ -47,19 +48,20 @@ src/
     atelier/                   # 조향·혼합·레시피·초안
     checkout/                  # 주문 조회·주문 정보 화면
     partner/                   # 문의 등록
+    admin/                     # 관리자 DTO·조회·수정·화면(소비자 DTO와 분리)
     onboarding/                # 가입 후 안내
   components/
     ui/, brand/, illustrations/, layout/, feedback/
   hooks/                       # 화면 폭·공유 API·기기 센서 등 브라우저 기능
   server/
-    bff/                       # 출처·본문·세션 쿠키·브라우저 응답 경계
+    bff/                       # 출처·본문·토큰 쿠키·브라우저 응답 경계
     backend/                   # FastAPI/Mock 설정·서버 전용 HTTP 연결
   lib/api/                     # 브라우저 클라이언트·공용 오류·RSC 조회 연결
   lib/                         # 형식·입력 검증·내부 경로·테스트 식별자
   styles/                      # 토큰·기본값·공유 요소·사이트 셸·모션·공유 커머스 모듈
 mock-server/
   app.ts, index.ts             # 독립 Express HTTP 서버
-  routes/                     # 인증·상품·장바구니·조향·주문·문의 API
+  routes/                     # 인증·조향·주문·문의·관리자 API
   fixtures/catalog.json       # 상품·컬렉션·향료·프로모션·추천 이름 원본
   data/store.ts               # Mock 저장소
   .data/db.json               # 실행 중 생성되는 로컬 데이터, Git 제외
@@ -83,30 +85,44 @@ e2e/
 
 브라우저는 동일 출처 `/api`만 호출합니다. Next의 명시적인 Route Handler가 허용한 리소스를 FastAPI 또는 Mock으로 연결합니다. 외부 rewrite와 catch-all 프록시는 제거했습니다. Server Components는 BFF를 HTTP로 재호출하지 않고 같은 서버 전용 통신 모듈로 데이터 원본을 직접 조회합니다.
 
-BFF는 요청 출처·JSON 크기·허용 쿠키·제한시간을 처리하고, FastAPI의 `detail` 및 422 오류를 공통 오류 형식으로 변환합니다. 가격·소유권·인증·트랜잭션은 백엔드에서 검증합니다. FastAPI 앱의 헬스 체크·설정·테스트 골격은 `apps/api`에 준비했으며, 업무 API는 현재 Mock으로 동작을 검증합니다.
+BFF는 요청 출처·JSON 크기·허용 쿠키·제한시간을 처리하고, FastAPI의 `detail` 및 422 오류를 공통 오류 형식으로 변환합니다. 가격·소유권·인증·트랜잭션은 백엔드에서 검증합니다. FastAPI 업무 API는 `apps/api`에 순차적으로 구현하며 웹 개발의 기본 백엔드는 Mock입니다.
 
-설정 예제, 리소스별 입력·응답 DTO, 세션·오류 계약, OpenAPI 인계 기준은 [FastAPI BFF 연결 문서](../../docs/FASTAPI_BFF.md)에 정리했습니다.
+카탈로그·입점 문의·레시피·조향 초안과 사용자 JWT 인증은 구현된 FastAPI API에 연결합니다. BFF는 요청 필드를 제한하고 응답을 공개 DTO로 검증합니다. FastAPI 오류를 Mock으로 우회하지 않습니다. 관리자 전용 JWT 로그인·등록·업무 API와 주문 중복 방지 키도 연결합니다. 관리자는 `/admin/admins/new`에서 다른 관리자를 등록할 수 있습니다.
+
+`npm run check:contract`는 운영 OpenAPI로 TypeScript 타입을 생성해 공개 DTO 호환성과 경로·버전을 검사합니다. 루트 전체 검사에도 포함되며, 생성 파일은 커밋하지 않습니다. [계약 검사 안내](contracts/README.md)를 참고합니다.
+
+Mock과 FastAPI는 동일한 JWT 계약을 사용합니다. BFF는 TokenPair JSON을 `aura_access`·`aura_refresh` HttpOnly 쿠키에 보관하고 Access JWT만 Bearer로 전달합니다. 사용자 조회는 `/api/auth/me`, 갱신은 `/api/auth/refresh`입니다. 브라우저는 401에서 탭 간 Web Lock으로 갱신을 직렬화하고 한 번만 재시도합니다. 로그아웃은 백엔드의 계열 폐기 204를 확인한 뒤 쿠키를 삭제합니다. 서버 세션·`/api/session`·쿠키 인증 모드는 제거했습니다.
+
+설정 예제, 리소스별 입력·응답 DTO, JWT·오류 계약, OpenAPI 인계 기준은 [FastAPI BFF 연결 문서](../../docs/FASTAPI_BFF.md)에 정리했습니다.
 
 ## 데이터 소유권과 Mock API
 
-DB에 해당하는 데이터는 브라우저 저장소에서 제거했습니다. 상품·컬렉션·향료·프로모션·추천 이름은 서버 fixture에서, 회원·세션·장바구니·레시피·초안·주문·문의는 Mock 저장소에서 관리합니다. 프런트엔드는 HTTP로만 접근합니다. `sessionStorage`에는 가입 안내 표시 여부만 남아 있습니다.
+장바구니는 브라우저 `localStorage`의 `aura_cart_v1` 키에 상품 ID·수량·선택 구성을 저장합니다. 로그인·로그아웃과 관계없이 같은 브라우저에서 유지하며, 같은 출처의 다른 탭에도 변경을 반영합니다. 컬렉션·향료·프로모션·추천 이름은 서버 fixture에서, 상품(fixture로 초기화한 뒤 관리자 수정 반영)·회원·토큰 계열·레시피·초안·주문·문의·관리자 이력은 Mock 저장소에서 관리하고 HTTP로 접근합니다. `sessionStorage`에는 가입 안내 표시 여부만 남아 있습니다.
 
-| API                                                                   | 책임                          |
-| --------------------------------------------------------------------- | ----------------------------- |
-| `GET /api/catalog`, `GET /api/catalog/products/:id`                   | 공용 상품·향료·홈 데이터      |
-| `GET /api/session`                                                    | 현재 회원과 익명 방문자 식별  |
-| `POST /api/auth/register`, `/login`, `/logout`                        | 회원·세션 변경                |
-| `GET /api/cart`, `POST /api/cart/items`, `PATCH /api/cart/items/:key` | 소유자별 장바구니·수량·삭제   |
-| `GET/POST /api/recipes`, `DELETE /api/recipes/:id`                    | 회원별 레시피와 버전          |
-| `GET/PUT/DELETE /api/atelier/draft`                                   | 방문자별 조향 초안            |
-| `GET/POST /api/orders`                                                | 회원 주문 조회·모의 주문 생성 |
-| `POST /api/partner`                                                   | 모의 입점 문의 저장           |
+| API                                                        | 책임                          |
+| ---------------------------------------------------------- | ----------------------------- |
+| `GET /api/catalog`, `GET /api/catalog/products/:id`        | 공용 상품·향료·홈 데이터      |
+| `GET /api/auth/me`                                         | 현재 회원과 익명 방문자 식별  |
+| `POST /api/auth/register`, `/login`, `/refresh`, `/logout` | 회원·JWT 발급·회전·폐기       |
+| `GET/POST /api/recipes`, `DELETE /api/recipes/:id`         | 회원별 레시피와 버전          |
+| `GET/PUT/DELETE /api/atelier/draft`                        | 방문자별 조향 초안            |
+| `GET/POST /api/orders`                                     | 회원 주문 조회·모의 주문 생성 |
+| `POST /api/partner`                                        | 모의 입점 문의 저장           |
+| `/api/admin/**`                                            | 관리자 전용 운영 API          |
 
-Mock 서버는 HttpOnly·SameSite 쿠키로 세션을 식별하고 비밀번호는 서버에서 scrypt 검증값으로 저장합니다. 회원과 방문자의 장바구니·레시피를 분리하며, 로그아웃하면 방문자 장바구니로 돌아옵니다. 조향 초안은 가입·로그인 이동 중에도 이어지도록 방문자에 귀속합니다. 가격·유효한 구성·레시피 ID·버전·생성 시각은 서버에서 결정합니다. 클라이언트가 보낸 가격을 주문 계산에 사용하지 않습니다.
+Mock 서버도 Bearer JWT를 검증하고 토큰 계열의 폐기 상태를 확인합니다. 비밀번호는 서버에서 scrypt 검증값으로 저장합니다. 레시피와 주문은 회원별로 분리합니다. 로컬 장바구니는 인증 변경 시에도 그대로 유지합니다. 조향 초안은 가입·로그인 이동 중에도 이어지도록 방문자에 귀속합니다. 가격·유효한 구성·레시피 ID·버전·생성 시각은 서버에서 결정합니다. 클라이언트가 보낸 가격을 주문 계산에 사용하지 않습니다.
 
-TanStack Query는 서버 데이터의 조회·로딩·오류·변경 후 캐시 갱신을 맡습니다. 회원별 쿼리 키에 소유자를 포함하고 인증 변경 시 기존 개인 캐시를 취소·제거합니다. 장바구니·레시피 변경 요청에는 시작 시점의 소유자를 보내 계정 전환 중 잘못된 소유자에게 적용되는 요청을 거절합니다. 초기 조회가 끝나기 전에 빈 장바구니나 초안으로 편집기를 초기화하지 않습니다.
+본문이 필요한 API는 JSON 객체만 받으며, 본문 누락·잘못된 JSON·배열은 400, 비 JSON 본문은 415, 32KiB 초과는 413으로 응답합니다. 파서 오류에 입력값을 포함하지 않습니다. 로그아웃과 삭제는 본문 없이 호출할 수 있습니다.
 
-기본 저장 파일은 `apps/web/mock-server/.data/db.json`이며 서버를 재시작해도 유지합니다. 삭제하면 초기화됩니다. `MOCK_PERSIST=0 npm run mock`은 메모리에서만 동작합니다. `MOCK_PORT`로 포트를 지정할 수 있습니다. 이 저장소는 단일 프로세스 개발용 JSON 파일이며 운영 DB의 트랜잭션·배포·복구를 제공하지 않습니다. 기존 브라우저 저장소의 시연 데이터는 자동 이전하지 않습니다.
+장바구니는 `useSyncExternalStore`로 구독하며 초기 복원이 끝나기 전에 빈 배열을 저장하지 않습니다. 손상된 JSON은 빈 장바구니로 복원하고, 저장 공간이 차단되면 저장 실패를 알리며 담기 성공을 표시하지 않습니다. 로컬 상품·가격·`unitPrice`는 신뢰하지 않고 현재 카탈로그로 복원합니다. 같은 항목의 누적 수량 15개 상한과 단품·Gift Set 구성품의 합산 재고를 화면에서 검사합니다.
+
+장바구니 API는 제거했습니다. 모의 주문은 `{ recipient, address, coupon?, items }`를 받으며, 각 `items` 항목에 `{ productId?, quantity, selection?, custom? }`를 전송합니다. 서버가 가격·구성·수량·재고와 맞춤 색을 다시 계산하고 응답의 상품에 `unitPrice`를 포함합니다. 사용자 간 재고 예약이나 주문 후 fixture 재고 차감은 수행하지 않습니다. 주문 재전송에는 같은 `Idempotency-Key`를 유지합니다(8~64자 영숫자·하이픈). 같은 회원·같은 키의 주문은 200, 신규 주문은 201입니다. 실제 주문 UI를 연결할 때는 주문 성공을 확인한 뒤 로컬 장바구니를 비웁니다.
+
+TanStack Query는 서버 데이터의 조회·로딩·오류·변경 후 캐시 갱신을 맡습니다. 회원별 쿼리 키에 소유자를 포함하고 인증 변경 시 기존 개인 캐시를 취소·제거합니다. 레시피 변경 요청에는 시작 시점의 소유자를 보내 계정 전환 중 잘못된 소유자에게 적용되는 요청을 거절합니다. 초기 조회가 끝나기 전에 빈 초안으로 편집기를 초기화하지 않습니다.
+
+기본 저장 파일은 `apps/web/mock-server/.data/db.json`이며 서버를 재시작해도 유지합니다. 삭제하면 초기화됩니다. `MOCK_PERSIST=0 npm run mock`은 메모리에서만 동작합니다. `MOCK_PORT`로 포트를 지정할 수 있습니다. 이 저장소는 단일 프로세스 개발용 JSON 파일이며 운영 DB의 트랜잭션·배포·복구를 제공하지 않습니다. 기존 서버 장바구니는 브라우저로 자동 이전하지 않으며 저장 파일에서 다시 불러오지 않습니다.
+
+관리자 계약은 [BFF 문서의 관리자 API](../../docs/FASTAPI_BFF.md#관리자-api-1단계-제안)를 따릅니다. `npm run mock`은 시작할 때 개발용 관리자 계정 `admin@aura.local` / `aura-admin-local`을 생성하거나 관리자 역할로 되돌립니다. `MOCK_ADMIN_EMAIL`·`MOCK_ADMIN_PASSWORD`로 바꾸고, `MOCK_ADMIN_EMAIL=`(빈 값)이면 생성하지 않습니다. 이 계정은 로컬 Mock 전용이며 운영 관리자 발급 절차와 무관합니다. `/admin/login`에서 관리자 계정으로 로그인합니다. 회원 인증과 별도의 JWT 쿠키를 사용하므로 관리자 로그아웃 후에도 회원 로그인은 유지됩니다.
 
 Playwright는 `MOCK_TEST_MODE=1`, `MOCK_PERSIST=0`으로 API를 시작하고 테스트별 쿠키에 연결된 `POST /__test__/seed`로 데이터를 준비합니다. 일반 실행에서는 시드 경로를 노출하지 않습니다. 다른 테스트나 실제 개발 데이터를 전역 초기화하지 않습니다.
 
@@ -127,11 +143,19 @@ npm run check:web
 npm run build
 npm exec --workspace @aura/web -- playwright install chromium
 npm run test:e2e
+npm run test:e2e:jwt
+npm run test:e2e:fastapi
 ```
 
 `check:web`은 ESLint·CSS 구조 검사·Next 라우트 타입 생성·TypeScript·Vitest를 실행합니다. 저장소 포맷과 Python까지 검증하려면 루트에서 `npm run check`를 사용합니다. 단위 테스트는 조향·수량·복원·내부 리다이렉트 규칙을, 통합 테스트는 실제 HTTP 요청으로 회원 간 데이터 분리·가격 변조 거절·레시피 버전·초안·모의 주문·문의·파일 영속성을 검증합니다.
 
-Playwright는 포트 4000의 메모리 Mock API와 포트 3100의 프로덕션 Next BFF 서버를 자동 시작·종료합니다. 기본 검증은 데스크톱·모바일 조작, 로그인·로그아웃에 따른 장바구니 전환, 검색 URL 동기화, 조향 초안 복원·초기화, 혼합·센서 권한 정리를 포함합니다. 실제 iPhone Safari의 센서·권한 동작은 기기 검증이 필요합니다.
+Playwright는 포트 4000의 메모리 Mock API와 포트 3100의 프로덕션 Next BFF 서버를 자동 시작·종료합니다. 기본 검증은 데스크톱·모바일 조작, 로그인·로그아웃 후 로컬 장바구니 유지, 새로고침·탭 간 동기화·저장 실패, 검색 URL 동기화, 조향 초안 복원·초기화, 혼합·센서 권한 정리를 포함합니다. 실제 iPhone Safari의 센서·권한 동작은 기기 검증이 필요합니다.
+
+`test:e2e:jwt`는 uv/Python 환경과 Next 빌드가 필요합니다. 포트 8100에 [테스트 전용 FastAPI 앱](../api/tests/fixtures/bff_app.py), 3200에 JWT 모드 Next 프로덕션 서버를 띄워 실제 JWT 검증기를 통한 로그인·로그아웃·폐기·위조·만료·회원 분리·출처 검사를 실행합니다. 테스트용 사용자·메모리 인증 저장소는 운영 앱에 등록하지 않습니다. 탭 간 갱신 테스트에는 Playwright Chromium 설치가 필요합니다.
+
+`test:e2e:fastapi`는 포트 8200에 실제 운영 카탈로그·문의·레시피 라우터를 사용하는 테스트 앱, 3300에 Next 프로덕션 서버를 실행합니다. 저장소만 테스트 대역으로 바꾸고 실제 서비스·도메인·JWT 검증기를 통과해 상품 SSR·문의 오류·레시피 CRUD·회원 분리·409와 관리자 JWT 로그인·등록·폐기, 주문 중복 방지를 검증합니다. 실제 PostgreSQL 영속성·트랜잭션 검증은 포함하지 않습니다. uv/Python과 Next 빌드가 필요하며 브라우저 설치는 필요하지 않습니다.
+
+개발 서버를 켜 둔 채 검증하려면 `AURA_E2E_MOCK_PORT=4100 npm run test:e2e`로 테스트 Mock 포트를 분리합니다. 반응형 회귀 검증에는 320px 가로 넘침, 상품 사진과 제목의 겹침, Gift Set 선택·축소 이미지, 조향 결과 버튼 배치, 컬렉션 설명 정렬도 포함합니다.
 
 테스트 선택자는 화면 문구·CSS 클래스와 분리합니다. 역할은 `getByRole`, 특정 조작은 `src/lib/test-ids.ts`의 식별자를 사용합니다. 선택자와 반복 조작은 `e2e/pages`, 데이터와 API 시드는 `e2e/fixtures`, 명세는 사용자 시나리오와 독립적인 기대 결과를 담당합니다. [Playwright Best Practices](https://playwright.dev/docs/best-practices)와 [Page Object Models](https://playwright.dev/docs/pom)를 기준으로 합니다.
 
@@ -155,6 +179,6 @@ CSS 검사는 PostCSS와 TypeScript 파서로 전역 진입점·클래스 참조
 
 30개 상품의 목록·상세·검색·Gift Set 구성, 장바구니, 가입·로그인, 24개 향료의 조향·혼합·레시피·초안, 회원 화면과 문의 폼을 제공합니다. 기존 화면 검수 기록은 [QA 기록](../../docs/archive/QA_RESULTS_KO.md)과 [인터랙션 적용표](../../docs/archive/REFERENCE_INTERACTION_MAPPING_KO.md)에 남겨 두었습니다. 현재 데이터 구조와 웹 개발 방법은 이 문서를 기준으로 합니다.
 
-현재 인증·주문·문의는 개발용 Mock API입니다. 실서비스 인증·DB·PG·이메일은 연결하지 않았습니다. 결제 버튼은 비활성 상태이며 주문 API는 모의 주문만 생성합니다. 문의 완료 화면도 실제 발송과 구분해 모의 저장임을 안내합니다. 판매 가격·재고·쿠폰 정책·맞춤 조향 제조 범위는 운영 연결 시 확정해야 합니다.
+운영은 Next.js BFF → FastAPI → PostgreSQL을 사용하며, 로컬 기본 개발 백엔드는 Mock입니다. `/checkout`에서 주문을 접수하고 토스 테스트 결제를 진행하며, `/mypage`에서 결제 이어하기·취소·전액 환불을 요청할 수 있습니다. 상품 Q&A 작성·내 문의·관리자 답변과 배송 상태·운송장 관리도 연결되어 있습니다. 실제 청구·메일 자동 발송·택배사 자동 연동·커스텀 제조 검증은 완료 범위에 포함하지 않습니다. [기능 점검 기록](../../docs/FEATURE_PARITY.md)과 [주문 운영 안내](../../docs/operations/COMMERCE.md)를 참고합니다.
 
 Gift Set 비주얼은 단품 사진 세 장을 조합한 HTML/CSS이며 최종 포장 목업은 미확정입니다. 조향 색과 비중은 개념적인 표현이고, 목업에 인쇄된 향 노트·효능·전성분은 제조 검증 자료가 아닙니다. 향료 이미지 목록과 해상도는 `public/assets/botanical-manifest.json`에서 관리합니다.

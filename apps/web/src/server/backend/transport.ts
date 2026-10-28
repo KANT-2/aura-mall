@@ -8,8 +8,13 @@ export type BackendResult = { status: number; data: unknown; cookies: string[]; 
 type BackendOptions = {
   method?: string;
   body?: string;
-  cookie?: string;
+  /** Supplied by the BFF cookie adapter, never copied from browser Authorization. */
+  token?: string;
   owner?: string;
+  guestId?: string;
+  idempotencyKey?: string;
+  /** Already filtered by the route's allow-list; never a raw browser query string. */
+  query?: URLSearchParams;
   signal?: AbortSignal;
   requestId?: string;
 };
@@ -24,11 +29,15 @@ export function backendSegment(value: string) {
 
 export function backendError(status: number, data: unknown) {
   let message = "요청을 처리하지 못했어요.";
+  let code = `HTTP_${status}`;
   if (status === 422) {
     message = "입력 항목을 확인해 주세요.";
   } else if (isRecord(data)) {
     if (isRecord(data.error) && typeof data.error.message === "string") {
       message = data.error.message;
+      if (typeof data.error.code === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(data.error.code)) {
+        code = data.error.code;
+      }
     } else if (typeof data.detail === "string") {
       message = data.detail;
     } else if (isRecord(data.detail) && typeof data.detail.message === "string") {
@@ -37,7 +46,7 @@ export function backendError(status: number, data: unknown) {
   }
 
   // FastAPI validation details can contain submitted passwords and other private input.
-  return new ApiError(status, message, status === 422 ? "VALIDATION_ERROR" : `HTTP_${status}`);
+  return new ApiError(status, message, status === 422 ? "VALIDATION_ERROR" : code);
 }
 
 /** Both RSC and BFF use this transport; RSC never calls the public Next API over HTTP. */
@@ -59,19 +68,32 @@ export async function backendRequest(
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
   try {
     const headers = new Headers({ Accept: "application/json", "X-Request-ID": requestId });
+    if (config.bffSharedKey && !["GET", "HEAD", "OPTIONS"].includes(options.method ?? "GET")) {
+      headers.set("X-Aura-BFF-Key", config.bffSharedKey);
+    }
+
     if (options.body !== undefined) {
       headers.set("Content-Type", "application/json");
     }
 
-    if (options.cookie) {
-      headers.set("Cookie", options.cookie);
+    if (options.token) {
+      headers.set("Authorization", `Bearer ${options.token}`);
     }
 
     if (options.owner) {
-      headers.set("X-Session-Owner", options.owner);
+      headers.set("X-Account-Owner", options.owner);
     }
 
-    const response = await fetch(`${config.apiUrl}${path}`, {
+    if (options.guestId) {
+      headers.set("X-Guest-ID", options.guestId);
+    }
+
+    if (options.idempotencyKey) {
+      headers.set("Idempotency-Key", options.idempotencyKey);
+    }
+
+    const search = options.query?.size ? `?${options.query}` : "";
+    const response = await fetch(`${config.apiUrl}${path}${search}`, {
       method: options.method ?? "GET",
       headers,
       body: options.body,

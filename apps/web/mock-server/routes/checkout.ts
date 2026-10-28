@@ -1,15 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
-import { restoreCart } from "@/features/cart/model/cart";
 import { itemPrice, shippingFee } from "@/features/cart/model/pricing";
-import { catalog, type MockDatabase } from "../data/store";
-import { resolveSession } from "../session";
-import { HttpError, requireString } from "../http";
+import { catalogOf, type Inquiry, type MockDatabase } from "../data/store";
+import { resolveIdentity } from "../auth";
+import { HttpError, requireJsonBody, requireString } from "../http";
+import { orderItems } from "../cart";
 
 export function checkoutRoutes(database: MockDatabase) {
   const router = Router();
   router.get("/orders", (req, res) => {
-    const { owner, user } = resolveSession(req, res, database);
+    const { owner, user } = resolveIdentity(req, res, database);
     if (!user) {
       throw new HttpError(401, "로그인이 필요해요.");
     }
@@ -27,13 +27,28 @@ export function checkoutRoutes(database: MockDatabase) {
         })),
     );
   });
-  router.post("/orders", (req, res) => {
-    const { owner, user } = resolveSession(req, res, database);
-    const items = restoreCart(database.state.carts[owner] ?? [], catalog);
-    if (!items.length) {
-      throw new HttpError(400, "주문할 상품이 없어요.");
+  router.post("/orders", requireJsonBody, (req, res) => {
+    const { owner, user } = resolveIdentity(req, res, database);
+    if (!user) {
+      throw new HttpError(401, "로그인 후 주문할 수 있어요.");
     }
 
+    const key = req.get("Idempotency-Key");
+    if (key !== undefined && !/^[A-Za-z0-9-]{8,64}$/.test(key)) {
+      throw new HttpError(400, "요청 식별자를 확인해 주세요.");
+    }
+
+    const previous = key
+      ? database.state.orders.find((order) => order.owner === owner && order.idempotencyKey === key)
+      : undefined;
+    if (previous) {
+      const { id, items, total, recipient, address, created } = previous;
+      res.json({ id, items, total, recipient, address, created });
+      return;
+    }
+
+    const catalog = catalogOf(database);
+    const items = orderItems(req.body.items, catalog);
     const prices = items.map((item) => itemPrice(item, catalog.products));
     if (prices.some((price) => price === null)) {
       throw new HttpError(400, "주문 금액을 확인해 주세요.");
@@ -49,6 +64,7 @@ export function checkoutRoutes(database: MockDatabase) {
     const order = {
       id: randomUUID(),
       owner,
+      idempotencyKey: key,
       items,
       recipient,
       address,
@@ -56,7 +72,6 @@ export function checkoutRoutes(database: MockDatabase) {
       created: new Date().toISOString(),
     };
     database.state.orders.unshift(order);
-    database.state.carts[owner] = [];
     if (req.body.coupon && user) {
       database.state.accounts[user.id].coupon = false;
     }
@@ -71,11 +86,11 @@ export function checkoutRoutes(database: MockDatabase) {
       created: order.created,
     });
   });
-  router.post("/partner", (req, res) => {
+  router.post("/partner", requireJsonBody, (req, res) => {
     const required = ["brand", "name", "email", "introduction", "message", "type"];
     const values = Object.fromEntries(
       required.map((key) => [key, requireString(req.body[key], "필수 입력 항목을 확인해 주세요.")]),
-    );
+    ) as Pick<Inquiry, "brand" | "name" | "email" | "introduction" | "message" | "type">;
     if (!/^\S+@\S+\.\S+$/.test(values.email) || req.body.consent !== "on") {
       throw new HttpError(400, "필수 입력 항목과 동의를 확인해 주세요.");
     }
@@ -83,8 +98,11 @@ export function checkoutRoutes(database: MockDatabase) {
     const inquiry = {
       id: randomUUID(),
       ...values,
-      website: req.body.website ?? "",
+      website: typeof req.body.website === "string" ? req.body.website.trim().slice(0, 500) : "",
       created: new Date().toISOString(),
+      status: "received" as const,
+      memo: "",
+      version: 1,
     };
     database.state.inquiries.push(inquiry);
     database.persist();

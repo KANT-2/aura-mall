@@ -1,0 +1,74 @@
+# Opt in only after reading docs/operations/DATABASE.md and running `ops/database.py init`.
+services:
+  db:
+    entrypoint: ["/bin/sh", "/opt/aura-postgres/primary.sh"]
+    command: &postgres-command
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_min_protocol_version=TLSv1.2
+      - -c
+      - ssl_cert_file=/var/lib/postgresql/tls/server.crt
+      - -c
+      - ssl_key_file=/var/lib/postgresql/tls/server.key
+      - -c
+      - hba_file=/opt/aura-postgres/pg_hba.conf
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=5
+      - -c
+      - max_replication_slots=5
+      - -c
+      - max_slot_wal_keep_size=1GB
+    volumes:
+      - ./ops/postgres:/opt/aura-postgres:ro
+      - ./.db-ops/server:/run/aura-server-tls:ro
+      - ./.db-ops/state:/run/aura-db-state:ro
+      - ./.db-ops/client/ca.crt:/run/aura-ca.crt:ro
+      - ./.db-ops/replication:/run/aura-replication:ro
+    healthcheck:
+      interval: 5s
+      retries: 120
+      start_period: 30s
+
+  db-standby:
+    image: postgres:17
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/opt/aura-postgres/standby.sh"]
+    command: *postgres-command
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      PGDATA: /var/lib/postgresql/standby/data
+    volumes:
+      - postgres_standby:/var/lib/postgresql
+      - ./ops/postgres:/opt/aura-postgres:ro
+      - ./.db-ops/server:/run/aura-server-tls:ro
+      - ./.db-ops/client/ca.crt:/run/aura-ca.crt:ro
+      - ./.db-ops/replication:/run/aura-replication:ro
+      - ./.db-ops/state:/run/aura-db-state:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      - aura-internal
+
+  api:
+    environment:
+      AURA_DATABASE_URL: ""
+      AURA_DATABASE_URL_FILE: /run/aura-db-client/database-url
+      AURA_DATABASE_RUNTIME_DIR: /run/aura-db-runtime
+    volumes:
+      # Mount the directory so atomic file replacement is visible in the container.
+      - ./.db-ops/client:/run/aura-db-client:ro
+      - ./.db-ops/runtime:/run/aura-db-runtime
+
+volumes:
+  postgres_standby:

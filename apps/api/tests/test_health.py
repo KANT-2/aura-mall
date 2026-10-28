@@ -25,7 +25,49 @@ def test_openapi_exposes_versioned_routes(client):
     schema = client.get("/openapi.json").json()
 
     assert schema["info"]["title"] == "AURA test API"
-    assert set(schema["paths"]) == {"/api/v1/health"}
+    assert set(schema["paths"]) == {
+        "/api/v1/health",
+        "/api/v1/auth/login",
+        "/api/v1/auth/register",
+        "/api/v1/auth/me",
+        "/api/v1/auth/refresh",
+        "/api/v1/auth/logout",
+        "/api/v1/auth/change-password",
+        "/api/v1/catalog",
+        "/api/v1/catalog/products/{product_id}",
+        "/api/v1/partner",
+        "/api/v1/recipes",
+        "/api/v1/recipes/{recipe_id}",
+        "/api/v1/atelier/draft",
+        "/api/v1/orders",
+        "/api/v1/orders/{order_id}/cancel",
+        "/api/v1/payments",
+        "/api/v1/payments/confirm",
+        "/api/v1/payments/{payment_id}",
+        "/api/v1/admin/auth/login",
+        "/api/v1/admin/auth/logout",
+        "/api/v1/admin/session",
+        "/api/v1/admin/admins",
+        "/api/v1/admin/overview",
+        "/api/v1/admin/products",
+        "/api/v1/admin/products/{product_id}",
+        "/api/v1/admin/products/{product_id}/stock-adjustments",
+        "/api/v1/admin/orders",
+        "/api/v1/admin/orders/{order_id}",
+        "/api/v1/admin/inquiries",
+        "/api/v1/admin/inquiries/{inquiry_id}",
+        "/api/v1/admin/payments/review",
+        "/api/v1/admin/refunds/review",
+        "/api/v1/admin/media",
+        "/api/v1/media/{asset_id}",
+        "/api/v1/products/{product_id}/questions",
+        "/api/v1/questions/mine",
+        "/api/v1/questions/{question_id}",
+        "/api/v1/admin/questions",
+        "/api/v1/admin/questions/{question_id}/answer",
+        "/api/v1/admin/orders/{order_id}/fulfillment",
+        "/api/v1/admin/auth/change-password",
+    }
 
 
 def test_api_prefix_is_configurable():

@@ -165,9 +165,8 @@ export function Auth({ mode, returnTo }: { mode: "login" | "register"; returnTo:
               <details className="micro">
                 <summary>약관 및 개인정보 처리 안내</summary>
                 <p>
-                  현재 회원 정보와 비밀번호 검증값은 이용 중인 브라우저에 보관됩니다. 서버 회원 인증
-                  및 운영 약관 연동 전까지 다른 기기에서는 계정을 이용할 수 없습니다. 저장한 향과
-                  계정은 브라우저 데이터 삭제 시 함께 삭제됩니다.
+                  현재 회원 기능은 개발용 시연 환경입니다. 실제 서비스 이용약관과 개인정보
+                  처리방침은 서비스 공개 전에 확정됩니다.
                 </p>
               </details>
             </>

@@ -4,10 +4,10 @@ import { useCatalog } from "@/features/catalog/hooks/use-catalog";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { Arrow } from "@/components/ui/arrow";
-import { useSession } from "@/features/account/hooks/use-session";
+import { useAccount } from "@/features/account/hooks/use-account";
 
 export function PromotionCarousel() {
-  const { user } = useSession();
+  const { user } = useAccount();
   const [promo, setPromo] = useState(0);
   const promoTouch = useRef<{ x: number; y: number } | null>(null);
   const { home } = useCatalog();

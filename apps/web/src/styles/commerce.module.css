@@ -192,6 +192,9 @@
   width: 18px;
   height: 18px;
   min-height: 0;
+  padding: 0;
+  margin: 0;
+  z-index: 1;
   accent-color: #91633b;
 }
 
@@ -680,7 +683,7 @@
   }
 
   :where(.root) :global(.detail-image) {
-    max-height: 360px;
+    max-height: none;
     min-height: 0;
   }
 
@@ -1383,6 +1386,33 @@
   display: block;
 }
 
+:where(.root):global(.a86-cart .a86-cart-thumb .gift-photo) {
+  padding: 6px;
+  gap: 5px;
+}
+
+:where(.root):global(.a86-cart .a86-cart-thumb .gift-photo-brand small),
+:where(.root):global(.a86-cart .a86-cart-thumb .gift-photo > span:last-child) {
+  display: none;
+}
+
+:where(.root):global(.a86-cart .a86-cart-thumb .a-gift-brand-mark) {
+  width: 48px;
+  height: 15px;
+  margin: auto;
+}
+
+:where(.root):global(.a86-cart .a86-cart-thumb .gift-photo > div) {
+  padding: 3px;
+  gap: 2px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+:where(.root):global(.a86-cart .a86-cart-thumb .gift-photo img) {
+  height: auto;
+  aspect-ratio: 1 / 1.6;
+}
+
 :where(.root):global(.a86-cart .a86-cart-thumb > .a86-asset),
 :where(.root):global(.a86-cart .a86-cart-thumb > img) {
   object-fit: contain;
@@ -1560,7 +1590,6 @@
 
 @media (prefers-reduced-motion: no-preference) {
   :where(.root):global(.detail .purchase-row .button) {
-    transform: translate3d(var(--aura-mx, 0px), var(--aura-my, 0px), 0) !important;
     transition:
       transform 0.24s var(--aura-motion-ease),
       background-color 0.22s ease,
@@ -1671,10 +1700,12 @@
 
 :where(.root):global(.detail .detail-image) {
   position: relative;
+  top: auto;
 }
 
 :where(.root) :global(.aura-image-preview) {
   border: 0;
+  margin: auto;
   padding: 0;
   background: transparent;
   max-height: min(94dvh, 900px);
@@ -1786,4 +1817,47 @@
       transform: translateY(0) scale(1);
     }
   }
+}
+
+.root .soldOutButton:disabled {
+  width: 100%;
+  justify-content: center;
+  border-color: #dedbd5;
+  background: #e7e4de;
+  color: #6b6862;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.soldOutCard :global(.product-image)::after {
+  position: absolute;
+  inset: 0;
+  background: rgb(250 249 246 / 48%);
+  content: "";
+  pointer-events: none;
+}
+
+.soldOutCard :global(.product-image) > .soldOutBadge {
+  display: grid;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  place-items: center;
+  padding: 0;
+  background: transparent;
+  color: #494741;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  transform: none;
+  transition: none;
+}
+
+.soldOutCard:is(:hover, :focus-visible) :global(.product-image) > .soldOutBadge {
+  transform: none;
+}
+
+.soldOutCard :is(h3, strong, p),
+.soldOutCard > :global(.eyebrow) {
+  color: #77746e;
 }
