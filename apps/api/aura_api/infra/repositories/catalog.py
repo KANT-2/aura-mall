@@ -37,7 +37,11 @@ async def load_catalog(session: AsyncSession) -> CatalogRows:
     return CatalogRows(
         collections=await rows(Collection, Collection.sort_order),
         types=await rows(ProductType, ProductType.sort_order),
-        products=await rows(Product, Product.sort_order),
+        products=list(
+            await session.scalars(
+                select(Product).where(Product.is_active.is_(True)).order_by(Product.sort_order)
+            )
+        ),
         ingredients=await rows(Ingredient, Ingredient.sort_order),
         scent_families=await rows(ScentFamily, ScentFamily.sort_order),
         family_ingredients=await rows(
@@ -58,7 +62,7 @@ async def find_product(session: AsyncSession, product_id: str) -> tuple[Product,
         await session.execute(
             select(Product, ProductType.name)
             .join(ProductType, Product.type_id == ProductType.id)
-            .where(Product.id == product_id)
+            .where(Product.id == product_id, Product.is_active.is_(True))
         )
     ).first()
     return None if row is None else (row[0], row[1])
@@ -66,7 +70,9 @@ async def find_product(session: AsyncSession, product_id: str) -> tuple[Product,
 
 async def load_rule_catalog(session: AsyncSession) -> domain.Catalog:
     """Products and ingredients as the domain rules see them (catalog order kept)."""
-    products = await session.scalars(select(Product).order_by(Product.sort_order))
+    products = await session.scalars(
+        select(Product).where(Product.is_active.is_(True)).order_by(Product.sort_order)
+    )
     ingredients = await session.scalars(select(Ingredient).order_by(Ingredient.sort_order))
     return domain.Catalog(
         products={

@@ -388,3 +388,15 @@ BFF HTTP 통합 테스트는 실제 서버 응답으로 FastAPI 형태의 오류
 - `PATCH /admin/orders/{order_id}/fulfillment`: `expectedStatus`와 다음 `status`(`preparing/shipped/delivered`), `reason`(1~200) 필수. 출고 시 `courier,trackingNumber`(각 최대100) 필수. 결제·환불과 같은 주문 행 잠금, 이전 상태 불일치 409, 상태 이력 제공.
 - `POST /admin/auth/change-password`: 기존 회원과 같은 `currentPassword,newPassword` 입력 검증, 성공 204 및 모든 관리자 세션 폐기. 관리자 로그인과 비밀번호 변경은 관리자 행 잠금으로 직렬화.
 - 관리자 결제·환불 검토 BFF는 `page,status,reason`만 전달하고 PG 비밀 키·거래 키는 브라우저에 제공하지 않음.
+
+## 1.7 상품 등록·상세 안내·이미지 관리
+
+0013은 상품 `is_active`(기존 true), `details`(기존 빈 객체), 공용 `media_assets`를 추가하고 컬렉션×유형 유일 제약을 해제합니다. 기존 SKU·가격·재고·주문 스냅샷을 유지합니다.
+
+- `POST /admin/products`: ID·컬렉션·유형·상품명·영문명·용량·분류·설명·등록된 이미지 필수. 가격/초기 재고/향 노트/상세 안내/추천/신상품/판매 노출을 지정합니다. 중복 ID는 409, 비회원·회원 토큰은 거절합니다. 상품 등록 이력은 `product.create`입니다.
+- 기존 `PATCH /admin/products/{id}`에 `isActive,volume,category,notes,details`를 추가합니다. 버전 검사와 감사 기록을 유지합니다. 판매 중지 상품은 카탈로그·공개 상세·신규 주문에서 제외하며 기존 주문은 보존합니다.
+- `details`: `usage,ingredients,precautions,manufacturer,origin,shipping,returns`의 일반 텍스트, 항목당 최대 5,000자. 관리자가 저장한 안내를 상품 상세에서 제공합니다.
+- `POST /admin/media`: 관리자 JSON `{data: Base64}` 이미지 업로드. 원본 JPEG/PNG/WebP 최대 2MB, 최대 1,600만 화소·정지 이미지만 허용하고 실제 디코딩 후 최대 2,000px WebP로 저장합니다. 응답 `{id,url,width,height}`. 이미지와 메타데이터는 분리하여 저장하지 않고 EXIF/텍스트 메타데이터를 제거합니다.
+- `GET /media/{asset_id}`와 BFF `/api/media/{id}`는 검증된 WebP 바이트만 전송합니다. 이미지 바이트는 DB에 보관하므로 API 복제본이 공유하고 DB 복제·백업에 포함됩니다. 공개 응답에 업로드 관리자 ID를 포함하지 않습니다.
+
+`ops/seed_records.py`는 요청된 일반 회원·조향·상품 문의·입점 문의·주문을 적재합니다. 별도 체험 유형·표시·읽기 전용 주문을 만들지 않습니다. 주문은 기존 접수·취소 서비스를 사용해 재고를 반영하며 미결제 만료 정책도 동일합니다. 재실행 시 기존 데이터와 비밀번호를 유지합니다.

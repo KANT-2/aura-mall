@@ -3,7 +3,7 @@
 -- contract in docs/FASTAPI_BFF.md. Run once on an empty database (PostgreSQL 13+):
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/schema.sql
 -- Then load initial catalog data with db/seed.sql. The cart is not stored (browser only).
--- This file is the latest full schema (migrations 0001 through 0012). Alembic applies the same
+-- This file is the latest full schema (migrations 0001 through 0013). Alembic applies the same
 -- DDL step by step from migrations/sql/; tests/db checks that both give the same tables.
 
 BEGIN;
@@ -500,7 +500,7 @@ CREATE TABLE admin_audit_logs (
     reason      VARCHAR(200),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT admin_audit_logs_action_check
-        CHECK (action IN ('product.update', 'product.stock', 'inquiry.update', 'admin.create', 'question.answer')),
+        CHECK (action IN ('product.create', 'product.update', 'product.stock', 'inquiry.update', 'admin.create', 'question.answer')),
     CONSTRAINT admin_audit_logs_target_check CHECK (target_type IN ('product', 'inquiry', 'admin', 'question'))
 );
 CREATE INDEX admin_audit_logs_target_idx
@@ -532,5 +532,15 @@ ALTER TABLE orders ADD COLUMN recipient_phone varchar(30) NOT NULL DEFAULT '';
 ALTER TABLE orders ADD COLUMN delivery_note varchar(300) NOT NULL DEFAULT '';
 ALTER TABLE orders ADD COLUMN courier varchar(100) NOT NULL DEFAULT '';
 ALTER TABLE orders ADD COLUMN tracking_number varchar(100) NOT NULL DEFAULT '';
+
+ALTER TABLE products DROP CONSTRAINT products_collection_type_key;
+ALTER TABLE products ADD COLUMN is_active boolean NOT NULL DEFAULT true;
+ALTER TABLE products ADD COLUMN details jsonb NOT NULL DEFAULT '{}';
+CREATE TABLE media_assets (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(), sha256 varchar(64) NOT NULL UNIQUE,
+    data bytea NOT NULL, uploaded_by uuid NOT NULL REFERENCES admins(id),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT media_assets_size_check CHECK (octet_length(data) BETWEEN 1 AND 2097152)
+);
 
 COMMIT;

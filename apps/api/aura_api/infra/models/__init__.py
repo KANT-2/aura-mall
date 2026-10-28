@@ -24,6 +24,7 @@ from aura_api.infra.models.identity import (
     User,
     UserCoupon,
 )
+from aura_api.infra.models.media import MediaAsset
 from aura_api.infra.models.ordering import (
     Order,
     OrderItem,
@@ -45,6 +46,7 @@ __all__ = [
     "Base",
     "Collection",
     "Ingredient",
+    "MediaAsset",
     "Order",
     "OrderItem",
     "OrderItemSelection",

@@ -60,7 +60,9 @@ class StatusChange:
 
 async def products_with_type_names(session: AsyncSession) -> dict[str, tuple[Product, str]]:
     rows = await session.execute(
-        select(Product, ProductType.name).join(ProductType, Product.type_id == ProductType.id)
+        select(Product, ProductType.name)
+        .join(ProductType, Product.type_id == ProductType.id)
+        .where(Product.is_active.is_(True))
     )
     return {product.id: (product, type_name) for product, type_name in rows}
 
@@ -78,7 +80,7 @@ async def take_stock(session: AsyncSession, product_id: str, quantity: int) -> b
     """Decrement only if enough is left; False means another order got there first."""
     result = await session.execute(
         update(Product)
-        .where(Product.id == product_id, Product.stock >= quantity)
+        .where(Product.id == product_id, Product.stock >= quantity, Product.is_active.is_(True))
         .values(stock=Product.stock - quantity)
     )
     return result.rowcount == 1

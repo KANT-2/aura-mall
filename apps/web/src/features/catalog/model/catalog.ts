@@ -1,4 +1,15 @@
+export const productDetailLabels = {
+  usage: "사용 방법·보관",
+  ingredients: "전성분",
+  precautions: "사용 시 주의사항",
+  manufacturer: "제조·책임판매업자",
+  origin: "제조국",
+  shipping: "배송 안내",
+  returns: "교환·반품 안내",
+} as const;
+export type ProductDetails = Partial<Record<keyof typeof productDetailLabels, string>>;
 export type Product = {
+  details?: ProductDetails;
   id: string;
   collection: string;
   type: string;

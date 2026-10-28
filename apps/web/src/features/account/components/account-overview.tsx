@@ -1,7 +1,6 @@
 "use client";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { useOrders } from "@/features/checkout/hooks/use-orders";
-import { money } from "@/lib/format";
 import { testIds } from "@/lib/test-ids";
 import styles from "@/features/account/components/account.module.css";
 import Link from "next/link";
@@ -14,17 +13,30 @@ import { totalCount } from "@/features/atelier/model/recipes";
 import { useNotify } from "@/components/feedback/notification-provider";
 import { useRecipes } from "@/features/atelier/hooks/use-recipes";
 import { useAccount } from "@/features/account/hooks/use-account";
-import { OrderActions } from "@/features/checkout/components/order-actions";
+import { useCart } from "@/features/cart/hooks/use-cart";
+import { OrderCard } from "@/features/checkout/components/order-card";
 import { Questions } from "@/features/questions/components/questions";
 import { MemberSettings } from "@/features/account/components/member-settings";
-export function MyPage() {
+export function MyPage({ initialTab = "scents" }: { initialTab?: string }) {
   const { ingredients } = useCatalog();
   const { signOut } = useAuth();
+  const { addCustom } = useCart();
+  const [addingScent, setAddingScent] = useState<string | null>(null);
+  const [addedScent, setAddedScent] = useState<string | null>(null);
   const { user, ready } = useAccount(),
     { recipes, ready: recipesReady, remove: removeRecipe } = useRecipes(),
     notify = useNotify(),
-    [tab, setTab] = useState("scents"),
+    [tab, setTab] = useState(initialTab),
     [filter, setFilter] = useState("all");
+  const memberId = user?.id ?? null;
+  const [orderPaging, setOrderPaging] = useState<{ owner: string | null; count: number }>({
+    owner: memberId,
+    count: 5,
+  });
+  if (orderPaging.owner !== memberId) {
+    setOrderPaging({ owner: memberId, count: 5 });
+  }
+
   const orders = useOrders(tab === "orders" || (tab === "scents" && filter === "purchased"));
   const purchased =
     orders.data
@@ -107,7 +119,12 @@ export function MyPage() {
           ["questions", "상품 문의"],
           ["account", "계정 관리"],
         ].map(([id, title]) => (
-          <button key={id} className={tab === id ? "selected" : ""} onClick={() => setTab(id)}>
+          <button
+            key={id}
+            className={tab === id ? "selected" : ""}
+            aria-pressed={tab === id}
+            onClick={() => setTab(id)}
+          >
             {title}
           </button>
         ))}
@@ -122,6 +139,7 @@ export function MyPage() {
             ].map(([id, title]) => (
               <button
                 className={filter === id ? "selected" : ""}
+                aria-pressed={filter === id}
                 onClick={() => setFilter(id)}
                 key={id}
               >
@@ -137,7 +155,13 @@ export function MyPage() {
             <div className="recipe-grid">
               {purchased.map((item) => (
                 <article className="saved-recipe" key={item.id}>
+                  <div className="saved-recipe-visual">
+                    <span className="saved-version">AURA / MY COLLECTION</span>
+                    <Asset id="custom-bottle" />
+                    <span className="saved-name">{item.name}</span>
+                  </div>
                   <div className="saved-recipe-body">
+                    <span className="eyebrow">MY PURCHASED SCENT</span>
                     <h2>{item.name}</h2>
                     <p>
                       {item.quantity}개 · {new Date(item.created).toLocaleDateString("ko-KR")}
@@ -150,6 +174,37 @@ export function MyPage() {
                         )
                         .join(" · ")}
                     </p>
+                    <button
+                      type="button"
+                      className={styles.reorderButton}
+                      disabled={addingScent === item.id}
+                      onClick={async () => {
+                        setAddingScent(item.id);
+                        try {
+                          if (
+                            await addCustom({
+                              name: item.name,
+                              label: item.label,
+                              color: item.color,
+                              counts: item.counts,
+                              productType: item.productType,
+                            })
+                          ) {
+                            setAddedScent(item.id);
+                          }
+                        } finally {
+                          setAddingScent(null);
+                        }
+                      }}
+                    >
+                      {addingScent === item.id ? "담는 중…" : "이 향 다시 담기"}
+                      <span aria-hidden="true">↗</span>
+                    </button>
+                    {addedScent === item.id && (
+                      <Link className="text-link" href="/cart">
+                        장바구니에서 확인하기 →
+                      </Link>
+                    )}
                   </div>
                 </article>
               ))}
@@ -245,22 +300,47 @@ export function MyPage() {
           <span className="chip">{user?.coupon ? "사용 가능" : "미보유"}</span>
         </article>
       ) : tab === "orders" && orders.data?.length ? (
-        <section>
-          {orders.data.map((order) => (
-            <article className="account-panel" key={order.id}>
-              <h2>{order.items.map((item) => item.product.name).join(" · ")}</h2>
-              <p>{money(order.total)}</p>
-              <OrderActions order={order} />
-              <p>
-                {order.recipient} · {order.address}
-              </p>
-            </article>
-          ))}
+        <section className={styles.ordersSection} aria-label="주문 내역">
+          <div className={styles.sectionHeader}>
+            <div>
+              <span className="eyebrow">MY ORDERS</span>
+              <h2>
+                주문 내역 <small>{orders.data.length}</small>
+              </h2>
+            </div>
+            <p>주문 상태와 배송 정보를 확인할 수 있어요.</p>
+          </div>
+          <div className={styles.orderList}>
+            {orders.data
+              .slice(0, orderPaging.owner === memberId ? orderPaging.count : 5)
+              .map((order) => (
+                <OrderCard key={order.id} order={order} />
+              ))}
+          </div>
+          <div className={styles.orderMore}>
+            <p>
+              총 {orders.data.length}건 중 {Math.min(orderPaging.count, orders.data.length)}건을
+              보고 있어요.
+            </p>
+            {orderPaging.count < orders.data.length && (
+              <button
+                type="button"
+                onClick={() => setOrderPaging({ owner: memberId, count: orderPaging.count + 5 })}
+              >
+                이전 주문 더 보기 <span aria-hidden="true">↓</span>
+              </button>
+            )}
+          </div>
         </section>
       ) : tab === "orders" && orders.isLoading ? (
         <LoadingSkeleton variant="orders" label="주문 내역을 불러오고 있어요." />
       ) : tab === "orders" && orders.error ? (
-        <p role="alert">주문 내역을 불러오지 못했어요.</p>
+        <div className={styles.loadError} role="alert">
+          <p>주문 내역을 불러오지 못했어요.</p>
+          <button type="button" onClick={() => void orders.refetch()}>
+            다시 불러오기
+          </button>
+        </div>
       ) : tab === "orders" ? (
         <div className="empty">
           <Asset id="empty-bag" />

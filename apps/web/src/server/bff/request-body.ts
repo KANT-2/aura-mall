@@ -3,8 +3,11 @@ import { ApiError } from "@/lib/api/errors";
 import { isRecord } from "@/lib/validation";
 
 const MAX_BODY_BYTES = 32 * 1024;
-export async function jsonRequestBody(request: Request): Promise<string | undefined> {
-  if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) {
+export async function jsonRequestBody(
+  request: Request,
+  maxBytes = MAX_BODY_BYTES,
+): Promise<string | undefined> {
+  if (Number(request.headers.get("content-length")) > maxBytes) {
     throw new ApiError(413, "입력 내용이 너무 길어요.", "PAYLOAD_TOO_LARGE");
   }
 
@@ -24,7 +27,7 @@ export async function jsonRequestBody(request: Request): Promise<string | undefi
       }
 
       size += value.byteLength;
-      if (size > MAX_BODY_BYTES) {
+      if (size > maxBytes) {
         await reader.cancel();
         throw new ApiError(413, "입력 내용이 너무 길어요.", "PAYLOAD_TOO_LARGE");
       }

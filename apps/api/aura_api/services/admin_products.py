@@ -15,7 +15,7 @@ from aura_api.infra.models import AdminAuditLog, Product
 from aura_api.infra.repositories import admin as repository
 
 # Column → field name the admin screens use in the change history.
-CLIENT_FIELDS = {"english_name": "englishName", "is_new": "isNew"}
+CLIENT_FIELDS = {"english_name": "englishName", "is_new": "isNew", "is_active": "isActive"}
 
 
 @dataclass(frozen=True)
