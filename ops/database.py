@@ -18,6 +18,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote, unquote, urlencode, urlsplit, urlunsplit
 
+from database_errors import OperationError, PrimaryUnavailable
+
 ROOT = Path(__file__).resolve().parents[1]
 VERIFY_API = """
 import asyncio
@@ -40,12 +42,6 @@ async def main():
         await engine.dispose()
 asyncio.run(main())
 """
-
-
-class OperationError(Exception):
-    def __init__(self, message, diagnostics=b""):
-        super().__init__(message)
-        self.diagnostics = diagnostics
 
 
 def run(args, *, data=None, check=True, output=None, timeout=180, env=None):
@@ -91,12 +87,14 @@ def identifier(value):
     return '"' + value.replace('"', '""') + '"'
 
 
-def retry(action, seconds=60):
+def retry(action, seconds=60, *, fail_fast=None):
     deadline = time.monotonic() + seconds
     while True:
         try:
             return action()
         except (OperationError, subprocess.TimeoutExpired):
+            if fail_fast is not None:
+                fail_fast()
             if time.monotonic() >= deadline:
                 raise
             time.sleep(2)
@@ -152,7 +150,7 @@ class Database:
     def standby(self):
         return "db-standby" if self.primary == "db" else "db"
 
-    def sql(self, service, statement):
+    def sql(self, service, statement, *, timeout=180):
         # Administrative SQL uses the local socket, with no password passed to Docker.
         result = self.dc(
             "exec",
@@ -163,6 +161,7 @@ class Database:
             'exec psql -XAt -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"',
             data="SET log_statement=none; SET log_min_error_statement=panic; "
             "SET log_min_duration_statement=-1;\n" + statement,
+            timeout=timeout,
         )
         # Quiet suppresses SET command tags so scalar queries remain parseable.
         return "\n".join(
@@ -175,6 +174,17 @@ class Database:
     def require_primary(self):
         if self.sql(self.primary, "SELECT pg_is_in_recovery();") != "f":
             raise OperationError("The configured writer is not a primary")
+
+    def ha_primary_alive(self):
+        if not self.read("ha.json", {}).get("enabled"):
+            return
+        try:
+            if self.sql(self.primary, "SELECT NOT pg_is_in_recovery();", timeout=2) != "t":
+                raise OperationError("Writer is not ready")
+        except (OperationError, subprocess.TimeoutExpired):
+            raise PrimaryUnavailable(
+                "Primary unavailable; the HA controller will recover"
+            ) from None
 
     def checkend(self, cert, days):
         return (
@@ -410,7 +420,7 @@ class Database:
             ):
                 raise OperationError("Standby is not streaming")
 
-        retry(streaming)
+        retry(streaming, fail_fast=self.ha_primary_alive)
         lsn = self.sql(self.primary, "SELECT pg_current_wal_lsn();")
 
         def replayed():
@@ -424,10 +434,13 @@ class Database:
             ):
                 raise OperationError("Standby has not replayed the required WAL")
 
-        retry(replayed)
+        retry(replayed, fail_fast=self.ha_primary_alive)
 
     def verify_api(self):
-        retry(lambda: self.dc("exec", "-T", "api", "python", "-c", VERIFY_API, timeout=20))
+        retry(
+            lambda: self.dc("exec", "-T", "api", "python", "-c", VERIFY_API, timeout=20),
+            fail_fast=self.ha_primary_alive,
+        )
         self.wait_api_generation()
 
     def wait_api_generation(self, url=None, seconds=120):
@@ -464,7 +477,7 @@ class Database:
                 raise OperationError("API container membership changed during acknowledgement")
             return workers
 
-        return retry(acknowledged, seconds)
+        return retry(acknowledged, seconds, fail_fast=self.ha_primary_alive)
 
     def restart_api(self):
         self.dc("up", "-d", "--no-deps", "--force-recreate", "api", timeout=180)
@@ -602,7 +615,7 @@ SELECT pg_create_physical_replication_slot('aura_standby')
             ):
                 raise OperationError("Old database sessions remain; they will not be terminated")
 
-        retry(drained, 120)
+        retry(drained, 120, fail_fast=self.ha_primary_alive)
         self.wait_replica()
         self.write("rotated.json", time.time())
         self.journal.unlink()
@@ -702,6 +715,10 @@ SELECT pg_create_physical_replication_slot('aura_standby')
                 path.unlink()
 
     def promote(self, allow_data_loss=False):
+        if (self.state / "ha.json").exists():
+            from failover import Failover
+
+            return Failover(self).transition()
         if (self.state / "rejoin-primary").exists():
             raise OperationError("The standby was already promoted and rejoined; use the runbook")
         if self.journal.exists():
@@ -728,6 +745,10 @@ SELECT pg_create_physical_replication_slot('aura_standby')
         print("Standby promoted; former primary is fenced. Rejoin a new standby before rotation.")
 
     def rejoin(self):
+        if (self.state / "ha.json").exists():
+            from failover import Failover
+
+            return Failover(self).resume()
         if self.primary != "db-standby" or not (self.state / "fenced-primary").exists():
             raise OperationError("Rejoin is only valid after a completed standby promotion")
         self.require_primary()
@@ -745,6 +766,10 @@ SELECT pg_create_physical_replication_slot('aura_standby')
         self.require_primary()
         self.verify_api()
         self.wait_replica()
+        if self.read("ha.json", {}).get("enabled"):
+            from failover import Failover
+
+            Failover(self).require_sync()
         if not self.checkend(self.server / "current" / "server.crt", 7):
             raise OperationError("Server certificate expires within 7 days")
         if not self.checkend(self.ca / "ca.crt", 365):
@@ -758,6 +783,9 @@ SELECT pg_create_physical_replication_slot('aura_standby')
                     "tls": "verified",
                     "last_password_rotation": self.read("rotated.json"),
                     "last_backup": self.read("backup.json"),
+                    "replication": "synchronous"
+                    if self.read("ha.json", {}).get("enabled")
+                    else "asynchronous",
                 }
             )
         )
@@ -831,6 +859,10 @@ def main():
             "install-timer",
             "deploy-api",
             "migrate",
+            "ha-enable",
+            "ha-watch",
+            "ha-install",
+            "ha-check",
         ],
     )
     parser.add_argument("--force", action="store_true", help="Renew a certificate before it is due")
@@ -846,19 +878,40 @@ def main():
         parser.error("Use a lowercase Compose project name")
     os.umask(0o077)
     database = Database(args.project)
+    if args.command == "ha-watch":
+        from failover import Failover
+
+        Failover(database).watch()
+        return
     with (database.home / "operations.lock").open("a") as lock:
+        deadline = time.monotonic() + 30
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise SystemExit("Another database operation is running") from None
+                time.sleep(0.1)
         try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise SystemExit("Another database operation is running") from None
-        try:
-            if args.command == "renew":
+            if args.command.startswith("ha-"):
+                from failover import Failover
+
+                ha = Failover(database)
+                {"ha-enable": ha.enable, "ha-install": ha.install, "ha-check": ha.tick}[
+                    args.command
+                ]()
+            elif (database.state / "ha-transition.json").exists():
+                raise OperationError("Database transition in progress; run ha-check to recover it")
+            elif args.command == "bootstrap" and database.read("ha.json", {}).get("enabled"):
+                raise OperationError("HA is already configured; use the HA recovery runbook")
+            elif args.command == "renew":
                 database.renew(args.force)
             elif args.command == "promote":
                 database.promote(args.allow_data_loss)
             else:
                 getattr(database, args.command.replace("-", "_"))()
-        except OperationError as error:
+        except (OperationError, PrimaryUnavailable) as error:
             raise SystemExit(str(error)) from None
         except (subprocess.TimeoutExpired, OSError):
             raise SystemExit(
