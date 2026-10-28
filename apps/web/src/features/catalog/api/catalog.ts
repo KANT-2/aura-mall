@@ -6,4 +6,6 @@ export const catalogQueryOptions = queryOptions({
   queryKey: catalogKey,
   queryFn: ({ signal }) => request<Catalog>("/catalog", { signal }),
   staleTime: 300_000,
+  // The server hydrates the initial catalog. Refresh on return without racing hydration.
+  refetchOnWindowFocus: "always",
 });
