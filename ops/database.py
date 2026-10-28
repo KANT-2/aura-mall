@@ -383,7 +383,8 @@ class Database:
         return (self.home / "replication" / "pgpass").read_text().strip().rsplit(":", 1)[1]
 
     def set_replication_password(self, password):
-        self.sql(self.primary, f"ALTER ROLE aura_replicator PASSWORD {literal(password)};")
+        # Publish reconnect credentials first: a synchronous ALTER ROLE can wait for
+        # a replica that has just restarted and must authenticate with the new password.
         atomic(
             self.home / "replication" / "pgpass",
             f"*:5432:replication:aura_replicator:{password}\n",
@@ -398,6 +399,19 @@ class Database:
                 "sh",
                 "/opt/aura-postgres/install-replication.sh",
             )
+        # Only replication credential metadata commits locally. Requiring remote
+        # acknowledgement here can deadlock authentication after a replica restart.
+        # The rotation journal recovers it, and wait_replica verifies durability
+        # before a rotation can complete. Application commits remain remote_apply.
+        self.sql(
+            self.primary,
+            "SET synchronous_commit=local; "
+            f"ALTER ROLE aura_replicator PASSWORD {literal(password)};",
+        )
+        if self.read("ha.json", {}).get("enabled") and not self.running(self.standby):
+            self.dc("unpause", self.standby, check=False)
+            self.dc("up", "-d", "--no-deps", self.standby)
+        if self.running(self.standby):
             self.sql(
                 self.primary,
                 "SELECT pg_terminate_backend(pid) FROM pg_stat_replication "
@@ -633,8 +647,8 @@ SELECT pg_create_physical_replication_slot('aura_standby')
             self.finish_rotation(record)
             return
         old_user = unquote(urlsplit(record["old_url"]).username)
-        self.sql(self.primary, f"ALTER ROLE {identifier(old_user)} LOGIN;")
         self.set_replication_password(record["old_replication_password"])
+        self.sql(self.primary, f"ALTER ROLE {identifier(old_user)} LOGIN;")
         atomic(self.url_file, record["old_url"] + "\n")
         self.wait_api_generation(record["old_url"])
         self.sql(self.primary, f"ALTER ROLE {identifier(record['new_user'])} NOLOGIN;")

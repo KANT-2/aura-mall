@@ -1,5 +1,6 @@
 """Automatic failover acceptance checks, called only with the disposable test DB."""
 
+import fcntl
 import importlib.util
 import json
 import secrets
@@ -111,14 +112,41 @@ def exercise(db, cli, module):
         stdout=watcher_log,
         stderr=watcher_log,
     )
+    operation_lock = None
     try:
         original = db.primary
         db.dc("stop", "--timeout", "0", db.standby)
         module.retry(ha.require_sync, 20)
         assert db.primary == original
         print("PASS: replica crash restarts the replica without promoting it", flush=True)
+        real_sql = db.sql
+        interrupted_replica = False
+
+        def crash_replica_during_password_commit(node, statement, **kwargs):
+            nonlocal interrupted_replica
+            if "ALTER ROLE aura_replicator PASSWORD" in statement and not interrupted_replica:
+                interrupted_replica = True
+                db.dc("stop", "--timeout", "0", db.standby)
+            return real_sql(node, statement, **kwargs)
+
+        db.sql = crash_replica_during_password_commit
+        try:
+            with (db.home / "operations.lock").open("a") as busy:
+                fcntl.flock(busy, fcntl.LOCK_EX)
+                db.set_replication_password(secrets.token_urlsafe(48))
+        finally:
+            db.sql = real_sql
+        assert interrupted_replica
+        ha.require_sync()
+        print(
+            "PASS: replica restart during synchronous password commit "
+            "completes under the operations lock",
+            flush=True,
+        )
         for _cycle in range(2):
             old, target = db.primary, db.standby
+            operation_lock = (db.home / "operations.lock").open("a")
+            fcntl.flock(operation_lock, fcntl.LOCK_EX)
             real_wait = db.wait_api_generation
             real_finish = db.finish_rotation
 
@@ -177,9 +205,13 @@ def exercise(db, cli, module):
                 started = time.monotonic()
                 if _cycle == 0:
                     db.dc("stop", "--timeout", "0", old)
+                    operation_lock.close()
+                    operation_lock = None
                 else:
                     # A hung node is still running; the controller must fence it itself.
                     db.dc("pause", old)
+                    operation_lock.close()
+                    operation_lock = None
 
                     def switched(target=target):
                         if db.primary != target:
@@ -224,6 +256,8 @@ def exercise(db, cli, module):
             "13/14 Refuse unsafe promotion; resume a durable journal in a fresh process", flush=True
         )
     finally:
+        if operation_lock is not None:
+            operation_lock.close()
         watcher.terminate()
         watcher.wait(timeout=10)
         watcher_log.seek(0)
