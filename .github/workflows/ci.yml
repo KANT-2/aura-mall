@@ -79,6 +79,7 @@ jobs:
           apps/api/.venv/bin/ruff format --check ops
           python3 ops/test_deploy.py
           python3 ops/test_timer.py
+          python3 ops/test_payments_config.py
           for script in ops/postgres/*.sh; do sh -n "$script"; done
 
       - name: Exercise disposable database cluster

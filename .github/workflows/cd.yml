@@ -56,6 +56,32 @@ jobs:
             "$DEPLOY_USER@$DEPLOY_HOST" \
             "hostname && test -d '$DEPLOY_PATH' && echo 'SSH connection OK'"
 
+      - name: Stage test payment settings
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          AURA_TOSS_SECRET_KEY: ${{ secrets.AURA_TOSS_SECRET_KEY }}
+          NEXT_PUBLIC_TOSS_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_TOSS_CLIENT_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, re
+          secret = os.environ.get('AURA_TOSS_SECRET_KEY', '')
+          client = os.environ.get('NEXT_PUBLIC_TOSS_CLIENT_KEY', '')
+          if not secret and not client:
+              raise SystemExit(0)
+          if not re.fullmatch(r'test_g?sk_[A-Za-z0-9_-]{8,200}', secret) or not re.fullmatch(r'test_g?ck_[A-Za-z0-9_-]{8,200}', client):
+              raise SystemExit('Configure both valid Toss test keys in the deployment environment')
+          os.umask(0o077)
+          target = pathlib.Path(os.environ['RUNNER_TEMP']) / 'aura-payments.json'
+          target.write_text(json.dumps({'AURA_TOSS_SECRET_KEY': secret, 'NEXT_PUBLIC_TOSS_CLIENT_KEY': client}))
+          PY
+          if test -f "$RUNNER_TEMP/aura-payments.json"; then
+            scp -q -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes \
+              "$RUNNER_TEMP/aura-payments.json" \
+              "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/.env.payments-pending.json"
+          fi
+
       - name: Deploy AURA to Debian
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -92,6 +118,11 @@ jobs:
             git switch "$deploy_branch"
             git pull --ff-only origin "$deploy_branch"
             test "$(git rev-parse HEAD)" = "$deploy_commit"
+
+            if test -f .env.payments-pending.json; then
+              python3 ops/configure_payments.py < .env.payments-pending.json
+              rm -- .env.payments-pending.json
+            fi
 
             echo "Validating Compose configuration..."
 
