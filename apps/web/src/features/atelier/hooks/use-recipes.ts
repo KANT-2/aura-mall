@@ -4,6 +4,7 @@ import { useAccount } from "@/features/account/hooks/use-account";
 import { useNotify } from "@/components/feedback/notification-provider";
 import {
   getRecipes,
+  deleteRecipe,
   recipesKey,
   saveRecipe,
   type RecipeInput,
@@ -30,6 +31,19 @@ export function useRecipes() {
     ready: ready && query.isSuccess,
     pending: mutation.isPending,
     error: query.error,
+    async remove(id: string) {
+      if (!owner) {
+        return;
+      }
+
+      try {
+        await deleteRecipe(id, owner);
+        await client.invalidateQueries({ queryKey: recipesKey(owner) });
+        notify("저장한 향을 삭제했어요.");
+      } catch (error) {
+        notify(error instanceof Error ? error.message : "삭제하지 못했어요.");
+      }
+    },
     async save(recipe: RecipeInput) {
       try {
         if (!owner) {

@@ -426,6 +426,13 @@ def test_production_app_has_no_test_routes_and_exposes_lifecycle_routes():
             "/api/v1/admin/inquiries/{inquiry_id}",
             "/api/v1/admin/payments/review",
             "/api/v1/admin/refunds/review",
+            "/api/v1/products/{product_id}/questions",
+            "/api/v1/questions/mine",
+            "/api/v1/questions/{question_id}",
+            "/api/v1/admin/questions",
+            "/api/v1/admin/questions/{question_id}/answer",
+            "/api/v1/admin/orders/{order_id}/fulfillment",
+            "/api/v1/admin/auth/change-password",
         }
         assert client.get("/test/me").status_code == 404
 

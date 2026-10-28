@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { OrderFulfillment } from "@/features/admin/components/order-fulfillment";
+import { orderStatusLabels } from "@/features/checkout/model/order";
 import { useState } from "react";
 import { money } from "@/lib/format";
 import { testIds } from "@/lib/test-ids";
@@ -26,7 +28,7 @@ export function AdminOrderList({ query }: { query: AdminQuery }) {
     <>
       <AdminHeading
         title="주문 조회"
-        description="주문 당시 상품명·가격 스냅샷 기준으로 조회해요. 상태 변경은 정책 확정 후 제공돼요."
+        description="주문 당시 상품명·가격 스냅샷 기준으로 조회해요. 결제 확인 후 준비·배송·완료 상태를 처리할 수 있어요."
       />
       <form
         className={styles.filters}
@@ -108,7 +110,10 @@ export function AdminOrderList({ query }: { query: AdminQuery }) {
                       <Link href={`/admin/orders/${encodeURIComponent(order.id)}`}>
                         {order.title}
                       </Link>
-                      <small>{order.id.slice(0, 8)}</small>
+                      <small>
+                        {order.id.slice(0, 8)} ·{" "}
+                        {order.status ? orderStatusLabels[order.status] : "확인 필요"}
+                      </small>
                     </th>
                     <td>{adminDate(order.created)}</td>
                     <td>{order.customer?.name ?? "비회원"}</td>
@@ -201,8 +206,13 @@ export function AdminOrderDetail({ id }: { id: string }) {
             <dd>{data.recipient}</dd>
             <dt>배송지</dt>
             <dd>{data.address}</dd>
+            <dt>연락처</dt>
+            <dd>{data.recipientPhone || "미등록"}</dd>
+            <dt>배송 요청사항</dt>
+            <dd>{data.deliveryNote || "없음"}</dd>
           </dl>
         </section>
+        <OrderFulfillment key={`${data.id}:${data.status}`} order={data} />
       </div>
     </>
   );

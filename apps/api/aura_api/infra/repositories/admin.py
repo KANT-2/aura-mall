@@ -281,7 +281,9 @@ async def overview_counts(session: AsyncSession, since: datetime) -> OverviewCou
 
 
 async def admin_by_email(session: AsyncSession, email: str) -> Admin | None:
-    return await session.scalar(select(Admin).where(func.lower(Admin.email) == email.lower()))
+    return await session.scalar(
+        select(Admin).where(func.lower(Admin.email) == email.lower()).with_for_update()
+    )
 
 
 async def admin_count(session: AsyncSession) -> int:

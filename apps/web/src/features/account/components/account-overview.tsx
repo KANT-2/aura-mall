@@ -14,16 +14,38 @@ import { totalCount } from "@/features/atelier/model/recipes";
 import { useNotify } from "@/components/feedback/notification-provider";
 import { useRecipes } from "@/features/atelier/hooks/use-recipes";
 import { useAccount } from "@/features/account/hooks/use-account";
+import { OrderActions } from "@/features/checkout/components/order-actions";
+import { Questions } from "@/features/questions/components/questions";
 import { MemberSettings } from "@/features/account/components/member-settings";
 export function MyPage() {
   const { ingredients } = useCatalog();
   const { signOut } = useAuth();
   const { user, ready } = useAccount(),
-    { recipes, ready: recipesReady } = useRecipes(),
+    { recipes, ready: recipesReady, remove: removeRecipe } = useRecipes(),
     notify = useNotify(),
     [tab, setTab] = useState("scents"),
     [filter, setFilter] = useState("all");
-  const orders = useOrders(tab === "orders");
+  const orders = useOrders(tab === "orders" || (tab === "scents" && filter === "purchased"));
+  const purchased =
+    orders.data
+      ?.filter(
+        (order) =>
+          order.status && ["paid", "preparing", "shipped", "delivered"].includes(order.status),
+      )
+      .flatMap((order) =>
+        order.items.flatMap((item) =>
+          item.custom
+            ? [
+                {
+                  ...item.custom,
+                  id: `${order.id}:${item.key}`,
+                  quantity: item.quantity,
+                  created: order.created,
+                },
+              ]
+            : [],
+        ),
+      ) ?? [];
   if (!ready || !recipesReady) {
     return (
       <main className={styles.root + " page-width"} aria-busy="true">
@@ -82,6 +104,7 @@ export function MyPage() {
           ["scents", "내가 만든 향"],
           ["orders", "주문 내역"],
           ["coupons", "내 쿠폰"],
+          ["questions", "상품 문의"],
           ["account", "계정 관리"],
         ].map(([id, title]) => (
           <button key={id} className={tab === id ? "selected" : ""} onClick={() => setTab(id)}>
@@ -106,7 +129,32 @@ export function MyPage() {
               </button>
             ))}
           </div>
-          {recipes.length && filter !== "purchased" ? (
+          {filter === "purchased" && orders.isLoading ? (
+            <LoadingSkeleton variant="orders" label="구매한 향을 불러오고 있어요." />
+          ) : filter === "purchased" && orders.error ? (
+            <p role="alert">구매 내역을 불러오지 못했어요.</p>
+          ) : filter === "purchased" && purchased.length ? (
+            <div className="recipe-grid">
+              {purchased.map((item) => (
+                <article className="saved-recipe" key={item.id}>
+                  <div className="saved-recipe-body">
+                    <h2>{item.name}</h2>
+                    <p>
+                      {item.quantity}개 · {new Date(item.created).toLocaleDateString("ko-KR")}
+                    </p>
+                    <p>
+                      {Object.entries(item.counts)
+                        .map(
+                          ([id, count]) =>
+                            `${ingredients.find((x) => x.id === id)?.name ?? id} ${count}회`,
+                        )
+                        .join(" · ")}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : recipes.length && filter !== "purchased" ? (
             <div className="recipe-grid">
               {recipes.map((r) => (
                 <article className="saved-recipe" key={r.id}>
@@ -153,6 +201,17 @@ export function MyPage() {
                     <Link className="text-link" href={"/atelier?recipe=" + r.id}>
                       이 향으로 다시 만들기 <Arrow />
                     </Link>
+                    <button
+                      type="button"
+                      className="text-link"
+                      onClick={() => {
+                        if (window.confirm("저장한 향을 삭제할까요?")) {
+                          void removeRecipe(r.id);
+                        }
+                      }}
+                    >
+                      저장한 향 삭제
+                    </button>
                     <small>
                       이 향을 다시 열어 장바구니에 담을 수 있어요. 실제 제조·가격은 확인이 필요해요.
                     </small>
@@ -181,7 +240,7 @@ export function MyPage() {
                 ? "3,000원 배송비 혜택 · 5만 원 이상 주문은 자동 무료배송"
                 : "사용 가능한 쿠폰이 없습니다."}
             </p>
-            <p className="micro">결제 기능 준비 전까지 쿠폰 사용 완료는 처리되지 않아요.</p>
+            <p className="micro">쿠폰은 주문 접수 시 사용 처리되며, 주문 취소 시 복구돼요.</p>
           </div>
           <span className="chip">{user?.coupon ? "사용 가능" : "미보유"}</span>
         </article>
@@ -191,6 +250,7 @@ export function MyPage() {
             <article className="account-panel" key={order.id}>
               <h2>{order.items.map((item) => item.product.name).join(" · ")}</h2>
               <p>{money(order.total)}</p>
+              <OrderActions order={order} />
               <p>
                 {order.recipient} · {order.address}
               </p>
@@ -209,6 +269,8 @@ export function MyPage() {
             컬렉션 둘러보기 →
           </Link>
         </div>
+      ) : tab === "questions" ? (
+        <Questions mine />
       ) : user.role !== "admin" ? (
         <MemberSettings key={`${user.id}:${user.name}:${user.marketing}`} member={user} />
       ) : null}

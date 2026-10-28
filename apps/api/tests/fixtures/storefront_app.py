@@ -332,7 +332,18 @@ async def take_stock(session, product_id, quantity):
     return True
 
 
-async def add_order(session, member_id, priced, snapshots, selection_names, coupon_id, key):
+async def add_order(
+    session,
+    member_id,
+    priced,
+    snapshots,
+    selection_names,
+    coupon_id,
+    key,
+    *,
+    recipient_phone="",
+    delivery_note="",
+):
     items = [
         SavedItem(
             key=line.key,
@@ -362,6 +373,8 @@ async def add_order(session, member_id, priced, snapshots, selection_names, coup
         address=priced.address,
         created_at=datetime.now(UTC),
         status="received",
+        recipient_phone=recipient_phone,
+        delivery_note=delivery_note,
     )
     orders_by_member.setdefault(member_id, []).insert(0, order)
     if key:

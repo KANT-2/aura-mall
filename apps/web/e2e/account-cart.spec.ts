@@ -99,7 +99,7 @@ test("restored prices come from the catalog and a separate browser has an empty 
   const isolated = await browser.newContext();
   try {
     const other = await isolated.newPage();
-    await other.goto("http://127.0.0.1:3100/cart");
+    await other.goto(new URL("/cart", page.url()).href);
     await expect(other.getByRole("heading", { name: "아직 담은 향이 없어요." })).toBeVisible();
   } finally {
     await isolated.close();

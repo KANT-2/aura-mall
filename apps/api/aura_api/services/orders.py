@@ -138,7 +138,15 @@ async def _place(
         }
         coupon_id = coupon.id if priced.use_coupon and coupon else None
         order = await repository.add_order(
-            session, member_id, priced, snapshots, selection_names, coupon_id, key
+            session,
+            member_id,
+            priced,
+            snapshots,
+            selection_names,
+            coupon_id,
+            key,
+            recipient_phone=str(raw.get("recipient_phone", "")).strip(),
+            delivery_note=str(raw.get("delivery_note", "")).strip(),
         )
         if coupon_id and not await repository.use_coupon(session, coupon_id, order.id):
             raise Conflict("COUPON_UNAVAILABLE", "사용할 수 없는 쿠폰이에요.")

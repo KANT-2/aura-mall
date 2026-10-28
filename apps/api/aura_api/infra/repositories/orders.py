@@ -42,6 +42,10 @@ class SavedOrder:
     address: str
     created_at: datetime
     status: str
+    recipient_phone: str = ""
+    delivery_note: str = ""
+    courier: str = ""
+    tracking_number: str = ""
 
 
 @dataclass(frozen=True)
@@ -97,12 +101,17 @@ async def add_order(
     selection_names: dict[str, str],
     coupon_id: uuid.UUID | None,
     idempotency_key: str | None = None,
+    *,
+    recipient_phone: str = "",
+    delivery_note: str = "",
 ) -> SavedOrder:
     """`snapshots[i]` is the product DTO for `priced.lines[i]`."""
     order = Order(
         user_id=user_id,
         idempotency_key=idempotency_key,
         recipient=priced.recipient,
+        recipient_phone=recipient_phone,
+        delivery_note=delivery_note,
         address=priced.address,
         items_amount=priced.items_amount,
         shipping_fee=priced.shipping_fee,
@@ -172,6 +181,10 @@ async def add_order(
         order.address,
         order.created_at,
         order.status,
+        order.recipient_phone,
+        order.delivery_note,
+        order.courier,
+        order.tracking_number,
     )
 
 
@@ -309,6 +322,10 @@ async def _saved(session: AsyncSession, orders: list[Order]) -> list[SavedOrder]
             order.address,
             order.created_at,
             order.status,
+            order.recipient_phone,
+            order.delivery_note,
+            order.courier,
+            order.tracking_number,
         )
         for order in orders
     ]

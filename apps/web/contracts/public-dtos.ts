@@ -15,6 +15,8 @@ import type {
 } from "@/features/admin/model/admin";
 import type { Credentials } from "@/features/account/model/account";
 
+import type { ProductQuestion, QuestionPage } from "@/features/questions/model/question";
+
 type Schemas = components["schemas"];
 type Assert<T extends true> = T;
 type Fits<Actual, Expected> = [Actual] extends [Expected] ? true : false;
@@ -42,6 +44,8 @@ type OrderItemDTO = Omit<Schemas["OrderItemOut"], "product" | "custom"> & {
 type OrderDTO = Omit<Schemas["OrderOut"], "items"> & { items: OrderItemDTO[] };
 
 export type PublicDTOContract = [
+  Assert<Fits<Schemas["QuestionOut"], ProductQuestion>>,
+  Assert<Fits<Schemas["AdminPage_QuestionOut_"], QuestionPage>>,
   Assert<Fits<ProductDTO, Product>>,
   Assert<Fits<CatalogDTO, Catalog>>,
   Assert<Fits<RecipeDTO, Recipe>>,

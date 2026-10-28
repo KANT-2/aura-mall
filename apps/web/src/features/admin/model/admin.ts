@@ -1,3 +1,4 @@
+import type { OrderStatus } from "@/features/checkout/model/order";
 import type { Product } from "@/features/catalog/model/catalog";
 
 /** Admin DTOs are separate from consumer DTOs; never reuse them in public catalog or account APIs. */
@@ -48,6 +49,7 @@ export type StockAdjustmentInput = { version: number; delta: number; reason: str
 
 export type AdminCustomer = { id: string; name: string; email: string };
 export type AdminOrderSummary = {
+  status?: OrderStatus;
   id: string;
   created: string;
   customer: AdminCustomer | null;
@@ -65,7 +67,21 @@ export type AdminOrderItem = {
   quantity: number;
   unitPrice: number | null;
 };
-export type AdminOrder = AdminOrderSummary & { address: string; items: AdminOrderItem[] };
+export type AdminOrder = AdminOrderSummary & {
+  address: string;
+  items: AdminOrderItem[];
+  recipientPhone?: string;
+  deliveryNote?: string;
+  courier?: string;
+  trackingNumber?: string;
+  statusHistory?: {
+    fromStatus: string | null;
+    status: string;
+    actorType: string;
+    reason: string | null;
+    changed: string;
+  }[];
+};
 
 export const inquiryStatuses = ["received", "reviewing", "done"] as const;
 export type InquiryStatus = (typeof inquiryStatuses)[number];
