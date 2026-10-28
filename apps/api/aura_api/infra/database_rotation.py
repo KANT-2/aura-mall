@@ -27,13 +27,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from aura_api.config import Settings
 from aura_api.infra.database import create_engine, create_sessionmaker
+from aura_api.infra.database_errors import DatabaseUnavailable
 
 PROBE = """SELECT current_user, current_setting('transaction_read_only'),
     EXISTS (SELECT FROM pg_stat_ssl WHERE pid=pg_backend_pid() AND ssl)"""
-
-
-class DatabaseUnavailable(RuntimeError):
-    """Public-safe failure: never include a URL or an underlying driver exception."""
 
 
 def version_of(url: str) -> str:

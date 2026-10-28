@@ -149,6 +149,11 @@ jobs:
             fi
             docker compose "${compose_args[@]}" up -d --no-deps --remove-orphans api web
 
+            if test -f .db-ops/state/ha.json; then
+              echo "Updating automatic database failover service..."
+              python3 ops/database.py ha-install
+            fi
+
             echo "Checking all API containers..."
             healthy=false
             for attempt in $(seq 1 12); do

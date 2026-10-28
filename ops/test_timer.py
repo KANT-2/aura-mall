@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from failover import Failover
+
 SOURCE = Path(__file__).resolve().parents[1]
 
 
@@ -24,6 +26,7 @@ class MaintenanceUnitTests(unittest.TestCase):
                     database = module.Database("aura-timer-test")
                     units = module.ROOT / "units"
                     database.write_timer_units(units)
+                    Failover(database).write_unit(units)
                     result = subprocess.run(
                         [
                             "systemd-analyze",
@@ -31,6 +34,7 @@ class MaintenanceUnitTests(unittest.TestCase):
                             "--man=no",
                             str(units / "aura-db-maintenance.service"),
                             str(units / "aura-db-maintenance.timer"),
+                            str(units / "aura-db-failover.service"),
                         ],
                         capture_output=True,
                         text=True,
