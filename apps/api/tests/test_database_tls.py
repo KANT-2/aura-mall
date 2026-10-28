@@ -38,7 +38,7 @@ def test_missing_secret_file_cannot_fall_back_to_an_unconfigured_database(tmp_pa
 def test_libpq_tls_options_are_translated_for_sqlalchemy_asyncpg(monkeypatch):
     context = ssl.create_default_context()
     create_context = Mock(return_value=context)
-    create_engine = Mock()
+    create_engine = Mock(wraps=database.create_async_engine)
     monkeypatch.setattr(database, "create_default_context", create_context)
     monkeypatch.setattr(database, "create_async_engine", create_engine)
     database.create_engine(
@@ -49,7 +49,7 @@ def test_libpq_tls_options_are_translated_for_sqlalchemy_asyncpg(monkeypatch):
     assert url.password == "p@ss"
     assert not url.query
     create_context.assert_called_once_with(cafile="/ca.crt")
-    assert create_engine.call_args.kwargs["connect_args"] == {"ssl": context}
+    assert create_engine.call_args.kwargs["connect_args"] == {"ssl": context, "timeout": 3}
     assert context.check_hostname
     assert context.verify_mode == ssl.CERT_REQUIRED
     assert context.minimum_version == ssl.TLSVersion.TLSv1_2

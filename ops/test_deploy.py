@@ -46,7 +46,7 @@ elif name == "docker":
 
 
 class DeploymentShellTests(unittest.TestCase):
-    def run_deployment(self, *, managed=False, actual_commit=COMMIT):
+    def run_deployment(self, *, managed=False, ha=False, actual_commit=COMMIT):
         workflow = (SOURCE / ".github/workflows/cd.yml").read_text()
         remote = textwrap.dedent(
             workflow.split("<<'REMOTE'\n", 1)[1].rsplit("\n          REMOTE", 1)[0]
@@ -71,6 +71,10 @@ class DeploymentShellTests(unittest.TestCase):
                     "with open(os.environ['AURA_CD_TEST_LOG'],'a') as log:\n"
                     " log.write('operation:' + sys.argv[1] + '\\n')\n"
                 )
+                if ha:
+                    state = root / ".db-ops/state"
+                    state.mkdir()
+                    (state / "ha.json").write_text('{"enabled": true}\n')
             # Keep the shell's backup writes inside this temporary directory.
             remote = remote.replace("$HOME/workspace/aura-backups", "${AURA_CD_TEST_BACKUP_DIR}")
             self.assertNotIn("$HOME", remote)
@@ -117,6 +121,12 @@ class DeploymentShellTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("docker", calls)
         self.assertNotIn("AURA HA deployment completed", result.stdout)
+
+    def test_managed_ha_updates_its_controller_after_deployment(self):
+        result, calls = self.run_deployment(managed=True, ha=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("operation:ha-install", calls)
+        self.assertIn("AURA HA deployment completed", result.stdout)
 
 
 if __name__ == "__main__":

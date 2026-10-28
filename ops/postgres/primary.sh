@@ -1,5 +1,9 @@
 #!/bin/sh
 set -eu
+export AURA_DB_NODE=db
+if [ -e /run/aura-db-state/ha.json ] || [ -e /run/aura-db-state/node-db ]; then
+  exec /bin/sh /opt/aura-postgres/node.sh "$@"
+fi
 # A durable fence also prevents a future `compose up` from starting the former writer.
 if [ -e /run/aura-db-state/fenced-primary ]; then
   if [ -e /run/aura-db-state/rejoin-primary ]; then

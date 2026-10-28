@@ -5,10 +5,11 @@ never commit on their own.
 """
 
 from collections.abc import AsyncIterator
+from socket import gaierror
 from ssl import TLSVersion, create_default_context
 
 from fastapi import Request
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, event
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -17,6 +18,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+
+from aura_api.infra.database_errors import DatabaseUnavailable
 
 # Matches the constraint and index names in db/schema.sql so Alembic comparisons stay clean.
 NAMING_CONVENTION = {
@@ -34,7 +37,7 @@ class Base(DeclarativeBase):
 
 def create_engine(database_url: str) -> AsyncEngine:
     url = make_url(database_url).set(drivername="postgresql+asyncpg")
-    connect_args = {}
+    connect_args = {"timeout": 3}
     # libpq URL options are not keyword arguments accepted by SQLAlchemy's asyncpg dialect.
     # Keep the same verify-full URL usable by psycopg, asyncpg seed and migration tools.
     if "sslmode" in url.query:
@@ -44,7 +47,24 @@ def create_engine(database_url: str) -> AsyncEngine:
         context.minimum_version = TLSVersion.TLSv1_2
         connect_args["ssl"] = context
         url = url.difference_update_query(["sslmode", "sslrootcert"])
-    return create_async_engine(url, connect_args=connect_args, pool_pre_ping=True)
+    engine = create_async_engine(url, connect_args=connect_args, pool_pre_ping=True)
+
+    @event.listens_for(engine.sync_engine, "do_connect")
+    def connect(dialect, record, args, kwargs):
+        try:
+            return dialect.connect(*args, **kwargs)
+        except (ConnectionError, TimeoutError, gaierror):
+            # These exceptions are not DBAPI.Error and bypass SQLAlchemy handle_error.
+            raise DatabaseUnavailable("Database connection is unavailable") from None
+
+    @event.listens_for(engine.sync_engine, "handle_error")
+    def connection_error(context):
+        # asyncpg can raise raw socket/DNS/timeouts outside its DBAPI wrapper.
+        # Normalize only errors from SQLAlchemy, never unrelated service/network calls.
+        if isinstance(context.original_exception, (ConnectionError, TimeoutError, gaierror)):
+            raise DatabaseUnavailable("Database connection is unavailable") from None
+
+    return engine
 
 
 def create_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
